@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,10 @@ def safe_output_name(name: str | None) -> str:
 def safe_asset_path(rel_path: str | None) -> Path | None:
     if not rel_path:
         return None
+    # URL 経由で送られてきたパスは NFC で揃える。クライアント (Mac の Chrome 等) が
+    # NFD のまま URL を送ってくるケースがあり、ディスク上が NFC だと Windows で
+    # 開けなくなる。両端 NFC に正規化することで normalization 由来の事故を防ぐ。
+    rel_path = unicodedata.normalize("NFC", rel_path)
     path = (PROJECT_ROOT / rel_path).resolve()
     root = PROJECT_ROOT.resolve()
     if root not in path.parents and path != root:

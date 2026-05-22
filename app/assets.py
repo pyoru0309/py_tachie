@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import sys
+import unicodedata
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -19,7 +20,15 @@ from .utils import ProjectContext, relative_to_root, slugify_project_id
 _log = app_logger("assets")
 
 
+def to_nfc(value: str) -> str:
+    # macOS の HFS+/APFS は濁点・半濁点を NFD で保存することがある。Windows (NTFS) は
+    # 厳密一致なので NFD ファイルを NFC 名で開けず素材が認識されなくなる。アップロード
+    # 経路 / scan / scenario すべてで NFC に統一して fork を発生させない。
+    return unicodedata.normalize("NFC", value or "")
+
+
 def safe_asset_filename(filename: str) -> str:
+    filename = to_nfc(filename)
     stem = re.sub(r'[\\/:*?"<>|]+', "_", Path(filename).stem).strip(" ._") or "asset"
     suffix = Path(filename).suffix.lower()
     return f"{stem}{suffix}"
@@ -159,8 +168,66 @@ def asset_items(paths: list[Path], prefix: str) -> list[dict[str, str]]:
     return items
 
 
+def migrate_nfc_filenames(root: Path) -> int:
+    # root 配下を recursive walk して、NFD 文字を含むファイル/ディレクトリ名を NFC に
+    # リネームする。Windows (NTFS) との互換のため。UI のアセット管理経由だけでなく
+    # ユーザーが Finder/Explorer から直接ファイルを置く経路もカバーする想定で、
+    # `scan_project_assets` を呼ぶ直前にこれを実行する。idempotent: NFC のみなら no-op。
+    #
+    # macOS APFS は normalization-insensitive matching するので、NFD ファイル A に対して
+    # NFC 名で `new_path.exists()` が True を返す (= 同じディスクエントリを指す)。
+    # この場合は一時名を経由した 2-step rename で強制的にディスク上の表記を変える。
+    # 真に別ファイル (= 別 inode) で衝突している場合のみ WARN+スキップ。
+    if not root.exists():
+        return 0
+    renamed = 0
+    # bottom-up で walk しないと、親ディレクトリを先にリネームすると下層の path が壊れる
+    entries: list[Path] = []
+    for path in root.rglob("*"):
+        entries.append(path)
+    entries.sort(key=lambda p: len(p.parts), reverse=True)
+    for path in entries:
+        try:
+            name = path.name
+            nfc_name = unicodedata.normalize("NFC", name)
+            if name == nfc_name:
+                continue
+            new_path = path.with_name(nfc_name)
+            if new_path.exists():
+                try:
+                    same_entry = path.stat().st_ino == new_path.stat().st_ino
+                except OSError:
+                    same_entry = False
+                if not same_entry:
+                    _log.warning(
+                        "NFC migration skipped (target exists with different inode): %s -> %s",
+                        path,
+                        new_path,
+                    )
+                    continue
+                # 同一 inode = APFS の normalization-insensitive matching。
+                # 一時名経由でリネームしてディスク上の表記を NFC に書き換える。
+                tmp_name = f".__nfc_migrate__{nfc_name}"
+                tmp_path = path.with_name(tmp_name)
+                if tmp_path.exists():
+                    tmp_path = path.with_name(f".__nfc_migrate__{uuid.uuid4().hex}__{nfc_name}")
+                path.rename(tmp_path)
+                tmp_path.rename(new_path)
+            else:
+                path.rename(new_path)
+            renamed += 1
+            _log.info("NFC migration: %s -> %s", name, nfc_name)
+        except OSError as exc:
+            _log.warning("NFC migration failed for %s: %s", path, exc)
+    return renamed
+
+
 def scan_project_assets(ctx: ProjectContext) -> dict[str, list[dict[str, str]]]:
     # AVIF は Pillow 12.x のネイティブ対応。背景/前景/オーバーレイ/キャラ全てで透過保持。
+    # 直前に NFC リネームを走らせて、macOS NFD 名のファイルが Windows で
+    # 認識されないバグを毎回防ぐ。idempotent なので overhead は小さい。
+    migrate_nfc_filenames(ASSETS_DIR)
+    migrate_nfc_filenames(ctx.root / "assets")
     background_exts = ("*.png", "*.jpg", "*.jpeg", "*.webp", "*.avif")
     overlay_exts = ("*.png", "*.webp", "*.avif")
     audio_exts = ("*.wav", "*.mp3", "*.m4a", "*.aac", "*.ogg")

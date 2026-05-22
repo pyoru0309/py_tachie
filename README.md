@@ -124,6 +124,13 @@ v2 描画エンジンと動画書き出しは three.js / mp4box.js を使いま�
 
 日本語フォントも空の状態で配布されます。最低限の日本語表示が必要なら、同じ画面の **Noto Sans JP をインストール** ボタンで `assets/fonts/NotoSansJP/` へ取り込みできます (`notofonts/noto-cjk` リポジトリの static OTF を 7 weight 取得 — Thin / Light / DemiLight / Regular / Medium / Bold / Black。書き出しでも利用可能)。
 
+### 6. 音声読み上げ (TTS) のボイス登録 (任意)
+
+VOICEVOX や Voicepeak で生成されるボイス (キャラクター × 声 × 感情) は、初回起動時に自動では登録されません。
+**全体設定 → 音声読み上げ → 「ボイスを登録」** ボタンを 1 度押すと、ローカルで起動している VOICEVOX / Voicepeak から利用可能なボイスを取得して `app_state/voice_catalog.json` に書き込みます。これでカット編集画面の「声」セレクタから話者を選べるようになります。
+
+ボイス追加・エンジン入れ替え後は同じボタンで再登録できます。
+
 ## ディレクトリ構成
 
 | パス | 役割 |

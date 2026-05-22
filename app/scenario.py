@@ -2,11 +2,19 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
 from .timecode import PROJECT_FPS, sec_to_frames
 from .utils import ProjectContext, current_project, write_project_file
+
+
+def _nfc(value: Any) -> str:
+    # macOS NFD ↔ Windows NFC のずれを scenario レベルで吸収する。
+    # src / background / foreground / audio など、ディスク上の素材を指す
+    # 文字列はすべて NFC で保持する。
+    return unicodedata.normalize("NFC", str(value or ""))
 
 
 ASSET_EXPRESSION_PRESETS_FILENAME = "expression_presets.json"
@@ -1023,12 +1031,12 @@ def normalize_cut_state(state: dict[str, Any], manifest: dict[str, Any]) -> dict
     except (TypeError, ValueError):
         background_color_opacity = 0.0
     normalized = {
-        "background": (
+        "background": _nfc(
             state["background"]
             if "background" in state and isinstance(state["background"], str)
             else defaults.get("background", "")
         ),
-        "foreground": (
+        "foreground": _nfc(
             state["foreground"]
             if "foreground" in state and isinstance(state["foreground"], str)
             else ""
@@ -1086,7 +1094,7 @@ def _normalize_cut(cut: dict[str, Any], index: int, manifest: dict[str, Any]) ->
         "id": str(cut.get("id") or f"cut_{index:03d}"),
         "startFrame": start_frame,  # None なら _fill_cut_start_frame で連番補完
         "durationFrame": duration_frame,
-        "audio": str(cut.get("audio") or ""),
+        "audio": _nfc(cut.get("audio")),
         "state": normalize_cut_state(cut.get("state") or {}, manifest),
     }
 
@@ -1474,7 +1482,7 @@ def _normalize_telop(telop: dict[str, Any], index: int) -> dict[str, Any]:
 def _normalize_video_track(track: Any) -> dict[str, Any] | None:
     if not isinstance(track, dict):
         return None
-    src = str(track.get("src") or "").strip()
+    src = _nfc(track.get("src")).strip()
     if not src:
         return None
     fit = str(track.get("fit") or "cover").lower()
@@ -1508,7 +1516,7 @@ def _normalize_video_track(track: Any) -> dict[str, Any] | None:
 
 
 def _normalize_bgm_track(track: dict[str, Any]) -> dict[str, Any] | None:
-    src = str(track.get("src") or "").strip()
+    src = _nfc(track.get("src")).strip()
     if not src:
         return None
     try:
@@ -1551,7 +1559,7 @@ def _normalize_video_layer(vl: dict[str, Any], index: int) -> dict[str, Any] | N
     - `layer` は `above_bg` / `above_fg` の 2 値のみ。
     - `scale` は 0.05〜4.0 でクランプ (縦横比維持の追加倍率)。
     """
-    src = str(vl.get("src") or "").strip()
+    src = _nfc(vl.get("src")).strip()
     if not src:
         return None
     start_frame = _coerce_frame_field(vl.get("startFrame"), vl.get("startSec")) or 0
@@ -1644,7 +1652,7 @@ def _normalize_sound_effect(se: dict[str, Any], index: int) -> dict[str, Any] | 
       (= ループ反復の境目には掛けない)。
     - 音量は 0.0..2.0 にクランプ (BGM トラックと同じレンジ)。
     """
-    src = str(se.get("src") or "").strip()
+    src = _nfc(se.get("src")).strip()
     if not src:
         return None
     start_frame = _coerce_frame_field(se.get("startFrame"), se.get("startSec")) or 0
