@@ -1,0 +1,90 @@
+/* デザイントークン: 配色・タイポ・余白・シャドウ */
+
+:root {
+  color-scheme: light;
+
+  /* サーフェス階層: bg < surface(panels) < surface-2(elements) < surface-3(hover) */
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --surface-2: #f4f7fa;
+  --surface-3: #e9eef3;
+  --surface-4: #dde4ec;
+
+  /* ボーダー */
+  --border: #d2dae4;
+  --border-strong: #b6c1cc;
+
+  /* テキスト */
+  --fg: #1a1f26;
+  --fg-muted: #5a6470;
+  --fg-faint: #8a939d;
+
+  /* アクセント */
+  --accent: #0f6f69;
+  --accent-fg: #ffffff;
+  --accent-hover: #0a564f;
+  --accent-soft: #d6ecea;
+  --accent-ring: rgba(15, 111, 105, 0.24);
+
+  /* セマンティック */
+  --danger: #b42318;
+  --danger-fg: #ffffff;
+  --danger-hover: #8f1d14;
+  --danger-soft: #fbe6e3;
+  --warn: #b9711d;
+  --ok: #117c43;
+
+  /* シャドウ */
+  --shadow-sm: 0 1px 2px rgba(15, 22, 30, 0.06);
+  --shadow-md: 0 8px 24px rgba(15, 22, 30, 0.10);
+  --shadow-lg: 0 24px 64px rgba(15, 22, 30, 0.18);
+
+  /* 形状 */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+
+  /* タイポグラフィ */
+  --font-jp: "LINE Seed JP", "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+    "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* ダークでは要素を一段ずつ明るく持ち上げる:
+   *   bg(0b0e13) → surface(181d25) → surface-2(232936) → surface-3(2d3441)
+   * パネル内の入力/ボタンは --surface-2 を背景にしてパネルから浮かせる。
+   */
+  --bg: #0b0e13;
+  --surface: #181d25;
+  --surface-2: #232a36;
+  --surface-3: #2e3543;
+  --surface-4: #3a4350;
+
+  /* ボーダーは --surface より明確にブライトに（埋もれ防止） */
+  --border: #3a4453;
+  --border-strong: #525d6e;
+
+  --fg: #e8ecf2;
+  --fg-muted: #9aa3b0;
+  --fg-faint: #6a7280;
+
+  --accent: #5fbab2;
+  --accent-fg: #0a1112;
+  --accent-hover: #4aa8a0;
+  --accent-soft: #1f4744;
+  --accent-ring: rgba(95, 186, 178, 0.32);
+
+  --danger: #ff7773;
+  --danger-fg: #1a0a09;
+  --danger-hover: #e0625e;
+  --danger-soft: #4a2222;
+  --warn: #f5b657;
+  --ok: #6dd28a;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.40);
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.50);
+}

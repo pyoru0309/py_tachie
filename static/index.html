@@ -1,0 +1,2719 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>立ち絵システム py_tachie</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=LINE+Seed+JP:wght@400;700;800&family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/tokens.css?v=20260505-v2-export" />
+    <link rel="stylesheet" href="/static/css/base.css?v=20260505-v2-export" />
+    <link rel="stylesheet" href="/static/css/components.css?v=20260505-v2-export" />
+    <link rel="stylesheet" href="/static/css/layout.css?v=20260505-v2-export" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/",
+          "mp4box": "https://cdn.jsdelivr.net/npm/mp4box@0.5.2/+esm"
+        }
+      }
+    </script>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("splite_anime_theme");
+          var dark = stored
+            ? stored === "dark"
+            : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+        } catch (_) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <section id="projectDashboard" class="project-dashboard">
+      <div class="dashboard-inner">
+        <div class="dashboard-header">
+          <div>
+            <h1>プロジェクト一覧</h1>
+            <p>最近の制作プロジェクトを選択</p>
+          </div>
+          <div class="dashboard-actions">
+            <button id="dashboardCreateProjectButton" type="button">
+              <span class="msym button-icon" aria-hidden="true">add</span>
+              <span>新規プロジェクト</span>
+            </button>
+            <button id="dashboardImportProjectButton" type="button" title="プロジェクトの ZIP アーカイブを取り込みます">
+              <span class="msym button-icon" aria-hidden="true">file_open</span>
+              <span>読み込み</span>
+            </button>
+            <input id="dashboardImportProjectFile" type="file" accept=".zip,application/zip" hidden />
+            <button id="dashboardAssetManagerButton" type="button">
+              <span class="msym button-icon" aria-hidden="true">inventory_2</span>
+              <span>アセット管理</span>
+            </button>
+            <button id="dashboardPsdImporterButton" type="button">
+              <span class="msym button-icon" aria-hidden="true">layers</span>
+              <span>PSDインポータ</span>
+            </button>
+            <button id="dashboardGlobalSettingsButton" type="button">
+              <span class="msym button-icon" aria-hidden="true">settings</span>
+              <span>全体設定</span>
+            </button>
+            <button id="dashboardHelpButton" type="button" title="ヘルプ (docs/) を別タブで開きます">
+              <span class="msym button-icon" aria-hidden="true">help</span>
+              <span>ヘルプ</span>
+            </button>
+            <button id="dashboardCloseButton" type="button">
+              <span class="msym button-icon" aria-hidden="true">arrow_forward</span>
+              <span>編集画面へ</span>
+            </button>
+            <button
+              id="dashboardThemeToggleButton"
+              class="icon-button"
+              type="button"
+              data-theme-toggle
+              aria-label="テーマ切替"
+              title="テーマ切替"
+            >
+              <span class="msym button-icon" aria-hidden="true" data-theme-icon>dark_mode</span>
+            </button>
+          </div>
+        </div>
+        <div class="dashboard-tools">
+          <label>
+            名称フィルタ
+            <input id="projectNameFilterInput" type="search" placeholder="プロジェクト名" />
+          </label>
+          <label>
+            日付フィルタ
+            <input id="projectDateFilterInput" type="date" />
+          </label>
+          <label>
+            並び順
+            <select id="projectSortSelect">
+              <option value="recent">最近開いた順</option>
+              <option value="updated">更新日時順</option>
+              <option value="name">名称順</option>
+              <option value="created">作成日時順</option>
+            </select>
+          </label>
+        </div>
+        <div id="projectGrid" class="project-grid"></div>
+      </div>
+    </section>
+    <main class="app-shell">
+      <section class="workspace">
+        <div class="preview-bar">
+          <div class="top-actions">
+            <button id="openDashboardButton" type="button">
+              <span class="msym button-icon" aria-hidden="true">dashboard</span>
+              <span>プロジェクト一覧</span>
+            </button>
+            <select id="projectSelect" class="project-select" aria-label="プロジェクト"></select>
+            <button id="createProjectButton" type="button">
+              <span class="msym button-icon" aria-hidden="true">add</span>
+              <span>新規</span>
+            </button>
+            <span class="top-actions-divider" aria-hidden="true"></span>
+            <button id="rescanAssetsButton" type="button">
+              <span class="msym button-icon" aria-hidden="true">refresh</span>
+              <span>素材再スキャン</span>
+            </button>
+            <button id="openAssetManagerButton" type="button">
+              <span class="msym button-icon" aria-hidden="true">inventory_2</span>
+              <span>アセット管理</span>
+            </button>
+            <span class="top-actions-divider" aria-hidden="true"></span>
+            <button id="renderButton" class="primary-button" type="button">
+              <span class="msym button-icon" aria-hidden="true">image</span>
+              <span>PNG出力</span>
+            </button>
+            <button id="exportVideoButton" class="primary-button" type="button">
+              <span class="msym button-icon" aria-hidden="true">movie</span>
+              <span>動画出力</span>
+            </button>
+            <button id="manualBackupButton" type="button" title="scenarios/main.json の手動バックアップを取ります（手動バックアップは自動で削除されません）">
+              <span class="msym button-icon" aria-hidden="true">save</span>
+              <span>バックアップ</span>
+            </button>
+            <span class="top-actions-divider" aria-hidden="true"></span>
+            <button id="openSettingsButton" type="button">
+              <span class="msym button-icon" aria-hidden="true">tune</span>
+              <span>設定</span>
+            </button>
+            <button
+              id="themeToggleButton"
+              class="icon-button"
+              type="button"
+              data-theme-toggle
+              aria-label="テーマ切替"
+              title="テーマ切替"
+            >
+              <span class="msym button-icon" aria-hidden="true" data-theme-icon>dark_mode</span>
+            </button>
+          </div>
+        </div>
+        <div class="preview-stage">
+          <div class="preview-frame">
+            <video id="livePreviewVideo" class="live-preview-video" hidden muted playsinline></video>
+            <img id="previewImage" alt="合成プレビュー" />
+            <!-- ライブプレビュー / 静止 still render はすべて WebGL/three.js。 -->
+            <canvas id="livePreviewWebglCanvas" width="1920" height="1080" hidden></canvas>
+            <div id="emptyPreview" class="empty-preview">プレビュー生成中</div>
+          </div>
+        </div>
+        <div class="transport-bar">
+          <button id="seekStartButton" type="button" class="ghost-button compact-action-button" title="再生ヘッドを先頭へ">
+            <span class="msym button-icon" aria-hidden="true">first_page</span>
+          </button>
+          <button id="jumpBack1SecButton" type="button" class="ghost-button compact-action-button" title="再生ヘッドを 1 秒戻す">
+            <span class="msym button-icon" aria-hidden="true">keyboard_double_arrow_left</span>
+          </button>
+          <button id="stepBackPreviewButton" type="button" class="ghost-button compact-action-button" title="再生ヘッドを 1 フレーム戻す">
+            <span class="msym button-icon" aria-hidden="true">chevron_left</span>
+          </button>
+          <button id="togglePreviewButton" type="button" data-play-state="stopped">
+            <span class="msym button-icon" aria-hidden="true">play_arrow</span>
+            <span>再生</span>
+          </button>
+          <button id="stepForwardPreviewButton" type="button" class="ghost-button compact-action-button" title="再生ヘッドを 1 フレーム進める">
+            <span class="msym button-icon" aria-hidden="true">chevron_right</span>
+          </button>
+          <button id="jumpForward1SecButton" type="button" class="ghost-button compact-action-button" title="再生ヘッドを 1 秒進める">
+            <span class="msym button-icon" aria-hidden="true">keyboard_double_arrow_right</span>
+          </button>
+          <button id="seekEndButton" type="button" class="ghost-button compact-action-button" title="再生ヘッドを終端へ">
+            <span class="msym button-icon" aria-hidden="true">last_page</span>
+          </button>
+          <button id="loopModeButton" type="button" class="ghost-button compact-action-button loop-toggle" data-loop-mode="off" title="ループ再生: なし (クリックで カット内 → シーン全体 → なし)">
+            <span class="msym button-icon" aria-hidden="true">repeat</span>
+          </button>
+          <div id="audioMeter" class="audio-meter" title="口パク入力ソースの音量。左端=dbFloor / 右端=dbCeil" aria-label="音量メーター">
+            <div class="audio-meter-track">
+              <div id="audioMeterFill" class="audio-meter-fill"></div>
+              <div id="audioMeterSilence" class="audio-meter-mark silence"></div>
+              <div id="audioMeterOpen" class="audio-meter-mark open"></div>
+              <span id="audioMeterScaleMin" class="audio-meter-scale-tick scale-min" aria-hidden="true">--</span>
+              <span id="audioMeterScaleMax" class="audio-meter-scale-tick scale-max" aria-hidden="true">--</span>
+            </div>
+            <div class="audio-meter-readout-row">
+              <span class="audio-meter-readout">
+                <span id="audioMeterDb" class="audio-meter-db">−∞</span>
+                <span class="audio-meter-unit">dB</span>
+                <span class="audio-meter-readout-sep">/</span>
+                <span class="audio-meter-norm-label">norm</span>
+                <span id="audioMeterNorm" class="audio-meter-norm">0.00</span>
+              </span>
+              <div class="audio-meter-legend">
+                <span class="audio-meter-legend-item"><span class="dot closed"></span>閉</span>
+                <span class="audio-meter-legend-item"><span class="dot mid"></span>中</span>
+                <span class="audio-meter-legend-item"><span class="dot open"></span>開</span>
+              </div>
+            </div>
+          </div>
+          <div id="playbackStatus" class="playback-status">停止中</div>
+          <div id="exportStatus" class="playback-status"></div>
+        </div>
+      </section>
+
+      <aside class="control-panel">
+        <div class="control-tabs" role="tablist" aria-label="編集パネル" data-target="cut">
+          <button class="control-tab active" data-control-tab="character" type="button">
+            <span class="msym button-icon" aria-hidden="true">person</span>
+            <span>キャラ配置</span>
+          </button>
+          <button class="control-tab" data-control-tab="dialog" type="button">
+            <span class="msym button-icon" aria-hidden="true">theater_comedy</span>
+            <span>お芝居</span>
+          </button>
+          <button class="control-tab" data-control-tab="effect" type="button">
+            <span class="msym button-icon" aria-hidden="true">auto_awesome</span>
+            <span>演出</span>
+          </button>
+        </div>
+        <div class="control-tabs control-tabs-telop hidden" data-target="telop">
+          <span class="control-tab active" aria-disabled="true">
+            <span class="msym button-icon" aria-hidden="true">subtitles</span>
+            <span>テロップ編集</span>
+          </span>
+          <button id="closeTelopEditorButton" type="button" class="ghost-button compact-action-button" title="テロップ選択を解除してカット編集に戻す">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>閉じる</span>
+          </button>
+        </div>
+
+        <section class="control-pane" data-control-pane="character">
+          <div class="panel-section">
+            <h2>編集中のキャラクター</h2>
+            <label>
+              <span class="cut-character-label-row">
+                <span>登場キャラ</span>
+                <code id="cutCharacterInstanceId" class="cut-character-instance-id" title="クリックでコピー">—</code>
+              </span>
+              <select id="cutCharacterSelect"></select>
+            </label>
+            <div class="button-row character-actions">
+              <button id="moveCharacterUpButton" type="button">
+                <span class="msym button-icon" aria-hidden="true">arrow_upward</span>
+                <span>前へ</span>
+              </button>
+              <button id="moveCharacterDownButton" type="button">
+                <span class="msym button-icon" aria-hidden="true">arrow_downward</span>
+                <span>後ろへ</span>
+              </button>
+              <button id="deleteCharacterButton" type="button">
+                <span class="msym button-icon" aria-hidden="true">delete</span>
+                <span>削除</span>
+              </button>
+            </div>
+            <div class="inline-fields">
+              <label>
+                X
+                <input id="characterXInput" type="number" step="10" />
+              </label>
+              <label>
+                Y
+                <input id="characterYInput" type="number" step="10" />
+              </label>
+              <label>
+                拡大率
+                <input id="characterScaleInput" type="number" min="0.1" max="2" step="0.01" />
+              </label>
+            </div>
+            <div class="settings-checkboxes character-render-options">
+              <label class="checkbox-row">
+                <input id="characterFlipXInput" type="checkbox" />
+                左右反転
+              </label>
+              <label class="checkbox-row">
+                <input id="characterRemoveWhiteInput" type="checkbox" />
+                白背景を透過扱いにする
+              </label>
+            </div>
+            <div class="button-row button-row-three">
+              <button id="centerCharacterButton" type="button">
+                <span class="msym button-icon" aria-hidden="true">align_horizontal_center</span>
+                <span>左右中央</span>
+              </button>
+              <button id="resetCharacterButton" type="button">
+                <span class="msym button-icon" aria-hidden="true">restart_alt</span>
+                <span>初期位置</span>
+              </button>
+              <button id="applyCharacterToAllCutsButton" type="button" title="このキャラと同じIDのキャラに、X/Y/拡大率/白背景 を一括反映します">
+                <span class="msym button-icon" aria-hidden="true">done_all</span>
+                <span>同一キャラに一括適用</span>
+              </button>
+            </div>
+            <label>
+              ベース
+              <select id="baseSelect"></select>
+            </label>
+            <label>
+              表情プリセット
+              <select id="expressionPresetSelect"></select>
+            </label>
+            <div class="inline-fields">
+              <label>
+                頬
+                <select id="cheekSelect"></select>
+              </label>
+              <label>
+                目
+                <select id="eyeSelect"></select>
+              </label>
+              <label>
+                口
+                <select id="mouthSelect"></select>
+              </label>
+            </div>
+            <div class="hairstyle-row">
+              <label>
+                髪型
+                <select id="hairstylePresetSelect"></select>
+              </label>
+              <label class="checkbox-row hairstyle-eye-above">
+                <input id="eyeAboveBangsInput" type="checkbox" />
+                目を前髪より前に出す
+              </label>
+            </div>
+            <div class="front-objects" id="frontMultiSelect">
+              <div class="front-objects-label">前面オブジェクト</div>
+              <button id="frontMultiSelectTrigger" type="button" class="multi-select-trigger" aria-expanded="false" aria-haspopup="listbox">
+                <div id="frontChips" class="multi-select-chips" aria-live="polite"></div>
+                <span class="msym multi-select-arrow" aria-hidden="true">expand_more</span>
+              </button>
+              <div id="frontList" class="multi-select-popover" hidden>
+                <input id="frontFilter" class="multi-select-filter" type="search" placeholder="絞り込み" autocomplete="off" />
+                <div id="frontOptions" class="multi-select-options" role="listbox" aria-multiselectable="true"></div>
+              </div>
+            </div>
+            <label class="preset-name-field">
+              プリセット名
+              <input id="presetNameInput" type="text" placeholder="通常" />
+            </label>
+            <div class="button-row">
+              <button id="savePresetButton" type="button">
+                <span class="msym button-icon" aria-hidden="true">bookmark_add</span>
+                <span>プリセット保存</span>
+              </button>
+              <button id="deletePresetButton" type="button">
+                <span class="msym button-icon" aria-hidden="true">delete</span>
+                <span>削除</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <h2>キャラを追加</h2>
+            <label>
+              素材キャラ
+              <select id="characterDefinitionSelect"></select>
+            </label>
+            <button id="addCharacterButton" class="wide-button" type="button">
+              <span class="msym button-icon" aria-hidden="true">person_add</span>
+              <span>追加</span>
+            </button>
+          </div>
+
+          <div class="panel-section">
+            <h2>キャラを置換</h2>
+            <p class="asset-hint">
+              配置済みキャラを別キャラに置換します。X / Y / 拡大率 / 前後関係 / 左右反転 / 白透過は保持され、ベース・表情・髪型は新キャラの初期値に戻ります。
+            </p>
+            <label>
+              置換元 (配置済)
+              <select id="replaceCharacterSourceSelect"></select>
+            </label>
+            <label>
+              置換先
+              <select id="replaceCharacterTargetSelect"></select>
+            </label>
+            <label class="checkbox-row">
+              <input id="replaceCharacterDubVoice" type="checkbox" />
+              話者カットの音声を吹き替える (新キャラの声で再合成)
+            </label>
+            <div id="replaceCharacterProgressArea" class="panel-section" hidden>
+              <progress id="replaceCharacterProgress" max="100" value="0"></progress>
+              <p id="replaceCharacterProgressLabel" class="asset-hint" aria-live="polite"></p>
+              <details>
+                <summary>ログを表示</summary>
+                <pre id="replaceCharacterProgressLog" class="asset-hint" style="max-height:160px;overflow:auto;"></pre>
+              </details>
+            </div>
+            <button id="replaceCharacterButton" class="wide-button" type="button">
+              <span class="msym button-icon" aria-hidden="true">swap_horiz</span>
+              <span>置換を実行</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="control-pane hidden" data-control-pane="dialog">
+          <div class="panel-section">
+            <h2>セリフ</h2>
+            <div class="inline-fields audio-duration-row">
+              <label>
+                音声
+                <select id="audioSelect"></select>
+                <input id="audioInput" type="hidden" />
+              </label>
+              <label>
+                表示時間
+                <span class="timecode-spinner">
+                  <input id="durationInput" type="text" inputmode="numeric" pattern="\d{1,3}:\d{1,2}\.\d{1,2}" placeholder="00:03.00" />
+                  <span class="timecode-spinner-buttons" aria-hidden="true">
+                    <button type="button" class="timecode-spinner-btn" data-spinner="up" tabindex="-1" title="+1 frame (Shift で +1秒)">▲</button>
+                    <button type="button" class="timecode-spinner-btn" data-spinner="down" tabindex="-1" title="-1 frame (Shift で -1秒)">▼</button>
+                  </span>
+                </span>
+              </label>
+            </div>
+            <div id="audioPathDisplay" class="asset-path-display">音声未選択</div>
+            <label>
+              話者
+              <select id="speakerCharacterSelect"></select>
+            </label>
+            <div class="dialogue-voice-row">
+              <label>
+                声
+                <select id="dialogueVoiceSelect"></select>
+              </label>
+              <label>
+                感情
+                <select id="dialogueVoiceEmotionSelect"></select>
+              </label>
+              <button id="regenerateDialogueAudioButton" type="button" class="primary-button" disabled>
+                <span class="msym button-icon" aria-hidden="true">graphic_eq</span>
+                <span>音声を再生成</span>
+              </button>
+            </div>
+            <p id="dialogueVoiceHint" class="asset-hint" hidden></p>
+            <textarea id="dialogueInput" rows="4"></textarea>
+            <div class="inline-fields">
+              <label>
+                文字サイズ
+                <input id="fontSizeInput" type="number" min="20" max="120" step="2" />
+              </label>
+              <label>
+                書体
+                <select id="fontFamilySelect"></select>
+              </label>
+              <label>
+                太さ
+                <select id="fontWeightSelect"></select>
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                文字色
+                <span class="color-control">
+                  <input id="cutTextColorInput" type="color" />
+                  <span id="cutTextColorValue" class="color-value">#ffffff</span>
+                </span>
+              </label>
+              <label>
+                アウトライン
+                <input id="cutTextOutlineWidthInput" type="number" min="0" max="12" step="1" />
+              </label>
+              <label>
+                アウトライン色
+                <span class="color-control">
+                  <input id="cutTextOutlineColorInput" type="color" />
+                  <span id="cutTextOutlineColorValue" class="color-value">#666666</span>
+                </span>
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                文字揃え
+                <select id="alignSelect">
+                  <option value="left">左揃え</option>
+                  <option value="center">中央揃え</option>
+                </select>
+              </label>
+              <label>
+                文字間 (px)
+                <input id="cutLetterSpacingInput" type="number" min="-5" max="20" step="0.1" />
+              </label>
+              <label>
+                行間 (px)
+                <input id="cutLineSpacingInput" type="number" min="-20" max="80" step="1" />
+              </label>
+            </div>
+            <div class="character-effect-block">
+              <label class="checkbox-row">
+                <input id="cutDialogueGlowEnabledInput" type="checkbox" />
+                セリフ文字に光彩
+              </label>
+              <div class="inline-fields character-effect-fields">
+                <label>
+                  色
+                  <span class="color-control">
+                    <input id="cutDialogueGlowColorInput" type="color" />
+                    <span id="cutDialogueGlowColorValue" class="color-value">#ffffff</span>
+                  </span>
+                </label>
+                <label>
+                  ぼかし(px)
+                  <input id="cutDialogueGlowBlurInput" type="number" min="0" max="200" step="1" />
+                </label>
+                <label>
+                  強度
+                  <input id="cutDialogueGlowOpacityInput" type="number" min="0" max="1" step="0.05" />
+                </label>
+              </div>
+            </div>
+            <div class="character-effect-block">
+              <label class="checkbox-row">
+                <input id="cutDialogueDropShadowEnabledInput" type="checkbox" />
+                セリフ文字にドロップシャドウ
+              </label>
+              <div class="inline-fields character-effect-fields">
+                <label>
+                  色
+                  <span class="color-control">
+                    <input id="cutDialogueDropShadowColorInput" type="color" />
+                    <span id="cutDialogueDropShadowColorValue" class="color-value">#000000</span>
+                  </span>
+                </label>
+                <label>
+                  ぼかし(px)
+                  <input id="cutDialogueDropShadowBlurInput" type="number" min="0" max="200" step="1" />
+                </label>
+                <label>
+                  強度
+                  <input id="cutDialogueDropShadowOpacityInput" type="number" min="0" max="1" step="0.05" />
+                </label>
+              </div>
+              <div class="inline-fields character-effect-fields">
+                <label>
+                  X 方向
+                  <input id="cutDialogueDropShadowOffsetXInput" type="number" step="1" />
+                </label>
+                <label>
+                  Y 方向
+                  <input id="cutDialogueDropShadowOffsetYInput" type="number" step="1" />
+                </label>
+              </div>
+            </div>
+            <div class="button-row">
+              <button id="applyDialogTextStyleButton" type="button" title="文字サイズ・書体・太さ・文字色・アウトライン・配置・文字間・行間・光彩・ドロップシャドウを、他カットへ一括反映します">
+                <span class="msym button-icon" aria-hidden="true">style</span>
+                <span>文字設定を一括反映</span>
+              </button>
+              <button id="applyDialogTextStyleToSameSpeakerButton" type="button" title="同じ話者(characterId)のカットにのみ、文字設定（セリフ枠は除外）を一括反映します">
+                <span class="msym button-icon" aria-hidden="true">person</span>
+                <span>同一話者に文字設定を一括反映</span>
+              </button>
+            </div>
+            <div class="inline-fields">
+              <label>
+                枠位置
+                <select id="speechPlacementSelect">
+                  <option value="bottom">下</option>
+                  <option value="top">上</option>
+                  <option value="left">左</option>
+                  <option value="right">右</option>
+                  <option value="center">中央</option>
+                </select>
+              </label>
+              <label>
+                行数
+                <select id="linesSelect">
+                  <option value="1">1段</option>
+                  <option value="2">2段</option>
+                </select>
+              </label>
+              <label>
+                帯の濃さ
+                <input id="boxOpacityInput" type="number" min="0" max="1" step="0.1" />
+              </label>
+            </div>
+            <div class="settings-checkboxes">
+              <label class="checkbox-row">
+                <input id="showSpeechBoxInput" type="checkbox" checked />
+                セリフ枠を表示
+              </label>
+              <label class="checkbox-row">
+                <input id="showSpeakerNameInput" type="checkbox" checked />
+                話者名を表示
+              </label>
+              <label class="checkbox-row">
+                <input id="showCharacterInput" type="checkbox" checked />
+                キャラクターを表示
+              </label>
+            </div>
+            <div class="button-row">
+              <button id="applyDialogBoxStyleButton" type="button" title="枠位置・行間・帯の濃さ・セリフ枠表示・話者名表示を、他カットへ一括反映します">
+                <span class="msym button-icon" aria-hidden="true">view_quilt</span>
+                <span>文字枠を一括設定</span>
+              </button>
+            </div>
+          </div>
+
+        </section>
+
+        <section class="control-pane hidden" data-control-pane="effect">
+          <div class="panel-section">
+            <h2>背景・場面</h2>
+            <div class="inline-fields">
+              <label>
+                モーション
+                <select id="motionTypeSelect">
+                  <option value="none">なし</option>
+                  <option value="shake_x">横シェイク</option>
+                  <option value="shake_y">縦シェイク</option>
+                  <option value="zoom">拡大</option>
+                </select>
+              </label>
+              <label>
+                前景
+                <select id="foregroundSelect"></select>
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                背景
+                <select id="backgroundSelect"></select>
+              </label>
+              <label>
+                背景ぼかし(px)
+                <input id="backgroundBlurPxInput" type="number" min="0" max="200" step="1" />
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                背景色
+                <span class="color-control">
+                  <input id="backgroundColorInput" type="color" />
+                  <span id="backgroundColorValue" class="color-value">#000000</span>
+                </span>
+              </label>
+              <label>
+                背景色 不透明度
+                <input id="backgroundColorOpacityInput" type="number" min="0" max="1" step="0.05" />
+              </label>
+            </div>
+            <p class="asset-hint">背景画像が未指定のときに表示される色です（既定は完全透明）。背景画像を指定するとそちらが優先されます。</p>
+            <div class="button-row">
+              <button id="applyEffectSceneToAllCutsButton" type="button" title="モーション・背景・背景ぼかし・背景色・前景を、他カットへ一括反映します">
+                <span class="msym button-icon" aria-hidden="true">done_all</span>
+                <span>背景・場面を一括適用</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <h2>キャラクター</h2>
+            <p class="asset-hint">このカットに登場するキャラクター全員に適用されます</p>
+            <div class="character-effect-block">
+              <label class="checkbox-row">
+                <input id="characterColorFilterEnabledInput" type="checkbox" />
+                色フィルター（乗算）
+              </label>
+              <div class="inline-fields character-effect-fields">
+                <label>
+                  色
+                  <span class="color-control">
+                    <input id="characterColorFilterColorInput" type="color" />
+                    <span id="characterColorFilterColorValue" class="color-value">#ffe8f9</span>
+                  </span>
+                </label>
+                <label>
+                  強度
+                  <input id="characterColorFilterOpacityInput" type="number" min="0" max="1" step="0.05" />
+                </label>
+              </div>
+            </div>
+
+            <div class="character-effect-block">
+              <label class="checkbox-row">
+                <input id="characterGlowEnabledInput" type="checkbox" />
+                光彩
+              </label>
+              <div class="inline-fields character-effect-fields">
+                <label>
+                  色
+                  <span class="color-control">
+                    <input id="characterGlowColorInput" type="color" />
+                    <span id="characterGlowColorValue" class="color-value">#ffffff</span>
+                  </span>
+                </label>
+                <label>
+                  ぼかし(px)
+                  <input id="characterGlowBlurInput" type="number" min="0" max="200" step="1" />
+                </label>
+                <label>
+                  強度
+                  <input id="characterGlowOpacityInput" type="number" min="0" max="1" step="0.05" />
+                </label>
+              </div>
+            </div>
+
+            <div class="character-effect-block">
+              <label class="checkbox-row">
+                <input id="characterDropShadowEnabledInput" type="checkbox" />
+                ドロップシャドウ
+              </label>
+              <div class="inline-fields character-effect-fields">
+                <label>
+                  色
+                  <span class="color-control">
+                    <input id="characterDropShadowColorInput" type="color" />
+                    <span id="characterDropShadowColorValue" class="color-value">#000000</span>
+                  </span>
+                </label>
+                <label>
+                  ぼかし(px)
+                  <input id="characterDropShadowBlurInput" type="number" min="0" max="200" step="1" />
+                </label>
+                <label>
+                  強度
+                  <input id="characterDropShadowOpacityInput" type="number" min="0" max="1" step="0.05" />
+                </label>
+              </div>
+              <div class="inline-fields character-effect-fields">
+                <label>
+                  X 方向
+                  <input id="characterDropShadowOffsetXInput" type="number" step="1" />
+                </label>
+                <label>
+                  Y 方向
+                  <input id="characterDropShadowOffsetYInput" type="number" step="1" />
+                </label>
+              </div>
+            </div>
+            <div class="button-row">
+              <button id="applyEffectCharacterToAllCutsButton" type="button" title="色フィルター・光彩・ドロップシャドウを、他カットへ一括反映します">
+                <span class="msym button-icon" aria-hidden="true">done_all</span>
+                <span>キャラクター効果を一括適用</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="control-pane hidden" data-control-pane="telop">
+          <div class="panel-section">
+            <div id="telopEditorEmpty" class="panel-empty" hidden>テロップが選択されていません。</div>
+            <div id="telopEditorPanel" class="telop-editor-panel"></div>
+          </div>
+        </section>
+
+        <section class="control-pane hidden" data-control-pane="soundEffect">
+          <div class="panel-section">
+            <div id="soundEffectEditorEmpty" class="panel-empty" hidden>効果音が選択されていません。</div>
+            <div id="soundEffectEditorPanel" class="sound-effect-editor-panel"></div>
+          </div>
+        </section>
+
+        <section class="control-pane hidden" data-control-pane="videoLayer">
+          <div class="panel-section">
+            <div id="videoLayerEditorEmpty" class="panel-empty" hidden>動画レイヤーが選択されていません。</div>
+            <div id="videoLayerEditorPanel" class="video-layer-editor-panel"></div>
+          </div>
+        </section>
+      </aside>
+
+      <section class="timeline-dock">
+        <div class="timeline-header">
+          <div class="timeline-toolbar">
+            <button id="timelineZoomOutButton" type="button" class="ghost-button compact-action-button" title="ズームアウト">
+              <span class="msym button-icon" aria-hidden="true">zoom_out</span>
+            </button>
+            <span id="timelineZoomLabel" class="timeline-zoom-label" aria-live="polite">100 px/s</span>
+            <button id="timelineZoomInButton" type="button" class="ghost-button compact-action-button" title="ズームイン">
+              <span class="msym button-icon" aria-hidden="true">zoom_in</span>
+            </button>
+            <span id="timelinePlayheadInfo" class="timeline-playhead-info" aria-live="polite" tabindex="0" role="button" title="ダブルクリックで再生ヘッドを移動 (MM:SS.FF)">00:00.00 / 0f</span>
+          </div>
+          <button id="openSceneDialogButton" type="button" class="ghost-button" style="margin-left:auto">
+            <span class="msym button-icon" aria-hidden="true">movie</span>
+            <span>シーン設定</span>
+          </button>
+          <button id="linkToggleButton" type="button" class="ghost-button" title="選択中のテロップ/効果音/動画レイヤーを再生位置のカットへリンク (再度押すと解除)" disabled>
+            <span class="msym button-icon" id="linkToggleIcon" aria-hidden="true">link</span>
+            <span id="linkToggleLabel">カットへリンク</span>
+          </button>
+          <button id="duplicateSelectedCutsButton" type="button" class="ghost-button" title="選択カットを複製">
+            <span class="msym button-icon" aria-hidden="true">content_copy</span>
+            <span>選択カットを複製</span>
+          </button>
+          <button id="deleteSelectedCutsButton" type="button" class="ghost-button" title="選択カットを削除">
+            <span class="msym button-icon" aria-hidden="true">delete</span>
+            <span>選択カットを削除</span>
+          </button>
+          <button id="splitCutAtPlayheadButton" type="button" class="ghost-button" title="再生位置でカットを 2 つに分割します（後半は音声・セリフ空）">
+            <span class="msym button-icon" aria-hidden="true">content_cut</span>
+            <span>再生位置でカット分割</span>
+          </button>
+          <button id="openAddCutBatchDialogButton" type="button" class="ghost-button">
+            <span class="msym button-icon" aria-hidden="true">playlist_add</span>
+            <span>カットを一括追加</span>
+          </button>
+          <div class="dropdown-button" id="addItemDropdown">
+            <button type="button" class="ghost-button" id="addItemDropdownTrigger" aria-haspopup="menu" aria-expanded="false">
+              <span class="msym button-icon" aria-hidden="true">add</span>
+              <span>アイテムを追加</span>
+              <span class="msym button-icon dropdown-caret" aria-hidden="true">expand_more</span>
+            </button>
+            <div class="dropdown-menu" role="menu" hidden>
+              <button id="addTelopButton" type="button" role="menuitem" class="dropdown-menu-item">
+                <span class="msym button-icon" aria-hidden="true">subtitles</span>
+                <span>テロップ</span>
+              </button>
+              <button id="addPosterTemplateButton" type="button" role="menuitem" class="dropdown-menu-item">
+                <span class="msym button-icon" aria-hidden="true">style</span>
+                <span>テンプレートからテロップ</span>
+              </button>
+              <button id="addSoundEffectButton" type="button" role="menuitem" class="dropdown-menu-item">
+                <span class="msym button-icon" aria-hidden="true">graphic_eq</span>
+                <span>効果音</span>
+              </button>
+              <button id="addVideoLayerButton" type="button" role="menuitem" class="dropdown-menu-item">
+                <span class="msym button-icon" aria-hidden="true">movie</span>
+                <span>動画</span>
+              </button>
+              <button id="openTitleEditorButton" type="button" role="menuitem" class="dropdown-menu-item" title="タイトル組版エディタで PNG を作成し、前景アセットとして取り込めます">
+                <span class="msym button-icon" aria-hidden="true">title</span>
+                <span>タイトル</span>
+              </button>
+            </div>
+          </div>
+          <button id="addTelopBatchButton" type="button" class="ghost-button">
+            <span class="msym button-icon" aria-hidden="true">format_list_bulleted</span>
+            <span>テロップ一括追加</span>
+          </button>
+        </div>
+        <div id="cutList" class="cut-list"></div>
+        <div id="timelineContainer" class="timeline-container" aria-label="シーンタイムライン">
+          <div id="timelineScroll" class="timeline-scroll">
+            <div id="timelineSpacer" class="timeline-spacer" aria-hidden="true"></div>
+            <canvas id="telopTrackCanvas" class="timeline-canvas" tabindex="0" aria-label="テロップ配置タイムライン"></canvas>
+          </div>
+        </div>
+      </section>
+    </main>
+    <dialog id="sceneDialog" class="settings-dialog scene-dialog">
+      <form method="dialog" class="settings-panel" id="sceneForm">
+        <div class="dialog-header">
+          <div>
+            <h2>シーン設定</h2>
+            <p>背景動画・BGM・テンポ等のシーン全体に対する設定</p>
+          </div>
+        </div>
+        <div class="dialog-body">
+          <div class="form-tabs" role="tablist" aria-label="シーン設定カテゴリ">
+            <button type="button" class="form-tab active" data-scene-tab="basic" role="tab" aria-selected="true">
+              <span class="msym button-icon" aria-hidden="true">tune</span>
+              <span>基本</span>
+            </button>
+            <button type="button" class="form-tab" data-scene-tab="motion" role="tab" aria-selected="false">
+              <span class="msym button-icon" aria-hidden="true">animation</span>
+              <span>体の揺れ</span>
+            </button>
+            <button type="button" class="form-tab" data-scene-tab="video" role="tab" aria-selected="false">
+              <span class="msym button-icon" aria-hidden="true">movie</span>
+              <span>背景動画</span>
+            </button>
+            <button type="button" class="form-tab" data-scene-tab="bgm" role="tab" aria-selected="false">
+              <span class="msym button-icon" aria-hidden="true">music_note</span>
+              <span>BGM</span>
+            </button>
+            <button type="button" class="form-tab" data-scene-tab="visualizer" role="tab" aria-selected="false">
+              <span class="msym button-icon" aria-hidden="true">graphic_eq</span>
+              <span>ビジュアライザ</span>
+            </button>
+          </div>
+
+          <section class="form-tab-panel" data-scene-tab-panel="basic">
+            <label>
+              タイトル
+              <input id="sceneTitleInput" type="text" />
+            </label>
+            <label>
+              テンポ (BPM)
+              <input id="sceneBpmInput" type="number" min="0" step="1" placeholder="未指定" />
+            </label>
+          </section>
+
+          <section class="form-tab-panel hidden" data-scene-tab-panel="motion">
+            <p class="asset-hint">全キャラのベース＋前髪を含めた立ち絵全体を Y 軸に揺らします。0 で無効。</p>
+            <div class="inline-fields">
+              <label>
+                呼吸の振幅 (px)
+                <input id="sceneBreathAmplitudeInput" type="number" min="0" max="40" step="1" />
+              </label>
+              <label>
+                呼吸の周期 (秒)
+                <input id="sceneBreathPeriodInput" type="number" min="0.5" max="20" step="0.1" />
+              </label>
+              <label>
+                BPMボブ振幅 (px)
+                <input id="sceneBpmBobAmplitudeInput" type="number" min="0" max="40" step="1" />
+              </label>
+            </div>
+          </section>
+
+          <section class="form-tab-panel hidden" data-scene-tab-panel="video">
+            <label class="checkbox-row">
+              <input id="sceneVideoEnabledInput" type="checkbox" />
+              背景動画を使用する
+            </label>
+            <div id="sceneVideoFields" class="scene-video-fields" hidden>
+              <label>
+                ソース
+                <select id="sceneVideoSrcSelect"></select>
+              </label>
+              <p class="asset-hint">アセット管理の「動画」に追加した素材から選択できます</p>
+              <div class="inline-fields">
+                <label>
+                  フィット
+                  <select id="sceneVideoFitSelect">
+                    <option value="cover">cover</option>
+                    <option value="contain">contain</option>
+                    <option value="fill">fill</option>
+                  </select>
+                </label>
+                <label>
+                  ループ
+                  <select id="sceneVideoLoopSelect">
+                    <option value="loop">繰り返し</option>
+                    <option value="stretch">伸縮</option>
+                    <option value="freeze_last_frame">最終フレーム停止</option>
+                  </select>
+                </label>
+                <label>
+                  再生速度
+                  <input id="sceneVideoSpeedInput" type="number" min="0.05" step="0.05" />
+                </label>
+              </div>
+              <div class="inline-fields">
+                <label>
+                  トリム開始(s)
+                  <input id="sceneVideoTrimStartInput" type="number" min="0" step="0.1" />
+                </label>
+                <label>
+                  トリム終了(s)
+                  <input id="sceneVideoTrimEndInput" type="number" min="0" step="0.1" placeholder="末尾まで" />
+                </label>
+                <label class="checkbox-row">
+                  <input id="sceneVideoMutedInput" type="checkbox" />
+                  動画の音声をミュート
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="form-tab-panel hidden" data-scene-tab-panel="bgm">
+            <div id="sceneBgmList" class="scene-bgm-list" aria-live="polite"></div>
+            <div class="dialog-actions">
+              <button type="button" id="addSceneBgmButton">
+                <span class="msym button-icon" aria-hidden="true">add</span>
+                <span>BGM を追加</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="form-tab-panel hidden" data-scene-tab-panel="visualizer">
+            <p class="asset-hint">背景の上、キャラクターの下に重なります。プラグインは plugins/visualizers/*.py に追加できます</p>
+            <label class="checkbox-row">
+              <input id="sceneVisualizerEnabledInput" type="checkbox" />
+              ビジュアライザを表示
+            </label>
+            <div class="inline-fields">
+              <label>
+                プラグイン
+                <select id="sceneVisualizerPluginSelect"></select>
+              </label>
+              <label>
+                音源 (BGM トラック)
+                <select id="sceneVisualizerAudioSelect">
+                  <option value="">音源なし (時間駆動のみ)</option>
+                </select>
+              </label>
+              <label>
+                重なり位置
+                <select id="sceneVisualizerLayerSelect">
+                  <option value="above_bg">背景の上 (キャラの下)</option>
+                  <option value="above_chars">キャラの上 (前景の下)</option>
+                  <option value="above_fg">前景の上 (セリフの下)</option>
+                </select>
+              </label>
+            </div>
+            <div id="sceneVisualizerParamsContainer" class="visualizer-params-container"></div>
+          </section>
+        </div>
+        <div class="dialog-footer">
+          <button type="button" id="closeSceneDialogButton">閉じる</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="settingsDialog" class="settings-dialog">
+      <form method="dialog" class="settings-panel">
+        <div class="dialog-header">
+          <div>
+            <h2>設定</h2>
+            <p>動画書き出しや口パク解析の共通設定</p>
+          </div>
+        </div>
+        <div class="settings-layout">
+          <div class="settings-tabs settings-tabs-vertical" role="tablist" aria-label="設定カテゴリ">
+            <button class="settings-tab active" data-tab="text" type="button">
+              <span class="msym button-icon" aria-hidden="true">text_fields</span>
+              <span>お芝居（文字）</span>
+            </button>
+            <button class="settings-tab" data-tab="speech" type="button">
+              <span class="msym button-icon" aria-hidden="true">format_quote</span>
+              <span>お芝居（セリフ枠）</span>
+            </button>
+            <button class="settings-tab" data-tab="motion" type="button">
+              <span class="msym button-icon" aria-hidden="true">theater_comedy</span>
+              <span>演出</span>
+            </button>
+            <button class="settings-tab" data-tab="telop" type="button">
+              <span class="msym button-icon" aria-hidden="true">subtitles</span>
+              <span>テロップ</span>
+            </button>
+            <button class="settings-tab" data-tab="animation" type="button">
+              <span class="msym button-icon" aria-hidden="true">animation</span>
+              <span>動画</span>
+            </button>
+            <button class="settings-tab" data-tab="lipsync" type="button">
+              <span class="msym button-icon" aria-hidden="true">graphic_eq</span>
+              <span>口パク解析</span>
+            </button>
+            <button class="settings-tab" data-tab="backup" type="button">
+              <span class="msym button-icon" aria-hidden="true">restore</span>
+              <span>バックアップ</span>
+            </button>
+          </div>
+          <div class="settings-content">
+            <div class="settings-groups">
+              <section class="settings-group" data-tab-panel="text">
+                <div class="settings-grid">
+                  <label>
+                    デフォルト書体
+                    <select id="defaultFontFamilySelect"></select>
+                  </label>
+                  <label>
+                    デフォルト太さ
+                    <select id="defaultFontWeightSelect"></select>
+                  </label>
+                  <label>
+                    デフォルト文字サイズ
+                    <input id="defaultFontSizeInput" type="number" min="20" max="120" step="2" />
+                  </label>
+                  <label>
+                    デフォルト文字色
+                    <span class="color-control">
+                      <input id="textColorInput" type="color" />
+                      <span id="textColorValue" class="color-value">#ffffff</span>
+                    </span>
+                  </label>
+                  <label>
+                    デフォルトアウトライン
+                    <input id="textOutlineWidthInput" type="number" min="0" max="12" step="1" />
+                  </label>
+                  <label>
+                    デフォルトアウトライン色
+                    <span class="color-control">
+                      <input id="textOutlineColorInput" type="color" />
+                      <span id="textOutlineColorValue" class="color-value">#666666</span>
+                    </span>
+                  </label>
+                  <label>
+                    文字間 (1/1000em)
+                    <input id="defaultLetterSpacingInput" type="number" min="-500" max="1000" step="100" />
+                  </label>
+                </div>
+                <fieldset class="optical-kerning-fieldset">
+                  <legend>オプティカルカーニング</legend>
+                  <label class="radio-row">
+                    <input type="radio" name="defaultOpticalKerningMode" value="off" />
+                    OFF
+                  </label>
+                  <label class="radio-row">
+                    <input type="radio" name="defaultOpticalKerningMode" value="standard" />
+                    標準（控えめに詰める）
+                  </label>
+                  <label class="radio-row">
+                    <input type="radio" name="defaultOpticalKerningMode" value="high" />
+                    強め（字面ぎりぎりまで詰める）
+                  </label>
+                </fieldset>
+                <div class="character-effect-block">
+                  <label class="checkbox-row">
+                    <input id="defaultDialogueGlowEnabledInput" type="checkbox" />
+                    セリフ文字の光彩
+                  </label>
+                  <div class="inline-fields character-effect-fields">
+                    <label>
+                      色
+                      <span class="color-control">
+                        <input id="defaultDialogueGlowColorInput" type="color" />
+                        <span id="defaultDialogueGlowColorValue" class="color-value">#ffffff</span>
+                      </span>
+                    </label>
+                    <label>
+                      ぼかし(px)
+                      <input id="defaultDialogueGlowBlurInput" type="number" min="0" max="200" step="1" />
+                    </label>
+                    <label>
+                      強度
+                      <input id="defaultDialogueGlowOpacityInput" type="number" min="0" max="1" step="0.05" />
+                    </label>
+                  </div>
+                </div>
+                <div class="character-effect-block">
+                  <label class="checkbox-row">
+                    <input id="defaultDialogueDropShadowEnabledInput" type="checkbox" />
+                    セリフ文字のドロップシャドウ
+                  </label>
+                  <div class="inline-fields character-effect-fields">
+                    <label>
+                      色
+                      <span class="color-control">
+                        <input id="defaultDialogueDropShadowColorInput" type="color" />
+                        <span id="defaultDialogueDropShadowColorValue" class="color-value">#000000</span>
+                      </span>
+                    </label>
+                    <label>
+                      ぼかし(px)
+                      <input id="defaultDialogueDropShadowBlurInput" type="number" min="0" max="200" step="1" />
+                    </label>
+                    <label>
+                      強度
+                      <input id="defaultDialogueDropShadowOpacityInput" type="number" min="0" max="1" step="0.05" />
+                    </label>
+                  </div>
+                  <div class="inline-fields character-effect-fields">
+                    <label>
+                      X 方向
+                      <input id="defaultDialogueDropShadowOffsetXInput" type="number" step="1" />
+                    </label>
+                    <label>
+                      Y 方向
+                      <input id="defaultDialogueDropShadowOffsetYInput" type="number" step="1" />
+                    </label>
+                  </div>
+                </div>
+              </section>
+              <section class="settings-group hidden" data-tab-panel="speech">
+                <div id="speechPreview" class="speech-preview" aria-hidden="true">
+                  <div class="speech-preview-band">
+                    <div class="speech-preview-speaker">話者</div>
+                    <div class="speech-preview-line">セリフのサンプルテキスト</div>
+                  </div>
+                </div>
+                <div class="settings-grid">
+              <label>
+                デフォルト帯の濃さ
+                <input id="defaultBoxOpacityInput" type="number" min="0" max="1" step="0.1" />
+              </label>
+              <label>
+                ボーダー太さ
+                <input id="boxBorderWidthInput" type="number" min="0" max="100" step="1" />
+              </label>
+              <label>
+                ボーダー色
+                <span class="color-control">
+                  <input id="boxBorderColorInput" type="color" />
+                  <span id="boxBorderColorValue" class="color-value">#ffffff</span>
+                </span>
+              </label>
+              <label>
+                背景色
+                <span class="color-control">
+                  <input id="boxBackgroundColorInput" type="color" />
+                  <span id="boxBackgroundColorValue" class="color-value">#14181c</span>
+                </span>
+              </label>
+              <label>
+                装飾画像
+                <select id="boxOverlayImageSelect"></select>
+              </label>
+              <label>
+                セリフXオフセット
+                <input id="speechOffsetXInput" type="number" min="0" max="1920" step="1" />
+              </label>
+              <label>
+                セリフYオフセット
+                <input id="speechOffsetYInput" type="number" min="0" max="1080" step="1" />
+              </label>
+              <label>
+                セリフ枠余白X
+                <input id="speechPaddingXInput" type="number" min="0" max="400" step="1" />
+              </label>
+              <label>
+                セリフ枠余白Y
+                <input id="speechPaddingYInput" type="number" min="0" max="200" step="1" />
+              </label>
+              <label>
+                行間 (px)
+                <input id="lineGapInput" type="number" min="0" max="120" step="1" />
+              </label>
+              <label>
+                話者名サイズ
+                <input id="speakerNameFontSizeInput" type="number" min="12" max="80" step="1" />
+              </label>
+              <label>
+                非話者の暗さ
+                <input id="inactiveCharacterOpacityInput" type="number" min="0" max="0.9" step="0.05" />
+              </label>
+              <label>
+                角丸 左上 (px)
+                <input id="boxBorderRadiusTLInput" type="number" min="0" max="500" step="1" />
+              </label>
+              <label>
+                角丸 右上 (px)
+                <input id="boxBorderRadiusTRInput" type="number" min="0" max="500" step="1" />
+              </label>
+              <label>
+                角丸 左下 (px)
+                <input id="boxBorderRadiusBLInput" type="number" min="0" max="500" step="1" />
+              </label>
+              <label>
+                角丸 右下 (px)
+                <input id="boxBorderRadiusBRInput" type="number" min="0" max="500" step="1" />
+              </label>
+            </div>
+            <div class="settings-checkboxes">
+              <label class="checkbox-row">
+                <input id="defaultShowSpeakerNameInput" type="checkbox" checked />
+                話者名を表示（デフォルト）
+              </label>
+            </div>
+          </section>
+          <section class="settings-group hidden" data-tab-panel="animation">
+            <h3>動画・アニメーション</h3>
+            <div class="settings-grid">
+              <label>
+                キャラクターアニメーションのコマ数
+                <select id="characterAnimationFpsInput">
+                  <option value="8">8</option>
+                  <option value="12">12（既定）</option>
+                  <option value="24">24</option>
+                </select>
+                <p class="asset-hint">体の揺れ・目パチ・口パクのフレーム量子化に使います。書き出し fps と独立して動作します（プロジェクトの基準は 24fps 固定）。</p>
+              </label>
+            </div>
+            <div class="settings-checkboxes">
+              <label class="checkbox-row">
+                <input id="blinkInput" type="checkbox" checked />
+                目パチ
+              </label>
+              <label class="checkbox-row">
+                <input id="lipSyncInput" type="checkbox" checked />
+                口パク
+              </label>
+            </div>
+            <div class="settings-grid">
+              <label>
+                目パチ方式
+                <select id="blinkAlgorithmSelect">
+                  <option value="anime">アニメ方式（既定）</option>
+                  <option value="uniform">均等方式</option>
+                </select>
+                <p class="asset-hint">アニメ方式: 「開き → 閉じ → 中 → 開き」のスナップ閉じ + 段階開き。均等方式: 各フレーム fps で均等な短い目パチ（中目なしのキャラはより短くなります）。</p>
+              </label>
+            </div>
+          </section>
+          <section class="settings-group hidden" data-tab-panel="lipsync">
+            <h3>口パク解析</h3>
+            <div class="settings-grid">
+              <label>
+                無音判定
+                <input id="lipSilenceInput" type="number" min="0" max="1" step="0.01" />
+              </label>
+              <label>
+                開き判定
+                <input id="lipOpenInput" type="number" min="0" max="1" step="0.01" />
+              </label>
+              <label>
+                RMS下限 dB
+                <input id="lipDbFloorInput" type="number" min="-100" max="0" step="1" />
+              </label>
+              <label>
+                RMS上限 dB
+                <input id="lipDbCeilInput" type="number" min="-100" max="0" step="1" />
+              </label>
+              <label>
+                スムージング
+                <input id="lipSmoothingInput" type="number" min="0" max="0.45" step="0.01" />
+              </label>
+            </div>
+          </section>
+          <section class="settings-group hidden" data-tab-panel="motion">
+            <h3>モーション</h3>
+            <p class="asset-hint">シーンの「モーション」で選択した動作のパラメータ。話者キャラに対して適用されます</p>
+            <h4 class="motion-subhead">横シェイク</h4>
+            <div class="settings-grid">
+              <label>
+                移動量 (px)
+                <input id="motionShakeXAmplitudeInput" type="number" min="10" max="100" step="10" />
+              </label>
+              <label>
+                回数
+                <input id="motionShakeXCountInput" type="number" min="1" max="20" step="1" />
+              </label>
+              <label>
+                速さ (秒)
+                <input id="motionShakeXDurationInput" type="number" min="0.5" max="2" step="0.1" />
+              </label>
+            </div>
+            <h4 class="motion-subhead">縦シェイク</h4>
+            <div class="settings-grid">
+              <label>
+                移動量 (px)
+                <input id="motionShakeYAmplitudeInput" type="number" min="10" max="100" step="10" />
+              </label>
+              <label>
+                回数
+                <input id="motionShakeYCountInput" type="number" min="1" max="20" step="1" />
+              </label>
+              <label>
+                速さ (秒)
+                <input id="motionShakeYDurationInput" type="number" min="0.5" max="2" step="0.1" />
+              </label>
+            </div>
+            <h4 class="motion-subhead">拡大</h4>
+            <div class="settings-grid">
+              <label>
+                倍率
+                <input id="motionZoomScaleInput" type="number" min="1.1" max="2" step="0.1" />
+              </label>
+              <label>
+                原点
+                <select id="motionZoomOriginSelect">
+                  <option value="center">中央</option>
+                  <option value="bottom">下</option>
+                  <option value="top">上</option>
+                </select>
+              </label>
+            </div>
+          </section>
+          <section class="settings-group hidden" data-tab-panel="telop">
+            <h3>テロップ既定値</h3>
+            <p class="asset-hint">「テロップを追加」「テロップ一括追加」で新規作成するテロップに使われるデフォルトです（既存テロップは変更されません）。</p>
+            <div class="settings-grid">
+              <label>
+                書体
+                <select id="telopDefaultFontFamilySelect"></select>
+              </label>
+              <label>
+                太さ
+                <select id="telopDefaultFontWeightSelect"></select>
+              </label>
+              <label>
+                文字サイズ (px)
+                <input id="telopDefaultFontSizeInput" type="number" min="20" max="160" step="2" />
+              </label>
+              <label>
+                文字色
+                <span class="color-control">
+                  <input id="telopDefaultColorInput" type="color" />
+                  <span id="telopDefaultColorValue" class="color-value">#ffffff</span>
+                </span>
+              </label>
+              <label>
+                アウトライン (px)
+                <input id="telopDefaultOutlineWidthInput" type="number" min="0" max="20" step="1" />
+              </label>
+              <label>
+                アウトライン色
+                <span class="color-control">
+                  <input id="telopDefaultOutlineColorInput" type="color" />
+                  <span id="telopDefaultOutlineColorValue" class="color-value">#000000</span>
+                </span>
+              </label>
+              <label>
+                文字間 (1/1000em)
+                <input id="telopDefaultLetterSpacingInput" type="number" min="-500" max="1000" step="100" />
+              </label>
+              <label>
+                行間 (px)
+                <input id="telopDefaultLineSpacingInput" type="number" min="-20" max="80" step="1" />
+              </label>
+            </div>
+            <fieldset class="optical-kerning-fieldset">
+              <legend>オプティカルカーニング</legend>
+              <label class="radio-row">
+                <input type="radio" name="telopDefaultOpticalKerningMode" value="off" />
+                OFF
+              </label>
+              <label class="radio-row">
+                <input type="radio" name="telopDefaultOpticalKerningMode" value="standard" />
+                標準（控えめに詰める）
+              </label>
+              <label class="radio-row">
+                <input type="radio" name="telopDefaultOpticalKerningMode" value="high" />
+                強め（字面ぎりぎりまで詰める）
+              </label>
+            </fieldset>
+            <h4 class="motion-subhead">光彩 (glow)</h4>
+            <div class="settings-checkboxes">
+              <label class="checkbox-row">
+                <input id="telopDefaultGlowEnabledInput" type="checkbox" />
+                既定で光彩を有効にする
+              </label>
+            </div>
+            <div class="settings-grid">
+              <label>
+                光彩色
+                <span class="color-control">
+                  <input id="telopDefaultGlowColorInput" type="color" />
+                  <span id="telopDefaultGlowColorValue" class="color-value">#ffffff</span>
+                </span>
+              </label>
+              <label>
+                ぼかし (px)
+                <input id="telopDefaultGlowBlurInput" type="number" min="0" max="60" step="1" />
+              </label>
+              <label>
+                不透明度
+                <input id="telopDefaultGlowOpacityInput" type="number" min="0" max="1" step="0.05" />
+              </label>
+            </div>
+            <h4 class="motion-subhead">ドロップシャドウ</h4>
+            <div class="settings-checkboxes">
+              <label class="checkbox-row">
+                <input id="telopDefaultDropShadowEnabledInput" type="checkbox" />
+                既定でドロップシャドウを有効にする
+              </label>
+            </div>
+            <div class="settings-grid">
+              <label>
+                影色
+                <span class="color-control">
+                  <input id="telopDefaultDropShadowColorInput" type="color" />
+                  <span id="telopDefaultDropShadowColorValue" class="color-value">#000000</span>
+                </span>
+              </label>
+              <label>
+                ぼかし (px)
+                <input id="telopDefaultDropShadowBlurInput" type="number" min="0" max="40" step="1" />
+              </label>
+              <label>
+                Xオフセット (px)
+                <input id="telopDefaultDropShadowOffsetXInput" type="number" min="-40" max="40" step="1" />
+              </label>
+              <label>
+                Yオフセット (px)
+                <input id="telopDefaultDropShadowOffsetYInput" type="number" min="-40" max="40" step="1" />
+              </label>
+              <label>
+                不透明度
+                <input id="telopDefaultDropShadowOpacityInput" type="number" min="0" max="1" step="0.05" />
+              </label>
+            </div>
+          </section>
+          <section class="settings-group hidden" data-tab-panel="backup">
+            <h3>シナリオのバックアップ</h3>
+            <p class="asset-hint">
+              <code>scenarios/main.json</code> のスナップショット一覧です。
+              自動 (auto) バックアップは「全体設定 → バックアップ」の保存件数で世代管理されます。
+              手動 (manual) と復元前 (preRestore) はこの画面からのみ削除できます。
+            </p>
+            <div id="backupListContainer" class="backup-list-container" role="region" aria-label="バックアップ一覧">
+              <div id="backupListEmpty" class="asset-hint" hidden>バックアップはまだありません。</div>
+              <table id="backupList" class="backup-list" hidden>
+                <thead>
+                  <tr>
+                    <th scope="col">作成日時</th>
+                    <th scope="col">種別</th>
+                    <th scope="col">サイズ</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="backupListBody"></tbody>
+              </table>
+            </div>
+            <div class="preset-list-actions">
+              <button type="button" id="refreshBackupListButton" class="link-button">
+                <span class="msym button-icon" aria-hidden="true">refresh</span>
+                <span>一覧を更新</span>
+              </button>
+              <button type="button" id="createManualBackupButton" class="link-button">
+                <span class="msym button-icon" aria-hidden="true">save</span>
+                <span>いま手動バックアップ</span>
+              </button>
+            </div>
+          </section>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button id="saveConfigButton" class="primary-button" type="button">
+            <span class="msym button-icon" aria-hidden="true">check</span>
+            <span>設定保存</span>
+          </button>
+          <button id="closeSettingsButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>閉じる</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="characterManagerDialog" class="settings-dialog character-detail-dialog">
+      <form method="dialog" class="settings-panel">
+        <div class="dialog-header">
+          <div class="character-detail-header-row">
+            <h2 id="characterManagerHeading">キャラ詳細</h2>
+            <label class="character-detail-color">
+              <span>カラー</span>
+              <span class="color-control">
+                <input id="characterManagerColorInput" type="color" />
+                <span id="characterManagerColorValue" class="color-value">未指定</span>
+              </span>
+              <button id="characterManagerColorClearButton" type="button" class="ghost-button compact-action-button" title="未指定（アクセントカラーを使う）に戻す">
+                <span class="msym button-icon" aria-hidden="true">restart_alt</span>
+              </button>
+            </label>
+          </div>
+          <p>選択中のキャラクター定義（表示名・既定位置・描画オプション）を編集します</p>
+        </div>
+        <div class="character-detail-body">
+          <input id="characterManagerAssetRootInput" type="hidden" />
+          <input id="characterManagerIdInput" type="hidden" />
+          <div class="character-detail-id">
+            <span class="character-detail-id-label">キャラID</span>
+            <code id="characterManagerIdDisplay" class="character-detail-id-value">—</code>
+          </div>
+          <label>
+            表示名
+            <input id="characterManagerNameInput" type="text" />
+          </label>
+          <div class="inline-fields">
+            <label>
+              既定X
+              <input id="characterManagerXInput" type="number" step="10" />
+            </label>
+            <label>
+              既定Y
+              <input id="characterManagerYInput" type="number" step="10" />
+            </label>
+            <label>
+              既定拡大率
+              <input id="characterManagerScaleInput" type="number" min="0.1" max="2" step="0.01" />
+            </label>
+          </div>
+          <div class="settings-checkboxes">
+            <label class="checkbox-row">
+              <input id="characterManagerRemoveWhiteInput" type="checkbox" />
+              白背景を透過扱いにする
+            </label>
+          </div>
+          <fieldset class="character-detail-voice">
+            <legend>音声アプリと紐付け</legend>
+            <p class="asset-hint" id="characterManagerVoiceHint">
+              VOICEVOX / Voicepeak が検出されているとき、このキャラクターのデフォルトの「声」と「感情」を選択できます。
+            </p>
+            <div class="inline-fields">
+              <label>
+                声
+                <select id="characterManagerVoiceSelect"></select>
+              </label>
+              <label>
+                感情
+                <select id="characterManagerVoiceEmotionSelect"></select>
+              </label>
+            </div>
+          </fieldset>
+          <div id="characterManagerMeta" class="asset-path-display">未選択</div>
+        </div>
+        <div class="dialog-actions">
+          <button id="deleteCharacterManagerButton" class="danger-button" type="button">
+            <span class="msym button-icon" aria-hidden="true">delete</span>
+            <span>このキャラを削除</span>
+          </button>
+          <button id="saveCharacterManagerButton" class="primary-button" type="button">
+            <span class="msym button-icon" aria-hidden="true">check</span>
+            <span>保存</span>
+          </button>
+          <button id="closeCharacterManagerButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>閉じる</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="projectFormDialog" class="project-form-dialog">
+      <form id="projectForm" method="dialog" class="project-form-panel">
+        <div class="dialog-header project-form-header">
+          <div>
+            <h2 id="projectFormTitle">プロジェクト作成</h2>
+            <p id="projectFormDescription">プロジェクト名を入力してください</p>
+          </div>
+        </div>
+        <label>
+          プロジェクト名
+          <input id="projectTitleInput" type="text" autocomplete="off" />
+        </label>
+        <div class="dialog-actions">
+          <button id="saveProjectFormButton" class="primary-button" type="submit">
+            <span class="msym button-icon" aria-hidden="true">check</span>
+            <span>保存</span>
+          </button>
+          <button id="cancelProjectFormButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>閉じる</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="applyToAllCutsDialog" class="project-form-dialog">
+      <form method="dialog" class="project-form-panel">
+        <div class="dialog-header project-form-header">
+          <div>
+            <h2>デフォルト設定をカットに反映</h2>
+            <p id="applyToAllCutsDescription">変更したデフォルト値を、プロジェクト内のカットに反映しますか？</p>
+          </div>
+        </div>
+        <p class="asset-hint">※ カット側で個別に変更した値も、保存した値で置き換えられます。Cmd+Z で取り消し可能です。</p>
+        <div class="dialog-actions">
+          <button id="applyToAllCutsConfirmButton" class="primary-button" type="button">
+            <span class="msym button-icon" aria-hidden="true">done_all</span>
+            <span>すべてに反映</span>
+          </button>
+          <button id="applyToAllCutsCancelButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>反映しない</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="applyToAllTelopsDialog" class="project-form-dialog">
+      <form method="dialog" class="project-form-panel">
+        <div class="dialog-header project-form-header">
+          <div>
+            <h2>テロップに一括反映</h2>
+            <p id="applyToAllTelopsDescription">テロップのスタイルを、シーン内のすべてのテロップに反映しますか？</p>
+          </div>
+        </div>
+        <p class="asset-hint">※ 個別に変更したテロップの値も置き換えられます。Cmd+Z で取り消し可能です。</p>
+        <div class="dialog-actions">
+          <button id="applyToAllTelopsConfirmButton" class="primary-button" type="button">
+            <span class="msym button-icon" aria-hidden="true">done_all</span>
+            <span>すべてに反映</span>
+          </button>
+          <button id="applyToAllTelopsCancelButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>反映しない</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="bulkApplyDialog" class="settings-dialog bulk-apply-dialog">
+      <form method="dialog" class="settings-panel">
+        <div class="dialog-header">
+          <div>
+            <h2 id="bulkApplyTitle">一括反映</h2>
+            <p id="bulkApplyDescription">反映する項目を選んで、すべてに適用します。</p>
+          </div>
+        </div>
+        <div class="dialog-body">
+          <div class="bulk-apply-actions-top">
+            <button type="button" id="bulkApplyCheckAllButton" class="link-button">すべて選択</button>
+            <button type="button" id="bulkApplyUncheckAllButton" class="link-button">すべて解除</button>
+          </div>
+          <div id="bulkApplyList" class="bulk-apply-list" role="group" aria-labelledby="bulkApplyTitle"></div>
+        </div>
+        <div class="dialog-actions">
+          <button id="bulkApplyConfirmButton" class="primary-button" type="button">
+            <span class="msym button-icon" aria-hidden="true">done_all</span>
+            <span>選択した項目を反映</span>
+          </button>
+          <button id="bulkApplyCancelButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>キャンセル</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="addCutBatchDialog" class="settings-dialog add-cut-batch-dialog">
+      <form id="addCutBatchForm" method="dialog" class="settings-panel">
+        <div class="dialog-header">
+          <div>
+            <h2>カットを一括追加</h2>
+            <p>現在のカットの後ろに、同じキャラ配置で複数のカットを追加します。</p>
+          </div>
+        </div>
+        <div class="dialog-body">
+          <div class="form-tabs" role="tablist" aria-label="一括追加モード">
+            <button type="button" class="form-tab active" data-batch-tab="text" role="tab" aria-selected="true">
+              <span class="msym button-icon" aria-hidden="true">format_align_left</span>
+              <span>テキスト</span>
+            </button>
+            <button type="button" class="form-tab" data-batch-tab="audio" role="tab" aria-selected="false">
+              <span class="msym button-icon" aria-hidden="true">graphic_eq</span>
+              <span>音声ファイル</span>
+            </button>
+            <button type="button" class="form-tab" data-batch-tab="yaml" role="tab" aria-selected="false">
+              <span class="msym button-icon" aria-hidden="true">data_object</span>
+              <span>YAML（音声含む）</span>
+            </button>
+          </div>
+          <input id="addCutBatchModeText" type="radio" name="addCutBatchMode" value="text" checked hidden />
+          <input id="addCutBatchModeAudio" type="radio" name="addCutBatchMode" value="audio" hidden />
+          <input id="addCutBatchModeYaml" type="radio" name="addCutBatchMode" value="yaml" hidden />
+
+          <section class="form-tab-panel" data-batch-tab-panel="text">
+            <p class="asset-hint">
+              改行区切りの場合、現在の話者で一括登録されます。「話者ID:セリフ」「話者名:セリフ」形式では、現在のカットに配置中のキャラクターに自動で話者を割り当てます（同名の話者が複数いる場合は前面側のレイヤーが優先されます）。区切り文字は半角「:」と全角「：」のどちらでも構いません。
+            </p>
+            <textarea id="addCutBatchTextInput" rows="10" placeholder="セリフ1&#10;character_1:セリフ2&#10;マキ：セリフ3"></textarea>
+            <div class="add-cut-batch-pause-row">
+              <label class="checkbox-row" id="addCutBatchPauseLabel">
+                <input id="addCutBatchPauseEnable" type="checkbox" />
+                指定秒数の余白を入れる
+              </label>
+              <label class="add-cut-batch-pause-field">
+                <input id="addCutBatchPauseSec" type="number" min="0" max="60" step="0.1" value="0.5" />
+                <span>秒</span>
+              </label>
+            </div>
+            <p class="asset-hint" id="addCutBatchPauseHint">
+              「音声を自動で作成する」が ON のとき、各カットの表示時間を「音声長 + 指定秒数」に拡張します。
+            </p>
+          </section>
+
+          <section class="form-tab-panel hidden" data-batch-tab-panel="audio">
+            <p class="asset-hint" id="addCutBatchAudioHint">
+              プロジェクトに登録済みの音声ファイル名が「連番-セリフ{-任意の文字列}.wav」形式であれば、一括登録可能です。話者は現在のカット位置と同じです。
+            </p>
+            <div id="addCutBatchAudioPreview" class="asset-hint" hidden></div>
+          </section>
+
+          <section class="form-tab-panel hidden" data-batch-tab-panel="yaml">
+            <span hidden></span>
+            <p class="asset-hint">
+              「セリフ書き出し」と互換のフォーマットに、<code>voice</code> / <code>pause_sec</code> を加えて指定できます。
+              voice はアプリ名 prefix 付きで <code>voicevox:四国めたん/ノーマル</code> や <code>voicepeak:Miyamai Moca</code>、感情込みは <code>voicepeak:Miyamai Moca/honwaka</code> のように書きます。
+              voice が無いものは音声生成をスキップ、感情が話者にない場合はノーマルにフォールバックします。
+            </p>
+            <textarea id="addCutBatchYamlInput" rows="14" placeholder="- index: 1
+  speaker: character_1
+  voice: voicevox:四国めたん/ノーマル
+  text: |
+    今日からこの教室で一緒に頑張ろう！
+- index: 2
+  speaker: character_2
+  voice: voicepeak:Miyamai Moca/honwaka
+  pause_sec: 0.5
+  text: |
+    ふんわり喋ります。
+"></textarea>
+          </section>
+          <label class="checkbox-row" id="addCutBatchAutoSynthLabel">
+            <input id="addCutBatchAutoSynth" type="checkbox" />
+            音声を自動で作成する
+          </label>
+          <p class="asset-hint" id="addCutBatchAutoSynthHint"></p>
+          <div id="addCutBatchProgressArea" class="panel-section" hidden>
+            <progress id="addCutBatchProgress" max="100" value="0"></progress>
+            <p id="addCutBatchProgressLabel" class="asset-hint" aria-live="polite"></p>
+            <details>
+              <summary>ログを表示</summary>
+              <pre id="addCutBatchProgressLog" class="asset-hint" style="max-height:160px;overflow:auto;"></pre>
+            </details>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button id="addCutBatchConfirmButton" class="primary-button" type="button">
+            <span class="msym button-icon" aria-hidden="true">playlist_add</span>
+            <span>上記の内容で一括登録</span>
+          </button>
+          <button id="addCutBatchCancelButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>キャンセル</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="addTelopBatchDialog" class="settings-dialog add-telop-batch-dialog">
+      <form id="addTelopBatchForm" method="dialog" class="settings-panel">
+        <div class="dialog-header">
+          <div>
+            <h2>テロップ一括追加</h2>
+            <p>新規入力は「テキスト」タブから、エクスポートを加工して戻すときは「YAML」タブから取り込めます。</p>
+          </div>
+        </div>
+        <div class="dialog-body">
+          <div class="form-tabs" role="tablist" aria-label="テロップ一括追加モード">
+            <button type="button" class="form-tab active" data-telop-batch-tab="text" role="tab" aria-selected="true">
+              <span class="msym button-icon" aria-hidden="true">format_align_left</span>
+              <span>テキスト</span>
+            </button>
+            <button type="button" class="form-tab" data-telop-batch-tab="yaml" role="tab" aria-selected="false">
+              <span class="msym button-icon" aria-hidden="true">data_object</span>
+              <span>YAML</span>
+            </button>
+          </div>
+
+          <section class="form-tab-panel" data-telop-batch-tab-panel="text">
+            <p class="asset-hint">改行区切りで入力した各行を、再生ヘッドから順番に追加します。</p>
+            <div class="inline-fields">
+              <label>
+                1行あたりの長さ (秒)
+                <input id="addTelopBatchDuration" type="number" min="0.1" step="0.1" value="1.0" />
+              </label>
+              <label>
+                行間ギャップ (秒)
+                <input id="addTelopBatchGap" type="number" min="0" step="0.1" value="0" />
+              </label>
+              <label class="checkbox-row">
+                <input id="addTelopBatchSkipBlank" type="checkbox" checked />
+                空行はスキップする
+              </label>
+            </div>
+            <label>
+              テロップ本文（1行 = 1テロップ）
+              <textarea id="addTelopBatchText" rows="10" placeholder="テロップ1&#10;テロップ2&#10;テロップ3"></textarea>
+            </label>
+            <p class="asset-hint" id="addTelopBatchHint">開始位置は再生ヘッドです。書体や色は「テロップを追加」と同じデフォルトを使います。</p>
+          </section>
+
+          <section class="form-tab-panel hidden" data-telop-batch-tab-panel="yaml">
+            <p class="asset-hint">
+              「テロップ書き出し」と互換のフォーマットを取り込みます。<code>start_sec</code> / <code>duration_sec</code> / <code>text</code> をそのまま使い、<code>style</code> を書けば 1 つだけ書体・色も上書きできます。<br>
+              既存のテロップは置き換えず、追加されます。エクスポートを加工して戻すときに便利です。
+            </p>
+            <textarea id="addTelopBatchYamlInput" rows="14" placeholder="- index: 1
+  start_sec: 0.0
+  duration_sec: 1.5
+  text: |
+    最初のテロップ
+- index: 2
+  start_sec: 1.5
+  duration_sec: 2.0
+  text: |
+    次のテロップ
+"></textarea>
+            <p class="asset-hint" id="addTelopBatchYamlHint">書体・色は省略時はテロップの既定値を使います。</p>
+          </section>
+        </div>
+        <div class="dialog-actions">
+          <button id="addTelopBatchConfirmButton" class="primary-button" type="button">
+            <span class="msym button-icon" aria-hidden="true">playlist_add</span>
+            <span>追加する</span>
+          </button>
+          <button id="addTelopBatchCancelButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>キャンセル</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="projectDuplicateDialog" class="project-form-dialog">
+      <form id="projectDuplicateForm" method="dialog" class="project-form-panel">
+        <div class="dialog-header project-form-header">
+          <div>
+            <h2>プロジェクトを複製</h2>
+            <p id="projectDuplicateDescription">複製先のプロジェクト名を入力してください</p>
+          </div>
+        </div>
+        <label>
+          複製先プロジェクト名
+          <input id="projectDuplicateTitleInput" type="text" autocomplete="off" />
+        </label>
+        <p id="projectDuplicateError" class="asset-warning" role="alert" hidden></p>
+        <div class="dialog-actions">
+          <button id="confirmProjectDuplicateButton" class="primary-button" type="submit">
+            <span class="msym button-icon" aria-hidden="true">content_copy</span>
+            <span>複製する</span>
+          </button>
+          <button id="cancelProjectDuplicateButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>閉じる</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="projectDeleteDialog" class="project-form-dialog">
+      <form id="projectDeleteForm" method="dialog" class="project-form-panel">
+        <div class="dialog-header project-form-header">
+          <div>
+            <h2>プロジェクト削除</h2>
+            <p id="projectDeleteDescription">削除するプロジェクト名を入力してください</p>
+          </div>
+        </div>
+        <label>
+          プロジェクト名
+          <input id="projectDeleteConfirmInput" type="text" autocomplete="off" />
+        </label>
+        <div class="dialog-actions">
+          <button id="confirmProjectDeleteButton" class="danger-button" type="submit">
+            <span class="msym button-icon" aria-hidden="true">delete</span>
+            <span>削除</span>
+          </button>
+          <button id="cancelProjectDeleteButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>閉じる</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="globalSettingsDialog" class="settings-dialog global-settings-dialog">
+      <form method="dialog" class="settings-panel">
+        <div class="dialog-header">
+          <div>
+            <h2>全体設定</h2>
+            <p>アプリ全体に共通する書き出し・描画設定</p>
+          </div>
+        </div>
+        <div class="settings-layout">
+          <div class="settings-tabs settings-tabs-vertical" role="tablist" aria-label="全体設定カテゴリ">
+            <button class="settings-tab active" data-global-tab="video" type="button">
+              <span class="msym button-icon" aria-hidden="true">movie</span>
+              <span>動画書き出し</span>
+            </button>
+            <button class="settings-tab" data-global-tab="editor" type="button">
+              <span class="msym button-icon" aria-hidden="true">history</span>
+              <span>編集</span>
+            </button>
+            <button class="settings-tab" data-global-tab="environment" type="button">
+              <span class="msym button-icon" aria-hidden="true">folder_managed</span>
+              <span>環境</span>
+            </button>
+            <button class="settings-tab" data-global-tab="tts" type="button">
+              <span class="msym button-icon" aria-hidden="true">record_voice_over</span>
+              <span>音声読み上げ</span>
+            </button>
+            <button class="settings-tab" data-global-tab="shortcuts" type="button">
+              <span class="msym button-icon" aria-hidden="true">keyboard</span>
+              <span>ショートカット</span>
+            </button>
+            <button class="settings-tab" data-global-tab="backup" type="button">
+              <span class="msym button-icon" aria-hidden="true">restore</span>
+              <span>バックアップ</span>
+            </button>
+            <button class="settings-tab" data-global-tab="cache" type="button">
+              <span class="msym button-icon" aria-hidden="true">memory</span>
+              <span>キャッシュ</span>
+            </button>
+          </div>
+          <div class="settings-content">
+            <section class="settings-group" data-global-tab-panel="video">
+              <h3>動画書き出しプリセット</h3>
+              <p class="asset-hint">「動画出力」で使用するプリセットを選択します（内蔵プリセットは固定設定）</p>
+              <div id="ffmpegStatusBanner" class="asset-warning" role="alert" hidden></div>
+              <div id="globalVideoPresetList" class="preset-list"></div>
+              <div class="preset-list-actions">
+                <button type="button" id="refreshFfmpegButton" class="link-button">
+                  <span class="msym button-icon" aria-hidden="true">refresh</span>
+                  <span>ffmpeg 対応状況を再検出</span>
+                </button>
+              </div>
+              <h3>音声・書き出し挙動</h3>
+              <div class="settings-checkboxes settings-checkboxes--stacked">
+                <div class="settings-checkbox-group">
+                  <label class="checkbox-row">
+                    <input id="globalMonoToStereoInput" type="checkbox" />
+                    モノラル音声をステレオ音声にミックスダウン
+                  </label>
+                  <p class="asset-hint">編集ソフトに取り込んだ際のチャネル不一致を回避します（推奨）。</p>
+                </div>
+                <div class="settings-checkbox-group">
+                  <label class="checkbox-row">
+                    <input id="globalPromptBeforeExportInput" type="checkbox" />
+                    動画書き出しにフォーマットを指定
+                  </label>
+                  <p class="asset-hint">ONにすると「動画出力」ボタンを押した時にダイアログが開き、プリセット／FPS／品質設定を毎回選べます。OFFのときは前回のプリセットでそのまま書き出します。</p>
+                </div>
+              </div>
+              <h3>動画書き出しの WebSocket バックプレッシャ (MB)</h3>
+              <p class="asset-hint">
+                ブラウザ → ffmpeg のフレーム送信で <code>ws.bufferedAmount</code> がこのサイズを超えたら送信を待機します。
+                既定 16MB は長尺 (例: 5000 frame 超) を完走させるための安全側の値。
+                スループットを上げたい場合は 32 / 64 を試してください。値を上げ過ぎるとブラウザのメモリが膨らみ、長尺でタブが落ちます。
+              </p>
+              <div class="settings-grid">
+                <label>
+                  バックプレッシャ (MB)
+                  <input id="globalBpThresholdMbInput" type="number" min="1" max="1024" step="1" />
+                </label>
+              </div>
+            </section>
+            <section class="settings-group hidden" data-global-tab-panel="editor">
+              <h3>編集履歴 (Undo / Redo)</h3>
+              <p class="asset-hint">編集中の Undo/Redo で覚えておく履歴の最大件数（1〜500）。リロードやプロジェクト切替で履歴は破棄されます</p>
+              <div class="settings-grid">
+                <label>
+                  履歴の上限件数
+                  <input id="globalHistorySizeInput" type="number" min="1" max="500" step="1" />
+                </label>
+              </div>
+              <h3>プレビュー再生</h3>
+              <p class="asset-hint">再生中、現在のカットから先読みするカット数（0〜20）。大きくするとカット境界の引っかかりが減りますが、ビジュアライザや背景動画など重い構成では前倒しで bake が走るため負荷が上がります。標準は 3。</p>
+              <div class="settings-grid">
+                <label>
+                  先読みするカット数
+                  <input id="globalPreviewLookaheadInput" type="number" min="0" max="20" step="1" />
+                </label>
+              </div>
+            </section>
+            <section class="settings-group hidden" data-global-tab-panel="environment">
+              <h3>ffmpeg バイナリのパス</h3>
+              <p class="asset-hint">空欄にすると環境変数 PATH から検出します。複数バージョンを使い分ける場合は絶対パスを入力してください。</p>
+              <div class="settings-grid">
+                <label class="settings-label-wide">
+                  ffmpeg
+                  <input id="globalFfmpegPathInput" type="text" placeholder="/opt/homebrew/bin/ffmpeg" autocomplete="off" />
+                </label>
+              </div>
+              <p id="globalFfmpegResolved" class="asset-hint"></p>
+              <h3>プロジェクトフォルダの場所</h3>
+              <p class="asset-hint">空欄にするとアプリ同梱の <code>projects/</code> を使います。外部ディスクなどへ移したい場合は絶対パスを入力してください（既存プロジェクトの自動移行は行いません）。</p>
+              <div class="settings-grid">
+                <label class="settings-label-wide">
+                  projects ディレクトリ
+                  <input id="globalProjectsPathInput" type="text" placeholder="/Volumes/Work/splite_anime_projects" autocomplete="off" />
+                </label>
+              </div>
+              <p id="globalProjectsResolved" class="asset-hint"></p>
+              <h3>ログの抑制</h3>
+              <p class="asset-hint">ターミナルに流れるアクセスログ（毎カット切替の <code>/api/v2/scene-bundle</code> など）を抑制します。動画書き出し中は本設定にかかわらず常にエラー以外を抑制します。</p>
+              <div class="settings-checkboxes">
+                <label class="checkbox-row">
+                  <input id="globalQuietModeInput" type="checkbox" />
+                  ログを抑制する（uvicorn のアクセスログを WARNING 以上のみに）
+                </label>
+              </div>
+              <h3>JS ライブラリ（three.js / mp4box.js）</h3>
+              <p class="asset-hint">
+                v2 描画エンジンと動画書き出しで利用する JS ライブラリの取得元です。
+                既定はローカル <code>static/vendor/</code>。未インストール時は CDN にフォールバックします。
+              </p>
+              <div class="settings-checkboxes">
+                <label class="checkbox-row">
+                  <input id="globalVendorUseCdnInput" type="checkbox" />
+                  CDN を使う（オフライン時はインストール推奨）
+                </label>
+              </div>
+              <div id="globalVendorStatus" class="asset-hint" aria-live="polite">未取得</div>
+              <div class="preset-list-actions">
+                <button type="button" id="installVendorLibsButton" class="link-button">
+                  <span class="msym button-icon" aria-hidden="true">download</span>
+                  <span>JS ライブラリのインストール</span>
+                </button>
+              </div>
+              <h3>日本語フォント（Noto Sans JP）</h3>
+              <p class="asset-hint">
+                同梱されていないので、必要に応じてインストールしてください。
+                <code>assets/fonts/NotoSansJP/</code> に展開し、配信物（CDN 非依存）として書き出しでも使えるようにします。
+              </p>
+              <div id="globalFontStatus" class="asset-hint" aria-live="polite">未取得</div>
+              <div class="preset-list-actions">
+                <button type="button" id="installNotoSansJpButton" class="link-button">
+                  <span class="msym button-icon" aria-hidden="true">download</span>
+                  <span>Noto Sans JP をインストール</span>
+                </button>
+              </div>
+              <h3>フォント自動認識（OS/2 + name テーブル）</h3>
+              <p class="asset-hint">
+                <code>assets/fonts/</code> 配下の各ファイルから OS/2.usWeightClass と name テーブルを読み出します。
+                自動判定が誤っているファイルがあれば、右側のドロップダウンで上書きできます（保存後に再スキャンします）。
+              </p>
+              <div id="globalFontScanStatus" class="asset-hint" aria-live="polite">未取得</div>
+              <div class="preset-list-actions">
+                <button type="button" id="refreshFontScanButton" class="link-button">
+                  <span class="msym button-icon" aria-hidden="true">refresh</span>
+                  <span>再スキャン</span>
+                </button>
+              </div>
+              <div id="globalFontScanList" class="font-scan-list"></div>
+            </section>
+            <section class="settings-group hidden" data-global-tab-panel="tts">
+              <h3>VOICEVOX</h3>
+              <p class="asset-hint">
+                起動中の VOICEVOX Engine と連携します。アプリを起動した状態で「ボイスを登録」を押すと話者一覧が取得できます。
+              </p>
+              <div class="settings-grid">
+                <label class="settings-label-wide">
+                  VOICEVOX アプリのパス
+                  <input id="ttsVoicevoxAppPathInput" type="text" placeholder="/Applications/VOICEVOX.app" autocomplete="off" />
+                </label>
+                <label class="settings-label-wide">
+                  VOICEVOX Engine の URL
+                  <input id="ttsVoicevoxBaseUrlInput" type="text" placeholder="http://127.0.0.1:50021" autocomplete="off" />
+                </label>
+              </div>
+              <p id="ttsVoicevoxStatus" class="asset-hint" aria-live="polite">未取得</p>
+              <h3>VOICEPEAK</h3>
+              <p class="asset-hint">
+                VOICEPEAK の CLI バイナリのパスを指定します。話者・感情はアプリのインストール内容により異なるため、変更があれば「ボイスを登録」を押し直してください。
+              </p>
+              <div class="settings-grid">
+                <label class="settings-label-wide">
+                  VOICEPEAK バイナリのパス
+                  <input id="ttsVoicepeakBinPathInput" type="text" placeholder="/Applications/voicepeak.app/Contents/MacOS/voicepeak" autocomplete="off" />
+                </label>
+              </div>
+              <p id="ttsVoicepeakStatus" class="asset-hint" aria-live="polite">未取得</p>
+              <div class="preset-list-actions">
+                <button type="button" id="ttsRefreshButton" class="primary-button">
+                  <span class="msym button-icon" aria-hidden="true">refresh</span>
+                  <span>ボイスを登録</span>
+                </button>
+              </div>
+              <p id="ttsCatalogStatus" class="asset-hint" aria-live="polite"></p>
+            </section>
+            <section class="settings-group hidden" data-global-tab-panel="shortcuts">
+              <h3>ショートカットキー</h3>
+              <p class="asset-hint">
+                各アクションに割り当てるキーをクリックして、置き換えたいキーを押してください。
+                「クリア」でなし（無効化）に、「初期値」で出荷時設定に戻せます。
+                Cmd/Ctrl + Z（取り消し）など OS 標準の組み合わせは固定です。
+                同じキーをグループ別に割り当てることもできます（例: ←→ をカットでは前後移動、テロップではフレーム移動。
+                タイムラインにフォーカスがあるときはテロップ側、それ以外はカット側が動きます）。
+              </p>
+              <div id="globalShortcutsList" class="shortcut-list"></div>
+              <div class="preset-list-actions">
+                <button type="button" id="resetShortcutsButton" class="link-button">
+                  <span class="msym button-icon" aria-hidden="true">restart_alt</span>
+                  <span>すべて初期値に戻す</span>
+                </button>
+              </div>
+            </section>
+            <section class="settings-group hidden" data-global-tab-panel="backup">
+              <h3>シナリオの自動バックアップ</h3>
+              <p class="asset-hint">
+                <code>scenarios/main.json</code> を周期的にスナップショットします。
+                プロジェクト切替時とダッシュボード復帰時にも自動取得されます。
+                <strong>auto</strong> バックアップは古い順に削除 (世代管理) されますが、
+                <strong>manual</strong> (「バックアップ」ボタン) と <strong>preRestore</strong> (復元前の安全網) は
+                ここでは削除されず、プロジェクト設定 → バックアップタブからのみ削除できます。
+              </p>
+              <div class="settings-grid">
+                <label>
+                  自動バックアップ間隔 (分)
+                  <input id="globalBackupIntervalInput" type="number" min="1" max="120" step="1" />
+                </label>
+                <label>
+                  保存件数 (auto のみ)
+                  <input id="globalBackupRetentionInput" type="number" min="1" max="1000" step="1" />
+                </label>
+              </div>
+              <p class="asset-hint">
+                例: 5 分 × 50 件 = 直近 250 分 (約 4 時間 10 分) を遡れます。manual / preRestore は件数に含まれません。
+              </p>
+            </section>
+            <section class="settings-group hidden" data-global-tab-panel="cache">
+              <h3>キャッシュの自動間引き</h3>
+              <p class="asset-hint">
+                <code>projects/&lt;id&gt;/cache/preview/</code> (プレビュー描画の中間 PNG) と
+                <code>cache/clean_pcm/</code> (録画素材音声) を、起動時に mtime ベースで間引きます。
+                削除されたファイルは次回開いたときに必要分だけ自動再生成されるため安全です。
+                手動の全削除は「アセット管理」→「キャッシュ」タブから実行できます。
+              </p>
+              <div class="settings-grid">
+                <label class="checkbox-row">
+                  <input id="globalCacheAutoPruneInput" type="checkbox" />
+                  起動時に古いキャッシュを自動削除する
+                </label>
+                <label>
+                  保持期間 (日)
+                  <input id="globalCacheAutoPruneDaysInput" type="number" min="1" max="365" step="1" />
+                </label>
+              </div>
+              <p class="asset-hint">
+                例: 30 日 = mtime が 30 日より古いファイルだけ削除。現在使用中のキャッシュは触れません。
+              </p>
+            </section>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button id="saveGlobalSettingsButton" class="primary-button" type="button">
+            <span class="msym button-icon" aria-hidden="true">check</span>
+            <span>保存</span>
+          </button>
+          <button id="closeGlobalSettingsButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>閉じる</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="psdImporterDialog" class="settings-dialog psd-importer-dialog">
+      <form method="dialog" class="settings-panel psd-importer-panel">
+        <div class="dialog-header">
+          <div>
+            <h2>PSDインポータ</h2>
+            <p>未対応構造のPSDから、表示中レイヤーをカテゴリへ割り当てて構造化キャラを生成します</p>
+          </div>
+        </div>
+        <div class="psd-importer-toolbar">
+          <label class="psd-importer-field" data-id-field>
+            キャラID
+            <input id="psdImporterIdInput" type="text" placeholder="半角英数推奨" autocomplete="off" />
+            <span id="psdImporterIdWarning" class="id-input-warning" hidden></span>
+          </label>
+          <label class="psd-importer-field">
+            表示名
+            <input id="psdImporterNameInput" type="text" placeholder="キャラクター表示名" />
+          </label>
+          <label class="psd-importer-field">
+            登録先
+            <select id="psdImporterScopeSelect">
+              <option value="common">共通アセット</option>
+              <option value="project">プロジェクト</option>
+            </select>
+          </label>
+          <label class="psd-importer-field">
+            PSDファイル
+            <input id="psdImporterFileInput" type="file" accept=".psd" />
+          </label>
+          <button type="button" id="psdImporterUploadButton" class="primary-button">
+            <span class="msym button-icon" aria-hidden="true">upload</span>
+            <span>PSDを読み込む</span>
+          </button>
+          <span id="psdImporterStatus" class="asset-hint" aria-live="polite"></span>
+        </div>
+        <div class="psd-importer-layout">
+          <div class="psd-importer-left-column">
+            <aside class="psd-importer-tree-pane">
+              <div class="psd-importer-pane-header">
+                <h3>レイヤー</h3>
+                <div class="psd-importer-tree-actions">
+                  <button type="button" id="psdImporterCheckAllButton" class="link-button">
+                    <span class="msym button-icon" aria-hidden="true">select_all</span>
+                    <span>すべて</span>
+                  </button>
+                  <button type="button" id="psdImporterUncheckAllButton" class="link-button">
+                    <span class="msym button-icon" aria-hidden="true">deselect</span>
+                    <span>解除</span>
+                  </button>
+                </div>
+              </div>
+              <div id="psdImporterTree" class="psd-importer-tree" role="tree"></div>
+            </aside>
+            <div class="psd-importer-yaml-section">
+              <div class="psd-importer-pane-header">
+                <h3>マッピングYAML</h3>
+                <div class="psd-importer-yaml-actions">
+                  <button type="button" id="psdImporterYamlClearButton" class="link-button">
+                    <span class="msym button-icon" aria-hidden="true">backspace</span>
+                    <span>すべてクリア</span>
+                  </button>
+                </div>
+              </div>
+              <p class="asset-hint">「○○に登録」を押すと、現在チェックされているレイヤーの組合わせがここに追記されます。直接編集／貼付も可能です。</p>
+              <textarea id="psdImporterYamlTextarea" class="psd-importer-yaml" spellcheck="false" placeholder="id: my-character&#10;name: マイキャラ&#10;ベース:&#10;  - フォルダ/レイヤー名"></textarea>
+            </div>
+          </div>
+          <section class="psd-importer-preview-pane">
+            <div class="psd-importer-pane-header">
+              <h3>プレビュー</h3>
+              <div class="psd-importer-preview-controls">
+                <button type="button" id="psdImporterZoomOutButton" class="link-button" title="縮小">
+                  <span class="msym button-icon" aria-hidden="true">zoom_out</span>
+                </button>
+                <span id="psdImporterZoomLabel" class="psd-importer-zoom-label">100%</span>
+                <button type="button" id="psdImporterZoomInButton" class="link-button" title="拡大">
+                  <span class="msym button-icon" aria-hidden="true">zoom_in</span>
+                </button>
+                <button type="button" id="psdImporterZoomResetButton" class="link-button" title="フィット">
+                  <span class="msym button-icon" aria-hidden="true">fit_screen</span>
+                </button>
+              </div>
+            </div>
+            <div class="psd-importer-preview-body">
+              <div class="psd-importer-mapping-buttons">
+                <!-- ボタンは PSD レイヤー / モデル重なり順 (上が前面、下が背面) に並べる。
+                     YAML の追記順もこの並びに連動する (serializePsdImporterYaml)。 -->
+                <button type="button" data-psd-importer-category="thumb">
+                  <span class="msym button-icon" aria-hidden="true">image</span>
+                  <span>サムネイルに設定</span>
+                </button>
+                <button type="button" data-psd-importer-category="front">
+                  <span class="msym button-icon" aria-hidden="true">stacks</span>
+                  <span>前面に登録</span>
+                </button>
+                <button type="button" data-psd-importer-category="bangs">
+                  <span class="msym button-icon" aria-hidden="true">cut</span>
+                  <span>前髪に登録</span>
+                </button>
+                <button type="button" data-psd-importer-category="eye">
+                  <span class="msym button-icon" aria-hidden="true">visibility</span>
+                  <span>目に登録</span>
+                </button>
+                <button type="button" data-psd-importer-category="mouth">
+                  <span class="msym button-icon" aria-hidden="true">sentiment_satisfied</span>
+                  <span>口に登録</span>
+                </button>
+                <button type="button" data-psd-importer-category="cheek">
+                  <span class="msym button-icon" aria-hidden="true">favorite</span>
+                  <span>頬に登録</span>
+                </button>
+                <button type="button" data-psd-importer-category="base">
+                  <span class="msym button-icon" aria-hidden="true">crop_original</span>
+                  <span>ベースに登録</span>
+                </button>
+                <button type="button" data-psd-importer-category="back_hair">
+                  <span class="msym button-icon" aria-hidden="true">content_cut</span>
+                  <span>後ろ髪に登録</span>
+                </button>
+              </div>
+              <div class="psd-importer-preview" id="psdImporterPreviewViewport">
+                <div class="psd-importer-preview-canvas" id="psdImporterPreviewCanvas">
+                  <img id="psdImporterPreviewImage" alt="プレビュー" />
+                  <div id="psdImporterPreviewEmpty" class="empty-preview">PSDを読み込んでチェックを入れるとプレビューを表示します</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+        <div class="dialog-actions">
+          <label class="psd-importer-format-field" title="レイヤー画像の保存形式">
+            <span>画像形式</span>
+            <select id="psdImporterFormatSelect">
+              <option value="png">PNG（標準・可逆）</option>
+              <option value="avif">AVIF（容量 1/30〜1/40・透過対応）</option>
+            </select>
+          </label>
+          <label class="psd-importer-format-field" title="PSDキャンバスの横上限px。0で無制限">
+            <span>横上限px</span>
+            <input id="psdImporterMaxWidthInput" type="number" min="0" step="1" value="2160" />
+          </label>
+          <label class="psd-importer-format-field" title="PSDキャンバスの縦上限px。0で無制限">
+            <span>縦上限px</span>
+            <input id="psdImporterMaxHeightInput" type="number" min="0" step="1" value="2160" />
+          </label>
+          <label class="psd-importer-format-field" title="縮小時の補間アルゴリズム（Pillow）">
+            <span>補間</span>
+            <select id="psdImporterResamplingSelect">
+              <option value="lanczos">Lanczos（高品質・標準）</option>
+              <option value="bicubic">Bicubic</option>
+              <option value="hamming">Hamming</option>
+              <option value="bilinear">Bilinear</option>
+              <option value="box">Box（縮小向け）</option>
+              <option value="nearest">Nearest（最近傍）</option>
+            </select>
+          </label>
+          <label class="checkbox-row" style="margin-top: 30px;" title="純白 (#FFFFFF) のピクセルを透明にしてから保存します。配布キャラでは元から α 抜きされていることが多いため通常 OFF。">
+            <input id="psdImporterBakeWhiteTransparentInput" type="checkbox" />
+            白背景を透過
+          </label>
+          <label class="checkbox-row" style="margin-top: 30px;" title="純黒 (#000000) の線をマスクとして検出し、近傍色との滑らかなアルファに焼き直します。シルエットは透明への半透明黒フリンジになります。白背景を透過と組み合わせる場合は必ず 白透過 → 黒線AA の順で適用されます。">
+            <input id="psdImporterBakeBlackLineAaInput" type="checkbox" />
+            黒線アンチエイリアス
+          </label>
+          <label class="psd-importer-format-field" title="黒線アンチエイリアスのパラメータプリセット。マスクのブラー半径や黒判定の閾値が変わります">
+            <span>AA プリセット</span>
+            <select id="psdImporterBlackLineAaPresetSelect"></select>
+          </label>
+          <button id="psdImporterConvertButton" class="primary-button" type="button" style="margin-top: 30px;">
+            <span class="msym button-icon" aria-hidden="true">auto_fix</span>
+            <span>変換して取り込み</span>
+          </button>
+          <button id="psdImporterCloseButton" type="button" style="margin-top: 30px;">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>閉じる</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="characterLayerEditorDialog" class="settings-dialog character-layer-editor-dialog">
+      <form method="dialog" class="settings-panel">
+        <div class="dialog-header">
+          <div>
+            <h2>レイヤー編集</h2>
+            <p id="characterLayerEditorSubtitle" class="asset-hint"></p>
+          </div>
+        </div>
+        <div class="layer-editor-toolbar">
+          <button type="button" id="characterLayerEditorAppendButton" class="primary-button">
+            <span class="msym button-icon" aria-hidden="true">add</span>
+            <span>追加インポート…</span>
+          </button>
+          <span id="characterLayerEditorStatus" class="asset-hint" aria-live="polite"></span>
+        </div>
+        <div id="characterLayerEditorBody" class="layer-editor-body"></div>
+        <div class="dialog-actions">
+          <button id="characterLayerEditorSaveButton" type="button" class="primary-button">
+            <span class="msym button-icon" aria-hidden="true">save</span>
+            <span>保存</span>
+          </button>
+          <button id="characterLayerEditorCancelButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>キャンセル</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="assetHairstylePresetsDialog" class="settings-dialog asset-presets-dialog">
+      <form method="dialog" class="settings-panel">
+        <div class="dialog-header">
+          <div>
+            <h2>髪型プリセット (アセット定義)</h2>
+            <p id="assetHairstylePresetsSubtitle" class="asset-hint"></p>
+          </div>
+        </div>
+        <p class="asset-hint" style="margin: 0 0 8px;">
+          ベース・前髪・後ろ髪を組み合わせて名前付きで保存します。プロジェクトのお芝居タブの
+          「髪型」セレクタはここで定義したプリセットを参照します。
+          <strong>「デフォルト」</strong>に印を付けたプリセットは新規キャラ追加時に自動適用されます。
+          髪型プリセットはアセット定義のみで、各プロジェクトでの個別上書きはできません。
+        </p>
+        <div id="assetHairstylePresetsBody" class="asset-presets-body"></div>
+        <div class="layer-editor-toolbar">
+          <button type="button" id="assetHairstylePresetsAddButton" class="primary-button">
+            <span class="msym button-icon" aria-hidden="true">add</span>
+            <span>髪型を追加</span>
+          </button>
+          <span id="assetHairstylePresetsStatus" class="asset-hint" aria-live="polite"></span>
+        </div>
+        <div class="dialog-actions">
+          <button id="assetHairstylePresetsSaveButton" type="button" class="primary-button">
+            <span class="msym button-icon" aria-hidden="true">save</span>
+            <span>保存</span>
+          </button>
+          <button id="assetHairstylePresetsCancelButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>キャンセル</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="assetExpressionPresetsDialog" class="settings-dialog asset-presets-dialog">
+      <form method="dialog" class="settings-panel">
+        <div class="dialog-header">
+          <div>
+            <h2>表情プリセット (アセット定義)</h2>
+            <p id="assetExpressionPresetsSubtitle" class="asset-hint"></p>
+          </div>
+        </div>
+        <p class="asset-hint" style="margin: 0 0 8px;">
+          各プロジェクトでも表情プリセットを上書き保存できますが、ここで保存したものは「アセット定義」として
+          すべてのプロジェクトに自動で読み込まれます。同名 ID のプリセットはプロジェクト側が優先されます。
+          <strong>「デフォルト」</strong>に印を付けたプリセットは新規キャラ追加時に自動適用されます。
+        </p>
+        <div id="assetExpressionPresetsBody" class="asset-presets-body"></div>
+        <div class="layer-editor-toolbar">
+          <button type="button" id="assetExpressionPresetsAddButton" class="primary-button">
+            <span class="msym button-icon" aria-hidden="true">add</span>
+            <span>プリセットを追加</span>
+          </button>
+          <span id="assetExpressionPresetsStatus" class="asset-hint" aria-live="polite"></span>
+        </div>
+        <div class="dialog-actions">
+          <button id="assetExpressionPresetsSaveButton" type="button" class="primary-button">
+            <span class="msym button-icon" aria-hidden="true">save</span>
+            <span>保存</span>
+          </button>
+          <button id="assetExpressionPresetsCancelButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>キャンセル</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="assetManagerDialog" class="settings-dialog asset-manager-dialog">
+      <form method="dialog" class="settings-panel asset-manager-panel">
+        <div class="dialog-header">
+          <div>
+            <h2>アセット管理</h2>
+            <p>共通／プロジェクトのアセットの一覧・追加・削除・復元</p>
+          </div>
+        </div>
+        <div id="assetMissingBanner" class="asset-warning hidden" role="alert">
+          <span class="msym button-icon" aria-hidden="true">warning</span>
+          <span id="assetMissingMessage" class="asset-warning-message">参照不整合: 0件</span>
+          <button type="button" class="link-button" id="assetMissingToggle">
+            <span>詳細</span>
+            <span class="msym button-icon" aria-hidden="true">expand_more</span>
+          </button>
+        </div>
+        <pre id="assetMissingDetails" class="asset-missing-details hidden"></pre>
+        <div class="asset-manager-layout">
+          <aside class="asset-manager-sidebar">
+            <div id="assetManagerTree" class="asset-tree" role="tree"></div>
+          </aside>
+          <section class="asset-manager-content">
+            <header class="asset-manager-header">
+              <div class="asset-manager-header-text">
+                <h3 id="assetCategoryTitle">アセット</h3>
+                <p id="assetCategoryHint" class="asset-hint"></p>
+              </div>
+              <div class="asset-manager-actions">
+                <input type="file" id="assetUploadInput" multiple class="hidden" />
+                <span id="assetUploadCharIdWrap" class="asset-char-input-wrap hidden" data-id-field>
+                  <input type="text" id="assetUploadCharIdInput" placeholder="キャラID（半角英数）" class="asset-char-input" autocomplete="off" />
+                  <span id="assetUploadCharIdWarning" class="id-input-warning" hidden></span>
+                </span>
+                <input type="text" id="assetUploadCharNameInput" placeholder="表示名" class="asset-char-input hidden" />
+                <button type="button" id="assetUploadButton" class="primary-button">
+                  <span class="msym button-icon" aria-hidden="true">upload</span>
+                  <span>追加</span>
+                </button>
+                <button type="button" id="assetEmptyTrashButton" class="danger-button hidden">
+                  <span class="msym button-icon" aria-hidden="true">delete_forever</span>
+                  <span>ゴミ箱を空にする</span>
+                </button>
+              </div>
+            </header>
+            <div id="assetCharacterUploadHint" class="asset-hint hidden">
+              キャラを追加するには、ID と表示名を入力してから「追加」で PSD / ZIP / カテゴリ別 PNG (base/, body/, eye/, mouth/, foreground/, cheek/) を選んでください
+            </div>
+            <div id="assetUploadStatus" class="asset-hint" aria-live="polite"></div>
+            <div id="assetList" class="asset-list"></div>
+          </section>
+        </div>
+        <div class="dialog-actions">
+          <button id="closeAssetManagerButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>閉じる</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="exportOptionsDialog" class="settings-dialog export-dialog">
+      <form method="dialog" class="settings-panel">
+        <div class="dialog-header">
+          <div>
+            <h2>動画書き出し設定</h2>
+            <p>このカット書き出しで使用するフォーマットと品質を指定します</p>
+          </div>
+        </div>
+        <div class="export-dialog-body">
+          <div class="export-dialog-settings">
+            <label class="settings-label-wide">
+              プリセット
+              <select id="exportOptionsPresetSelect"></select>
+            </label>
+            <p id="exportOptionsPresetHint" class="asset-hint"></p>
+            <label class="settings-label-wide" id="exportOptionsEncoderEngineWrap" hidden>
+              エンコードエンジン
+              <select id="exportOptionsEncoderEngineSelect"></select>
+            </label>
+            <p id="exportOptionsEncoderEngineHint" class="asset-hint" hidden></p>
+            <div class="settings-grid">
+              <label>
+                FPS
+                <select id="exportOptionsFpsInput">
+                  <option value="8">8</option>
+                  <option value="12">12</option>
+                  <option value="24" selected>24</option>
+                </select>
+              </label>
+              <label id="exportOptionsCrfWrap">
+                CRF（画質：小さいほど高画質）
+                <input id="exportOptionsCrfInput" type="number" min="0" max="51" step="1" />
+              </label>
+              <label id="exportOptionsMaxrateWrap">
+                最大ビットレート (例: 8M / 4000k)
+                <input id="exportOptionsMaxrateInput" type="text" placeholder="未指定" />
+              </label>
+              <label id="exportOptionsEncoderPresetWrap">
+                エンコード速度プリセット
+                <select id="exportOptionsEncoderPresetSelect">
+                  <option value="">指定しない</option>
+                  <option value="ultrafast">ultrafast</option>
+                  <option value="superfast">superfast</option>
+                  <option value="veryfast">veryfast</option>
+                  <option value="faster">faster</option>
+                  <option value="fast">fast</option>
+                  <option value="medium">medium</option>
+                  <option value="slow">slow</option>
+                  <option value="slower">slower</option>
+                  <option value="veryslow">veryslow</option>
+                </select>
+              </label>
+            </div>
+            <div class="settings-checkboxes">
+              <label class="checkbox-row">
+                <input id="exportOptionsIncludeAudioInput" type="checkbox" checked />
+                音声を含める
+              </label>
+              <p class="asset-hint">OFF にすると映像のみのファイル（音声トラックなし）で出力します。透過素材をカット単位で書き出して動画編集ソフトに取り込むとき、音声トラックが無い方が都合が良い場合に使ってください。</p>
+              <label class="checkbox-row">
+                <input id="exportOptionsMonoToStereoInput" type="checkbox" />
+                モノラル音声をステレオにミックスダウン
+              </label>
+            </div>
+            <div class="export-target-radio" role="radiogroup" aria-label="書き出し範囲">
+              <label class="checkbox-row">
+                <input type="radio" name="exportTarget" value="cut" checked />
+                このカット
+              </label>
+              <label class="checkbox-row">
+                <input type="radio" name="exportTarget" value="project" />
+                シナリオ全体
+              </label>
+            </div>
+          </div>
+          <div class="export-dialog-preview">
+            <canvas
+              id="exportPreviewCanvas"
+              class="export-dialog-preview-canvas"
+              width="1920"
+              height="1080"
+              aria-label="書き出しプレビュー"
+            ></canvas>
+            <p id="exportPreviewProgress" class="export-dialog-progress" aria-live="polite"></p>
+            <div
+              id="exportPreviewProgressBar"
+              class="export-dialog-progress-bar"
+              hidden
+            >
+              <div id="exportPreviewProgressBarFill" class="export-dialog-progress-bar-fill"></div>
+            </div>
+          </div>
+        </div>
+        <details id="exportDialogLog" class="export-dialog-log">
+          <summary>ログ</summary>
+          <div id="exportDialogLogContent" class="export-dialog-log-content"></div>
+        </details>
+        <div class="dialog-actions">
+          <button id="exportOptionsConfirmButton" class="primary-button" type="button">
+            <span class="msym button-icon" aria-hidden="true">movie</span>
+            <span>この設定で書き出す</span>
+          </button>
+          <button id="exportOptionsCancelButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>キャンセル</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="videoFixCheckDialog" class="settings-dialog project-form-dialog video-fix-dialog">
+      <form id="videoFixCheckForm" method="dialog" class="project-form-panel">
+        <div class="dialog-header project-form-header">
+          <div>
+            <h2>動画素材の検査</h2>
+            <p id="videoFixCheckDescription">
+              この素材は録画時の frame drop により映像と音声がズレます。<br />
+              アプリ用に再エンコード（CFR + silence 埋め）してから取り込みます。
+            </p>
+          </div>
+        </div>
+        <dl id="videoFixCheckStats" class="video-fix-stats">
+          <div><dt>ファイル</dt><dd id="videoFixCheckFile">-</dd></div>
+          <div><dt>素材長</dt><dd id="videoFixCheckDuration">-</dd></div>
+          <div><dt>検出された gap</dt><dd id="videoFixCheckGapInfo">-</dd></div>
+        </dl>
+        <fieldset id="videoFixPresetGroup" class="video-fix-preset">
+          <legend>エンコード方式</legend>
+          <label id="videoFixPresetHwLabel" hidden>
+            <input type="radio" name="videoFixPreset" value="hw" />
+            <span><span id="videoFixPresetHwName">ハードウェア</span>（高速 / 推奨）<small id="videoFixPresetHwHint">— GPU/専用回路を使用</small></span>
+          </label>
+          <label>
+            <input type="radio" name="videoFixPreset" value="balanced" />
+            <span>バランス（libx264 medium / crf=18）<small>— CPU 全コア。120s 動画で 30s〜1min</small></span>
+          </label>
+          <label>
+            <input type="radio" name="videoFixPreset" value="quality" />
+            <span>画質重視（libx264 slow / crf=15）<small>— CPU 全コア。処理時間 2 倍以上</small></span>
+          </label>
+        </fieldset>
+        <p class="asset-hint">
+          元素材は残し、同じフォルダに <code>&lt;name&gt;.fixed.mp4</code> として保存します。
+        </p>
+        <div class="dialog-actions">
+          <button id="videoFixCheckConfirmButton" class="primary-button" type="submit">
+            <span class="msym button-icon" aria-hidden="true">video_settings</span>
+            <span>再エンコードして取り込む</span>
+          </button>
+          <button id="videoFixCheckCancelButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>キャンセル</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="videoFixProgressDialog" class="settings-dialog project-form-dialog video-fix-dialog">
+      <form id="videoFixProgressForm" method="dialog" class="project-form-panel">
+        <div class="dialog-header project-form-header">
+          <div>
+            <h2 id="videoFixProgressTitle">動画を再エンコード中…</h2>
+            <p id="videoFixProgressDescription">完了までこのウィンドウは閉じられません。</p>
+          </div>
+        </div>
+        <progress id="videoFixProgressBar" value="0" max="1" style="width:100%;height:1.4em"></progress>
+        <p id="videoFixProgressText" class="asset-hint" style="text-align:right">0%</p>
+        <p id="videoFixProgressError" class="asset-warning" role="alert" hidden></p>
+        <div class="dialog-actions">
+          <button id="videoFixProgressCloseButton" type="button" disabled>
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>閉じる</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+    <script type="module" src="/static/js/app.js?v=20260505-v2-export"></script>
+  </body>
+</html>

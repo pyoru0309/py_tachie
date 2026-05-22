@@ -1,0 +1,114 @@
+{
+  "version": 4,
+  "id": "maki_py",
+  "name": "マキ",
+  "backHairs": [],
+  "bases": [
+    {
+      "id": "base_マキ_ボディ",
+      "name": "マキ_ボディ",
+      "path": "assets/characters/maki_py/base/マキ_ボディ.avif",
+      "sourceCombination": "マキ/ボディ"
+    }
+  ],
+  "cheeks": [],
+  "eyes": [
+    {
+      "id": "eye_マキ_目_目閉じ",
+      "name": "マキ_目_目閉じ",
+      "path": "assets/characters/maki_py/eye/マキ_目_目閉じ.avif",
+      "sourceCombination": "マキ/目/目閉じ",
+      "flags": {
+        "blinkClosed": true
+      }
+    },
+    {
+      "id": "eye_マキ_目_半目閉じ",
+      "name": "マキ_目_半目閉じ",
+      "path": "assets/characters/maki_py/eye/マキ_目_半目閉じ.avif",
+      "sourceCombination": "マキ/目/半目閉じ",
+      "flags": {
+        "blinkHalf": true
+      }
+    },
+    {
+      "id": "eye_マキ_目_目開き",
+      "name": "マキ_目_目開き",
+      "path": "assets/characters/maki_py/eye/マキ_目_目開き.avif",
+      "sourceCombination": "マキ/目/目開き",
+      "flags": {
+        "blinkOpen": true
+      }
+    },
+    {
+      "id": "eye_マキ_目_泣き1",
+      "name": "マキ_目_泣き1",
+      "path": "assets/characters/maki_py/eye/マキ_目_泣き1.avif",
+      "sourceCombination": "マキ/目/泣き1"
+    },
+    {
+      "id": "eye_マキ_目_泣き2",
+      "name": "マキ_目_泣き2",
+      "path": "assets/characters/maki_py/eye/マキ_目_泣き2.avif",
+      "sourceCombination": "マキ/目/泣き2"
+    }
+  ],
+  "mouths": [
+    {
+      "id": "mouth_マキ_口_大きな開き口",
+      "name": "マキ_口_大きな開き口",
+      "path": "assets/characters/maki_py/mouth/マキ_口_大きな開き口.avif",
+      "sourceCombination": "マキ/口/大きな開き口",
+      "flags": {
+        "lipOpen": true
+      }
+    },
+    {
+      "id": "mouth_マキ_口_開き口",
+      "name": "マキ_口_開き口",
+      "path": "assets/characters/maki_py/mouth/マキ_口_開き口.avif",
+      "sourceCombination": "マキ/口/開き口",
+      "flags": {
+        "lipMid": true
+      }
+    },
+    {
+      "id": "mouth_マキ_口_閉じ口",
+      "name": "マキ_口_閉じ口",
+      "path": "assets/characters/maki_py/mouth/マキ_口_閉じ口.avif",
+      "sourceCombination": "マキ/口/閉じ口",
+      "flags": {
+        "lipClosed": true
+      }
+    },
+    {
+      "id": "mouth_マキ_口_ワ口",
+      "name": "マキ_口_ワ口",
+      "path": "assets/characters/maki_py/mouth/マキ_口_ワ口.avif",
+      "sourceCombination": "マキ/口/ワ口"
+    },
+    {
+      "id": "mouth_マキ_口_波口",
+      "name": "マキ_口_波口",
+      "path": "assets/characters/maki_py/mouth/マキ_口_波口.avif",
+      "sourceCombination": "マキ/口/波口"
+    }
+  ],
+  "bangs": [],
+  "fronts": [],
+  "defaults": {
+    "character": {
+      "x": 240,
+      "y": -250,
+      "scale": 1.0
+    },
+    "removeWhite": false,
+    "baseId": "base_マキ_ボディ"
+  },
+  "importYaml": "import_manifest.yml",
+  "voice": {
+    "id": "voicepeak:Tsurumaki Maki",
+    "emotion": ""
+  },
+  "color": "#ffc800"
+}

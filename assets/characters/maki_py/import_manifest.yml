@@ -1,0 +1,47 @@
+schemaVersion: 1
+id: maki_py
+name: マキ
+removeWhite: false
+voice:
+  id: voicepeak:Tsurumaki Maki
+color: '#ffc800'
+ベース:
+- マキ/ボディ
+目:
+- マキ/目/目閉じ
+- マキ/目/半目閉じ
+- マキ/目/目開き
+- マキ/目/泣き1
+- マキ/目/泣き2
+口:
+- マキ/口/大きな開き口
+- マキ/口/開き口
+- マキ/口/閉じ口
+- マキ/口/ワ口
+- マキ/口/波口
+サムネイル: マキ/口/開き口,マキ/目/目開き,マキ/ボディ
+flags:
+  マキ/目/目閉じ:
+  - blinkClosed
+  マキ/目/半目閉じ:
+  - blinkHalf
+  マキ/目/目開き:
+  - blinkOpen
+  マキ/口/大きな開き口:
+  - lipOpen
+  マキ/口/開き口:
+  - lipMid
+  マキ/口/閉じ口:
+  - lipClosed
+expressionPresets:
+- name: 表情1
+  isDefault: true
+  cheek: ''
+  eye: マキ_目_目開き
+  mouth: マキ_口_閉じ口
+hairstylePresets:
+- name: 髪型1
+  isDefault: true
+  base: マキ_ボディ
+  bangs: ''
+  backHair: ''

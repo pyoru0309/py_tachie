@@ -1,0 +1,10 @@
+[
+  {
+    "id": "preset_1",
+    "name": "表情1",
+    "cheekId": "",
+    "eyeId": "eye_マキ_目_目開き",
+    "mouthId": "mouth_マキ_口_閉じ口",
+    "isDefault": true
+  }
+]

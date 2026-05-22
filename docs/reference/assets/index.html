@@ -1,0 +1,1725 @@
+
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="立ち絵合成・シナリオプレビュー・動画書き出しツールの利用マニュアル">
+      
+      
+        <meta name="author" content="立ち絵システム">
+      
+      
+      
+        <link rel="prev" href="../project-settings/">
+      
+      
+        <link rel="next" href="../file-structure/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.33">
+    
+    
+      
+        <title>素材管理 - 立ち絵システム ユーザーガイド</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.53a7feaf.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=LINE+Seed+JP:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"LINE Seed JP";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="ナビゲーション"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          コンテンツにスキップ
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="ヘッダー">
+    <a href="../.." title="立ち絵システム ユーザーガイド" class="md-header__button md-logo" aria-label="立ち絵システム ユーザーガイド" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="ナビゲーション">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            立ち絵システム ユーザーガイド
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              素材管理
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="ダークモードに切替"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="ダークモードに切替" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="ライトモードに切替"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="ライトモードに切替" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="検索">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="検索">
+  <button type="button" class="md-search__button">
+    検索
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="ナビゲーション" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="立ち絵システム ユーザーガイド" class="md-nav__button md-logo" aria-label="立ち絵システム ユーザーガイド" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    立ち絵システム ユーザーガイド
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ホーム
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    チュートリアル
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    チュートリアル
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    はじめに
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/create-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクトを作成する
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/import-character/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    キャラクターをインポートする
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/voice-synthesis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    音声合成 (VOICEVOX / VOICEPEAK) を使う
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/export-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PNG / 動画を書き出す
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リファレンス
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    リファレンス
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    編集画面リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../title-editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    タイトル組版エディタ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../project-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクト設定リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    素材管理
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    素材管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        共通素材
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プロジェクト固有素材
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        背景
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        動画背景
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        音声
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        効果音
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        フォント
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#png" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        セリフ枠の装飾 PNG
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャラクター
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        素材再スキャン
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        アセット管理ダイアログ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="アセット管理ダイアログ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        「キャッシュ」タブ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        起動時の自動間引き
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        「音声（プロジェクト）」での未使用フィルタと一括削除
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャラクターサムネイル
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        レイヤー編集 (目パチ・口パクのフラグ + 表示名)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        表情プリセット / 髪型プリセット (アセット定義)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャラクターカラー
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../file-structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ファイル構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    テクニカルガイド
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    テクニカルガイド
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/character-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    キャラクターモデルの推奨構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/psd-layer-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PSD レイヤー命名規則
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/scenario-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シナリオ形式
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/rendering-and-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    レンダリングと動画生成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/visualizer-plugin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    オーディオビジュアライザ開発ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    トラブルシュート
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        共通素材
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プロジェクト固有素材
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        背景
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        動画背景
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        音声
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        効果音
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        フォント
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#png" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        セリフ枠の装飾 PNG
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャラクター
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        素材再スキャン
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        アセット管理ダイアログ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="アセット管理ダイアログ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        「キャッシュ」タブ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        起動時の自動間引き
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        「音声（プロジェクト）」での未使用フィルタと一括削除
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャラクターサムネイル
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        レイヤー編集 (目パチ・口パクのフラグ + 表示名)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        表情プリセット / 髪型プリセット (アセット定義)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャラクターカラー
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="ナビゲーション" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    ホーム
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../editor/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    リファレンス
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+<h1 id="_1">素材管理<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<p>素材は、全プロジェクトで使う共通素材と、特定プロジェクトだけで使うプロジェクト固有素材に分かれます。
+両方に素材がある場合、プロジェクト固有素材と共通素材があわせて選択肢に表示されます。</p>
+<h2 id="_2">共通素材<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>assets/
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  characters/
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  backgrounds/
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  videos/
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  audio/
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  sound_effects/
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  fonts/
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  overlays/
+</span></code></pre></div>
+<h2 id="_3">プロジェクト固有素材<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>projects/&lt;project_id&gt;/
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  assets/
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    characters/
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    backgrounds/
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    videos/
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    audio/
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    sound_effects/
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    fonts/
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    overlays/
+</span></code></pre></div>
+<p><code>projects/</code> の保存先は全体設定で別ディレクトリへ切り替えられます。</p>
+<h2 id="_4">背景<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<p>背景は <code>backgrounds/</code> に置きます。対応拡張子は <code>.png</code> / <code>.jpg</code> / <code>.jpeg</code> / <code>.webp</code> / <code>.avif</code> です。
+出力時は 1920×1080 にカバー配置されます。</p>
+<h2 id="_5">動画背景<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<p>シーンの <code>videoTrack</code> で使う動画は <code>videos/</code> に置きます。対応コンテナは <code>.mp4</code> / <code>.mov</code> / <code>.webm</code> など、ffmpeg / ブラウザ両方が読める形式を推奨します。<code>fit</code> (cover / contain / fit)、<code>muted</code>、<code>loop</code>、<code>trimStartSec</code> / <code>trimEndSec</code>、<code>speed</code> を指定できます。</p>
+<h2 id="_6">音声<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<p>音声は <code>audio/</code> に置きます。対応拡張子は <code>.wav</code> / <code>.mp3</code> / <code>.m4a</code> / <code>.aac</code> / <code>.ogg</code> です。
+カットに音声を設定すると、口パク解析と動画書き出しの両方で利用されます。
+シーンの BGM (<code>bgmTracks</code>) も同じ拡張子をサポートし、<code>volume</code> / <code>fadeInSec</code> / <code>fadeOutSec</code> / <code>useForLipSync</code> で挙動を調整します。</p>
+<h2 id="_7">効果音<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<p>効果音は <code>sound_effects/</code> に置きます。対応拡張子は音声と同じく <code>.wav</code> / <code>.mp3</code> / <code>.m4a</code> / <code>.aac</code> / <code>.ogg</code> です。
+タイムラインの効果音帯 (テロップ帯の直下) に配置すると、シーン時間軸上の任意の点で再生されます。同じ時刻に複数の効果音を重ねることができます。</p>
+<p>スキーマは <code>scene.soundEffects[]</code> で、1 アイテムあたり次のフィールドを持ちます。</p>
+<table>
+<thead>
+<tr>
+<th>フィールド</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>アイテム ID (自動生成)</td>
+</tr>
+<tr>
+<td><code>src</code></td>
+<td>素材ファイルパス</td>
+</tr>
+<tr>
+<td><code>startFrame</code></td>
+<td>再生開始フレーム</td>
+</tr>
+<tr>
+<td><code>durationFrame</code></td>
+<td>区間の長さ (フレーム数)。0 のときは素材長そのまま</td>
+</tr>
+<tr>
+<td><code>loop</code></td>
+<td><code>true</code> で <code>durationFrame</code> 区間内をループ再生 (<code>durationFrame</code> が素材より長いとき)</td>
+</tr>
+<tr>
+<td><code>audioOffsetSec</code></td>
+<td>素材内の頭出し秒数。タイムラインで左端をドラッグして切ったときの再生開始位置 / 「再生位置で音声分割」の右側に入る値</td>
+</tr>
+<tr>
+<td><code>volume</code></td>
+<td>音量 (0.0〜1.0+)</td>
+</tr>
+<tr>
+<td><code>fadeInSec</code> / <code>fadeOutSec</code></td>
+<td>区間冒頭・末尾のフェード秒</td>
+</tr>
+<tr>
+<td><code>linkedCutId</code></td>
+<td>カット境界と同期させたいときの紐付け先カット ID</td>
+</tr>
+</tbody>
+</table>
+<p>タイムライン上では効果音バーの <strong>左右両端をドラッグでリサイズ</strong>、<strong>バー本体をドラッグで移動</strong>、<code>Shift+クリック</code> で <strong>複数選択</strong> ができます。再生位置に乗っている効果音は「再生位置で分割」ボタンが「音声分割」に切り替わり、<code>durationFrame</code> と <code>audioOffsetSec</code> を分けて 2 つに分割します (新しい音声ファイルは作りません)。</p>
+<h2 id="_8">フォント<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<p>フォントは <code>fonts/</code> に置きます。対応拡張子は <code>.otf</code> と <code>.ttf</code> です。素材再スキャン後、書体セレクタに反映されます。
+ファイル名の末尾が <code>Bold</code> / <code>Medium</code> / <code>Regular</code> などの場合は太さとして推定されます。
+ライブプレビューの canvas は manifest 上のフォント情報を <code>FontFace</code> 登録して、サーバの Pillow と同じ書体で描画します。</p>
+<h2 id="png">セリフ枠の装飾 PNG<a class="headerlink" href="#png" title="Permanent link">&para;</a></h2>
+<p>装飾 PNG は <code>overlays/</code> に置きます。設定画面の <code>装飾 PNG</code> で選択すると、セリフ枠に重ねて描画されます。</p>
+<h2 id="_9">キャラクター<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<p>キャラクターは <code>characters/&lt;character_id&gt;/</code> に置きます。<code>character_manifest.json</code> がない場合でも、カテゴリフォルダ (<code>back_hair/</code> / <code>base/</code> / <code>cheek/</code> / <code>eye/</code> / <code>mouth/</code> / <code>bangs/</code> / <code>front/</code>) から素材一覧を生成できます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>characters/
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  sample/
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    character_manifest.json
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    thumb.png                  (任意)
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    import_manifest.yml        (任意。配布用マニフェスト。レイヤー編集 / プリセット保存時に自動更新)
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    expression_presets.json    (任意。アセット単位の表情プリセット定義)
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    hairstyle_presets.json     (任意。アセット単位の髪型プリセット定義)
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    back_hair/
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    base/
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    cheek/
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    eye/
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    mouth/
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    bangs/
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    front/
+</span></code></pre></div>
+<p>PSD は <code>characters/&lt;character_id&gt;/psd/</code> に置きます。サーバ起動時または素材再スキャン時に、未変換または更新済みの PSD を自動で再インポートします。</p>
+<h2 id="_10">素材再スキャン<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
+<p>ファイルを追加・削除・差し替えた後は、ヘッダーの <code>素材再スキャン</code> を押します。
+プロジェクトの <code>generated/manifest.json</code> が更新され、背景・動画・音声・フォント・装飾 PNG・キャラクターの選択肢に反映されます。</p>
+<h2 id="_11">アセット管理ダイアログ<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
+<p>ヘッダーの <code>素材</code> (またはダッシュボードの該当タブ) から、素材ファイルを直接管理できます。</p>
+<ul>
+<li>ドラッグ &amp; ドロップでアップロード</li>
+<li>名称変更 / 削除 / ゴミ箱からの復元 / ゴミ箱を空にする</li>
+<li>共通素材 / プロジェクト固有素材の切替</li>
+<li>欠落しているパス (<code>assetMissing</code>) のハイライト</li>
+</ul>
+<h3 id="_12">「キャッシュ」タブ<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
+<p>プロジェクトツリーの <strong>キャッシュ</strong> を選ぶと、<code>projects/&lt;id&gt;/cache/</code> 配下の中間ファイル群と、全プロジェクトで共有される <code>cache/clean_pcm/</code> (録画素材の連続 PCM キャッシュ) のサイズを一覧で確認できます。</p>
+<ul>
+<li>上段の <strong>合計サイズサマリ</strong> に「全プロジェクト + 共有を全削除」ボタンが付きます。</li>
+<li>プロジェクト別の行には <code>preview</code> (= GL バック描画の中間 PNG) と <code>lipsync</code> (= 口パク解析データ) のサイズと件数が出ます。<strong>削除</strong> ボタンでそのプロジェクトのキャッシュだけを空にできます。</li>
+<li>一番下の <strong>共有キャッシュ</strong> 行で <code>clean_pcm</code> (動画レイヤーの音声 PTS gap 補正用 WAV キャッシュ) を空にできます。<code>psd-importer/</code> は PSD インポート中セッションの作業用なので、ここからは触りません (= 既存仕組みで自動管理されます)。</li>
+</ul>
+<p>削除しても<strong>プロジェクトは壊れません</strong>。次回開いたときに必要分だけ自動再生成されます。長尺シナリオを何ヶ月も触っていると <code>cache/preview/</code> だけで数 GB に膨らみがちなので、書き出しが終わって落ち着いたら定期的に削除するのがおすすめです。</p>
+<p><code>thumbnail.png</code> (プロジェクト一覧用のサムネイル) は削除対象外で残ります。</p>
+<h3 id="_13">起動時の自動間引き<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h3>
+<p><code>全体設定 → キャッシュ</code> タブで、mtime が指定日数より古いキャッシュファイルを起動時に自動削除する設定ができます。既定は <strong>ON / 30 日</strong>。</p>
+<p>対象は <code>cache/preview/</code> / <code>cache/lipsync/</code> / <code>cache/clean_pcm/</code> の 3 つだけで、<code>thumbnail.png</code> と <code>psd-importer/</code> には触れません。最近編集中の token (= ファイル名 SHA1 ハッシュ) は mtime が更新されているので削除されず、起動直後のヒットレートは維持されます。</p>
+<h3 id="_14">「音声（プロジェクト）」での未使用フィルタと一括削除<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h3>
+<p>プロジェクト固有の <strong>音声</strong> カテゴリでは、ファイル数が増えがちな TTS 生成物 (<code>audio/tts/*.wav</code>) を効率的に整理するための専用ツールバーが表示されます。</p>
+<ul>
+<li><strong>未使用のみ表示</strong> チェックで、現在のシナリオに参照されていない音声だけに絞り込めます。参照判定は <code>cut.audio</code> (話者音声) と <code>scene.bgmTracks[].src</code> (BGM) を走査して行います (効果音は別カテゴリなので対象外)。</li>
+<li>各音声カードの右上に <strong>「使用中」 / 「未使用」</strong> バッジが付き、左上にチェックボックスが付きます。使用中の音声はチェックボックスが無効化されているので、誤って削除されません。</li>
+<li><strong>「未使用を全選択」</strong> で表示中の未使用音声をまとめて選択 → <strong>「選択した音声を一括削除」</strong> でゴミ箱へ送れます (個別カードの「削除」ボタンも従来どおり使えます)。ゴミ箱からは復元できます。</li>
+</ul>
+<p>このツールバーは「音声（プロジェクト）」でのみ表示されます。共通音声、効果音、その他のカテゴリには出ません。</p>
+<h2 id="_15">キャラクターサムネイル<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h2>
+<p>キャラクターのサムネイルは <code>&lt;character_id&gt;/thumb.png</code> を優先して使用します。
+PSD インポート時に <code>thumb</code> / <code>thumbnail</code> / <code>サムネイル</code> / <code>サムネ</code> のレイヤーがあれば自動で書き出されます。
+手動で差し替えたい場合は同名の PNG を直接配置してください。</p>
+<h2 id="_16">レイヤー編集 (目パチ・口パクのフラグ + 表示名)<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h2>
+<p><code>キャラ管理</code> ダイアログから <code>レイヤー編集</code> を開くと、各レイヤーに以下を設定できます。</p>
+<ul>
+<li><strong>表示名 (<code>name</code>)</strong>: セレクタやリストで使われる人間向けラベル。インポート直後の機械生成名 (例: <code>制服_デフォルト</code>) を読みやすい名前に直したい場面に。レイヤー ID は不変なので、シナリオの参照は壊れません。</li>
+<li><strong>目パチフラグ (eye)</strong>: <code>開き</code> (= <code>blinkOpen</code>) / <code>中間</code> (= <code>blinkHalf</code>) / <code>閉じ</code> (= <code>blinkClosed</code>)</li>
+<li><strong>口パクフラグ (mouth)</strong>: <code>閉じ</code> (= <code>lipClosed</code>) / <code>中間</code> (= <code>lipMid</code>) / <code>開き</code> (= <code>lipOpen</code>)</li>
+</ul>
+<p><code>blinkOpen</code> 以外は manifest 全体で <strong>1 枚だけ</strong> 立てられる排他フラグで、別レイヤーで ON にすると自動で外れます。フラグの動作詳細は <a href="../../technical/character-model/#blink-lipsync-flags">キャラクターモデル</a> を参照してください。</p>
+<p>設定した表示名 / フラグは <code>character_manifest.json</code> の各エントリに書き込まれ、<code>import_manifest.yml</code> の <code>flags:</code> ブロックや <code>expressionPresets</code> / <code>hairstylePresets</code> 内のレイヤー名参照も同期更新されます。</p>
+<h2 id="_17">表情プリセット / 髪型プリセット (アセット定義)<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
+<p>ダッシュボード → アセット管理から各キャラクターカードに 2 つのプリセット編集アイコンが追加されています。</p>
+<ul>
+<li><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 17.5c2.33 0 4.3-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5M8.5 11A1.5 1.5 0 0 0 10 9.5 1.5 1.5 0 0 0 8.5 8 1.5 1.5 0 0 0 7 9.5 1.5 1.5 0 0 0 8.5 11m7 0A1.5 1.5 0 0 0 17 9.5 1.5 1.5 0 0 0 15.5 8 1.5 1.5 0 0 0 14 9.5a1.5 1.5 0 0 0 1.5 1.5M12 20a8 8 0 0 1-8-8 8 8 0 0 1 8-8 8 8 0 0 1 8 8 8 8 0 0 1-8 8m0-18C6.47 2 2 6.5 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2"/></svg></span> <strong>表情プリセット</strong>: 頬 + 目 + 口 の組合せをアセット側で名前付き保存します。プロジェクト編集画面のセレクタにも <code>(アセット)</code> 印つきで自動表示されます。プロジェクト固有の組合せ上書きはカット編集の「保存」ボタンで作れます (<a href="../../technical/character-model/#expression-presets">詳細</a>)。</li>
+<li><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m19 3-6 6 2 2 7-7V3m-10 9.5a.5.5 0 0 1-.5-.5.5.5 0 0 1 .5-.5.5.5 0 0 1 .5.5.5.5 0 0 1-.5.5M6 20a2 2 0 0 1-2-2 2 2 0 0 1 2-2 2 2 0 0 1 2 2 2 2 0 0 1-2 2M6 8a2 2 0 0 1-2-2 2 2 0 0 1 2-2 2 2 0 0 1 2 2 2 2 0 0 1-2 2m3.64-.36c.23-.5.36-1.05.36-1.64a4 4 0 0 0-4-4 4 4 0 0 0-4 4 4 4 0 0 0 4 4c.59 0 1.14-.13 1.64-.36L10 12l-2.36 2.36C7.14 14.13 6.59 14 6 14a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4c0-.59-.13-1.14-.36-1.64L12 14l7 7h3v-1z"/></svg></span> <strong>髪型プリセット</strong>: ベース + 前髪 + 後ろ髪 の組合せを名前付き保存します。アセット定義のみで完結し、プロジェクト固有の上書きは持ちません。<code>デフォルト</code> を 1 つ立てておくと、新規キャラ追加時に自動選択されます (<a href="../../technical/character-model/#hairstyle-presets">詳細</a>)。</li>
+</ul>
+<p>どちらのプリセットも <code>assets/characters/&lt;id&gt;/expression_presets.json</code> / <code>hairstyle_presets.json</code> に保存され、保存と同時に <code>import_manifest.yml</code> も透過ミラーで再生成されます。配布用アセット ZIP にそのまま同梱できます。</p>
+<h2 id="_18">キャラクターカラー<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h2>
+<p>ヘッダーの <code>キャラ管理</code> でキャラクターを選んで開くダイアログ右上に、<strong>カラー</strong> ピッカーがあります。ここで設定した色 (<code>character_manifest.json</code> の <code>color</code> フィールド) は次の場所で表示色に反映されます。</p>
+<ul>
+<li>編集画面の <strong>アクティブなカットカード</strong> のアクセントカラー（タイトル左の縦バー / 枠線 / 背景塗り）</li>
+<li>タイムライン下部の <strong>カットバー</strong> の塗り色</li>
+</ul>
+<p>「未指定」（<code>color</code> 空文字）のときは従来どおりテーマのアクセントカラーが使われます。話者キャラが未設定のカット、もしくは話者キャラの色が未指定のカットも未指定扱いです。色を再設定したいときは、ピッカーの右の <code>restart_alt</code> ボタン（「未指定（アクセントカラーを使う）に戻す」）を押すと初期化できます。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="フッター" >
+        
+          
+          <a href="../project-settings/" class="md-footer__link md-footer__link--prev" aria-label="前: プロジェクト設定リファレンス">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                前
+              </span>
+              <div class="md-ellipsis">
+                プロジェクト設定リファレンス
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../file-structure/" class="md-footer__link md-footer__link--next" aria-label="次: ファイル構成">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                次
+              </span>
+              <div class="md-ellipsis">
+                ファイル構成
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.footer","navigation.indexes","navigation.sections","navigation.path","navigation.tracking","search.highlight","toc.follow"],"search":"../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"コピーしました","clipboard.copy":"クリップボードへコピー","search.result.more.one":"このページ内にもう1件見つかりました","search.result.more.other":"このページ内にあと#件見つかりました","search.result.none":"何も見つかりませんでした","search.result.one":"1件見つかりました","search.result.other":"#件見つかりました","search.result.placeholder":"検索キーワードを入力してください","search.result.term.missing":"検索に含まれない","select.version":"バージョン切り替え"},"version":null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.63456bd9.min.js"></script>
+      
+    
+  </body>
+</html>

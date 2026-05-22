@@ -1,0 +1,1749 @@
+
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="立ち絵合成・シナリオプレビュー・動画書き出しツールの利用マニュアル">
+      
+      
+        <meta name="author" content="立ち絵システム">
+      
+      
+      
+        <link rel="prev" href="../technical/visualizer-plugin/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.33">
+    
+    
+      
+        <title>トラブルシュート - 立ち絵システム ユーザーガイド</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.53a7feaf.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=LINE+Seed+JP:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"LINE Seed JP";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="ナビゲーション"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          コンテンツにスキップ
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="ヘッダー">
+    <a href="./.." title="立ち絵システム ユーザーガイド" class="md-header__button md-logo" aria-label="立ち絵システム ユーザーガイド" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="ナビゲーション">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            立ち絵システム ユーザーガイド
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              トラブルシュート
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="ダークモードに切替"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="ダークモードに切替" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="ライトモードに切替"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="ライトモードに切替" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="検索">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="検索">
+  <button type="button" class="md-search__button">
+    検索
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="ナビゲーション" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="立ち絵システム ユーザーガイド" class="md-nav__button md-logo" aria-label="立ち絵システム ユーザーガイド" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    立ち絵システム ユーザーガイド
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ホーム
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    チュートリアル
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    チュートリアル
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    はじめに
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/create-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクトを作成する
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/import-character/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    キャラクターをインポートする
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/voice-synthesis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    音声合成 (VOICEVOX / VOICEPEAK) を使う
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/export-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PNG / 動画を書き出す
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リファレンス
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    リファレンス
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    編集画面リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/title-editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    タイトル組版エディタ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/project-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクト設定リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    素材管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/file-structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ファイル構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    テクニカルガイド
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    テクニカルガイド
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../technical/character-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    キャラクターモデルの推奨構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../technical/psd-layer-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PSD レイヤー命名規則
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../technical/scenario-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シナリオ形式
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../technical/rendering-and-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    レンダリングと動画生成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../technical/visualizer-plugin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    オーディオビジュアライザ開発ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    トラブルシュート
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    トラブルシュート
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        画面が開かない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#110-fps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        動画書き出しが極端に遅い (1〜10 fps しか出ない)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#windows-activateps1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows で Activate.ps1 が実行できない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        素材が選択肢に出ない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャラクターが表示されない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        白い部分が消えすぎる
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        黒線がジャギジャギする / にじむ
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        口パクが動かない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目パチが動かない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ffmpeg-ffmpeg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ffmpeg が見つからない / 「ffmpeg が利用できません」と出る
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        動画書き出しに失敗する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nvenc-videotoolbox-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        書き出し時に NVENC / VideoToolbox が UI に出てこない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        フォントが反映されない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#weight-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        フォントの太さ (weight) が思ったものにならない / セレクタに 1 種類しか出ない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        動画レイヤーの音声が後半でズレる / 「再エンコードしますか？」と聞かれる
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cdn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        オフラインで動かしたい (CDN を使いたくない)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プロジェクトを別環境に持って行きたい
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#psd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PSD インポートで差分が出ない / レイヤーが落ちる
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ライブプレビューが重い / もたつく
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#voicevox-voicepeak" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        音声合成 (VOICEVOX / VOICEPEAK)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#undo-redo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Undo / Redo が効かない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        起動はするが書き出しキャッシュが肥大化する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        効果音をループ + 区間指定で使うと、書き出しで指定区間を超えて鳴り続ける
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        画面が開かない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#110-fps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        動画書き出しが極端に遅い (1〜10 fps しか出ない)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#windows-activateps1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows で Activate.ps1 が実行できない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        素材が選択肢に出ない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャラクターが表示されない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        白い部分が消えすぎる
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        黒線がジャギジャギする / にじむ
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        口パクが動かない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目パチが動かない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ffmpeg-ffmpeg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ffmpeg が見つからない / 「ffmpeg が利用できません」と出る
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        動画書き出しに失敗する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nvenc-videotoolbox-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        書き出し時に NVENC / VideoToolbox が UI に出てこない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        フォントが反映されない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#weight-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        フォントの太さ (weight) が思ったものにならない / セレクタに 1 種類しか出ない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        動画レイヤーの音声が後半でズレる / 「再エンコードしますか？」と聞かれる
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cdn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        オフラインで動かしたい (CDN を使いたくない)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プロジェクトを別環境に持って行きたい
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#psd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PSD インポートで差分が出ない / レイヤーが落ちる
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ライブプレビューが重い / もたつく
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#voicevox-voicepeak" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        音声合成 (VOICEVOX / VOICEPEAK)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#undo-redo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Undo / Redo が効かない
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        起動はするが書き出しキャッシュが肥大化する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        効果音をループ + 区間指定で使うと、書き出しで指定区間を超えて鳴り続ける
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+<h1 id="_1">トラブルシュート<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<h2 id="_2">画面が開かない<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<p>サーバが起動しているか確認してください。</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>app<span class="w">                    </span><span class="c1"># 推奨 (内部で ws_per_message_deflate=False を強制)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python3<span class="w"> </span>-m<span class="w"> </span>app<span class="w"> </span>--port<span class="w"> </span><span class="m">8001</span><span class="w">        </span><span class="c1"># 別ポートで上書きしたいとき</span>
+</span></code></pre></div>
+<p>ブラウザでは <code>http://127.0.0.1:8000/</code> を開きます。
+別のプロセスが 8000 番ポートを使っている場合は、上の <code>--port</code> で別ポートに切り替えて URL もそれに合わせます。</p>
+<h2 id="110-fps">動画書き出しが極端に遅い (1〜10 fps しか出ない)<a class="headerlink" href="#110-fps" title="Permanent link">&para;</a></h2>
+<p>WebSocket の permessage-deflate が原因のことが多いです。<code>python -m app</code> で起動していれば自動で OFF になりますが、<code>uvicorn</code> を直接呼んでいる場合は次が必要です。</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>-m<span class="w"> </span>uvicorn<span class="w"> </span>app.main:app<span class="w"> </span>--host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span>--ws-per-message-deflate<span class="w"> </span><span class="nb">false</span>
+</span></code></pre></div>
+<p><code>websockets</code> ライブラリが入っていないと WebSocket 自体が動きません。<code>requirements.txt</code> には個別に <code>websockets</code> を明記しているので、<code>pip install -r requirements.txt</code> で確実に入ります。</p>
+<h2 id="windows-activateps1">Windows で <code>Activate.ps1</code> が実行できない<a class="headerlink" href="#windows-activateps1" title="Permanent link">&para;</a></h2>
+<p>PowerShell の実行ポリシーで止められている可能性があります。次のいずれかで対処します。</p>
+<div class="language-powershell highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c"># A. 一時的に Bypass で起動する</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">PowerShell</span> <span class="n">-ExecutionPolicy</span> <span class="n">Bypass</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c"># B. コマンドプロンプトで activate.bat を使う</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">.\.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">activate</span><span class="p">.</span><span class="n">bat</span>
+</span></code></pre></div>
+<h2 id="_3">素材が選択肢に出ない<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p>素材を正しいフォルダに置いたあと、ヘッダーの <code>素材再スキャン</code> を押してください。
+背景・動画・音声・フォント・装飾 PNG・キャラクターの各フォルダと対応拡張子を確認してください。
+共通素材 (<code>assets/</code>) とプロジェクト固有素材 (<code>projects/&lt;id&gt;/assets/</code>) のどちらに置いたかも確認します。</p>
+<h2 id="_4">キャラクターが表示されない<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<p>次を確認します。</p>
+<ul>
+<li>カット内にキャラクターが追加されている</li>
+<li><code>キャラクターを表示</code> が有効になっている</li>
+<li><code>base</code> の素材 ID が選ばれている</li>
+<li>画像ファイルが PNG / WebP / AVIF として開ける</li>
+<li>X / Y 座標と拡大率が画面外になっていない</li>
+</ul>
+<h2 id="_5">白い部分が消えすぎる<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<p><code>白背景を透過扱いにする</code> は <code>#FFFFFF</code> 完全一致のピクセルだけを透明化する簡易処理です。
+白い服、白い髪飾り、ハイライトなどが消える場合は、透過 PNG として素材を書き出してください。</p>
+<h2 id="_6">黒線がジャギジャギする / にじむ<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<p>純黒線画キャラなら、PSD インポータダイアログ下部の <strong>黒線アンチエイリアス</strong> を ON にして取り込み直してください。
+プリセットセレクタで「シャープ / 標準 / ソフト / マイルド / 太線対応」が選べます。絵柄や線の太さによって相性が違うので、同じ PSD を別 ID で複数回インポートして比較するのが手早いです。
+詳しくは <a href="../technical/character-model/#黒線アンチエイリアス-psd-インポート時に焼き込み">キャラクターモデル: 黒線アンチエイリアス</a> を参照してください。</p>
+<p>なお処理は素材 PNG に焼き込まれます (再生時のオン・オフは無し)。後から変えたいときは PSD を再インポートします。</p>
+<h2 id="_7">口パクが動かない<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<p>次を確認します。</p>
+<ul>
+<li>設定画面の <code>口パク</code> が有効になっている</li>
+<li>カットに話者 (<code>speakerCharacterId</code>) が設定されている</li>
+<li>話者キャラのレイヤー編集で、口素材に <code>閉じ</code> / <code>中間</code> / <code>開き</code> (= <code>lipClosed</code> / <code>lipMid</code> / <code>lipOpen</code>) のフラグが立っている (最低 <code>開き</code> 1 つ)</li>
+<li>音声ファイルが存在しているか、シーンの BGM で <code>useForLipSync</code> が ON になっている</li>
+<li><code>ffmpeg</code> / <code>ffprobe</code> が利用できる</li>
+</ul>
+<p>無音区間ではカット選択の口がそのまま表示される仕様です (<code>lipMid</code> 未設定なら mid 帯域もカット選択にフォールバック)。</p>
+<h2 id="_8">目パチが動かない<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<p>次を確認します。</p>
+<ul>
+<li>設定画面の <code>目パチ</code> が有効になっている</li>
+<li>レイヤー編集で「目パチさせたい目」(普通目・驚き目など) に <code>開き</code> (= <code>blinkOpen</code>) フラグが立っている</li>
+<li>レイヤー編集で閉じ目素材に <code>閉じ</code> (= <code>blinkClosed</code>) フラグが立っている (これが無いと目パチ自体が起きない)</li>
+<li>カットで選んだ目が <code>開き</code> フラグ付きである (笑い目・ウインク目を選んだカットは目パチがスキップされる仕様)</li>
+</ul>
+<p><code>中間</code> (= <code>blinkHalf</code>) は任意で、無ければ「ぱちっと閉じてぱちっと開く」2 段目パチになります。</p>
+<h2 id="ffmpeg-ffmpeg">ffmpeg が見つからない / 「ffmpeg が利用できません」と出る<a class="headerlink" href="#ffmpeg-ffmpeg" title="Permanent link">&para;</a></h2>
+<ul>
+<li>ターミナルで <code>ffmpeg -version</code> を実行できるか確認してください。コマンドが見つからない場合は ffmpeg がインストールされていない、または PATH に通っていません。</li>
+<li>インストール手順は <a href="../tutorials/getting-started/#3-ffmpeg-のインストール">はじめに</a> を参照してください。</li>
+<li>macOS は <code>brew install ffmpeg</code>、Windows は <code>winget install Gyan.FFmpeg</code> がいちばん簡単です。</li>
+<li>PATH に通せない場合は、立ち絵システムの <code>全体設定 → ffmpeg のパス</code> に <code>ffmpeg</code> (Windows なら <code>ffmpeg.exe</code>) の絶対パスを指定すれば動きます。</li>
+</ul>
+<h2 id="_9">動画書き出しに失敗する<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<ul>
+<li>上記「ffmpeg が見つからない」を確認してください。</li>
+<li>書き出し中に <code>Killed</code> / OOM が出る場合は、長尺シーンを複数シーンに分割してください (動画書き出しは v2 GL レンダ → ffmpeg のワンパスで、ブラウザの WebGL コンテキストとサーバの ffmpeg プロセスが主なメモリ消費源)。</li>
+<li>HW エンコーダで失敗する場合は、<code>ffmpeg -encoders | grep nvenc</code> などで該当エンコーダがビルドに含まれているか確認します。</li>
+<li>音声パスや背景パスが存在しない場合も失敗することがあります。素材再スキャン後、各カット / シーンの音声と背景を選び直してください。</li>
+</ul>
+<h2 id="nvenc-videotoolbox-ui">書き出し時に NVENC / VideoToolbox が UI に出てこない<a class="headerlink" href="#nvenc-videotoolbox-ui" title="Permanent link">&para;</a></h2>
+<ul>
+<li>全体設定の <code>ffmpeg のパス</code> を保存し直すと、<code>ffmpeg -encoders</code> のキャッシュが更新されます。</li>
+<li>NVENC は GPL ビルドの ffmpeg に含まれます。LGPL ビルドだと表示されません。</li>
+<li>VideoToolbox は macOS の標準 ffmpeg に含まれます。Linux / Windows では出ません。</li>
+</ul>
+<h2 id="_10">フォントが反映されない<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>.otf</code> / <code>.ttf</code> を <code>assets/fonts/</code> か <code>projects/&lt;project_id&gt;/assets/fonts/</code> に置きます。</li>
+<li>ヘッダーの <code>素材再スキャン</code> を押します。</li>
+<li>ファイルがない場合はシステム既定フォントにフォールバックします。</li>
+<li>ライブプレビューと書き出しで書体が違って見えるときは、ブラウザを再読み込みして <code>FontFace</code> 登録を更新してください。</li>
+<li>配布直後の <code>assets/fonts/</code> は空です。最低限の日本語表示が必要なら、全体設定 → 環境 → <code>Noto Sans JP をインストール</code> を一度押してください。</li>
+</ul>
+<h2 id="weight-1">フォントの太さ (weight) が思ったものにならない / セレクタに 1 種類しか出ない<a class="headerlink" href="#weight-1" title="Permanent link">&para;</a></h2>
+<p>立ち絵システムは <code>assets/fonts/</code> 配下のフォントから OS/2.usWeightClass (フォント自身が申告する公式 weight 値) を読み取って太さを判定します。OS/2 が無い・壊れているフォントや、ベンダ独自の命名 (例: <code>AwesomeFont-XYZ.otf</code> の <code>XYZ</code> が weight 略号) で誤判定が出る場合は、<strong>全体設定 → 環境 → フォント自動認識</strong> の表で各ファイルにドロップダウンから明示的な weight を割り当てられます。</p>
+<ul>
+<li>上書きは <code>app_state/global_config.json</code> の <code>fontWeightOverrides</code> (<code>{相対パス: weight_id}</code>) として永続化されます。</li>
+<li>保存後は自動で素材再スキャンが走り、新しい weight が右パネルのフォントセレクタに反映されます。</li>
+<li>「自動 (xxx)」を選び直せば override を解除できます。</li>
+</ul>
+<h2 id="_11">動画レイヤーの音声が後半でズレる / 「再エンコードしますか？」と聞かれる<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
+<p>NVIDIA ShadowPlay などのゲーム録画 MP4 はフレームドロップ箇所で PTS (映像タイムスタンプ) が飛ぶことがあり、そのままだと動画レイヤーの音声が後半で実時間と数百 ms 単位でズレます。</p>
+<p>立ち絵システムは動画レイヤーで素材を選んだ直後に PTS gap を検査し、合計 50 ms を超えるとダイアログで再エンコードを促します。</p>
+<ul>
+<li>推奨は <strong>ダイアログで「再エンコードする」を選ぶ</strong>。HW エンコーダ（VideoToolbox / NVENC / QSV / VA-API）が利用可能ならデフォルトで選択されており、実時間より高速で <code>&lt;元ファイル名&gt;.fixed.mp4</code> が同フォルダに出力されます。</li>
+<li>元ファイルは残るので、再選択時は sidecar (<code>&lt;元ファイル名&gt;.fixed.mp4.json</code>) の SHA で「既に修正済み」と判定され、ダイアログは出ません。</li>
+<li><code>キャンセル</code> を選んだ場合は元ファイルのまま使えますが、書き出し時に音ズレ / <code>apad</code> はみ出しが残る可能性があります。</li>
+</ul>
+<p>詳しい挙動は <a href="../reference/editor/#動画レイヤー編集パネル">編集画面リファレンス → 動画レイヤー編集パネル</a> を参照してください。</p>
+<h2 id="cdn">オフラインで動かしたい (CDN を使いたくない)<a class="headerlink" href="#cdn" title="Permanent link">&para;</a></h2>
+<p>three.js / mp4box.js は既定では <code>static/vendor/</code> のローカル版を見て、無ければ jsdelivr CDN にフォールバックします。社内環境でインターネットを切る前に、ネットワークが繋がる環境で 1 回だけ全体設定 → 環境 → <code>JS ライブラリのインストール</code> を押してください。<code>static/vendor/three/&lt;ver&gt;/</code> と <code>static/vendor/mp4box/&lt;ver&gt;/</code> に展開され、以後は CDN 不要で起動できます。</p>
+<p><code>CDN を使う</code> チェックは「ローカル版があっても CDN を使う」モードです。デバッグ用なので通常は OFF のままで問題ありません。</p>
+<h2 id="_12">プロジェクトを別環境に持って行きたい<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
+<p>各プロジェクトカードの <code>アーカイブ</code> ボタンで <code>&lt;タイトル&gt;.splite.zip</code> がダウンロードできます。別環境のダッシュボード上部の <code>読み込み</code> ボタンで取り込めば、シナリオ・設定・固有素材が復元されます。</p>
+<ul>
+<li>古いスキーマ (例: v3) で書き出した zip を最新版で読み込んでも、自動で v4 に migration されます。</li>
+<li>共通アセット (<code>assets/characters/&lt;id&gt;/</code>) は zip に含まれません。完全コピーが必要なら、<code>assets/</code> 自体を別途同期してください。</li>
+</ul>
+<h2 id="psd">PSD インポートで差分が出ない / レイヤーが落ちる<a class="headerlink" href="#psd" title="Permanent link">&para;</a></h2>
+<ul>
+<li>レイヤー名が命名規則 (<code>カテゴリ/ID</code> または <code>カテゴリ:ID</code>、フォルダ構造) に沿っているか確認してください。</li>
+<li>カテゴリは <code>back_hair</code> / <code>base</code> / <code>cheek</code> / <code>eye</code> / <code>mouth</code> / <code>bangs</code> / <code>front</code> の 7 種です。</li>
+<li>名前の先頭が <code>_</code> のレイヤーは取り込み対象外です。</li>
+<li>複雑なレイヤー効果やクリッピングは作画ツール側でラスタライズしてから保存してください。</li>
+<li>縦横上限を小さく設定すると等倍縮小されます。元解像度を保ちたいときは <code>0</code> にしてください。</li>
+</ul>
+<h2 id="_13">ライブプレビューが重い / もたつく<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
+<ul>
+<li>動画背景 (<code>videoTrack</code>) が長い場合は、シーン分割を検討してください。</li>
+<li>全体設定の <code>静音モード</code> を ON にすると uvicorn のアクセスログが抑制され、コンソール出力のオーバーヘッドが減ります。</li>
+<li>別プロジェクトに切り替える前に必ず再生を止めてください (内部的にも自動で停止しますが、明示停止の方がメモリの解放が早いです)。</li>
+</ul>
+<h2 id="voicevox-voicepeak">音声合成 (VOICEVOX / VOICEPEAK)<a class="headerlink" href="#voicevox-voicepeak" title="Permanent link">&para;</a></h2>
+<p>VOICEVOX や VOICEPEAK の連携で問題が起きた場合は <a href="../tutorials/voice-synthesis/#7-音声合成のトラブルシュート">音声合成 (VOICEVOX / VOICEPEAK) を使う</a> を参照してください。よくある原因:</p>
+<ul>
+<li>全体設定 → 音声読み上げの「ボイスを登録」を 1 回も押していない (= カタログ未取得)</li>
+<li>VOICEVOX が起動していない (立ち絵システム側から自動起動を試みますが、20 秒以上かかる環境では再ボタンが必要)</li>
+<li>voice ID 形式が古い (<code>voicevox:8</code> 等)。「ボイスを登録」を押すと自動で <code>voicevox:四国めたん/ノーマル</code> 形式に再書き換えされます</li>
+</ul>
+<h2 id="undo-redo">Undo / Redo が効かない<a class="headerlink" href="#undo-redo" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>Cmd/Ctrl+Z</code> / <code>Cmd+Shift+Z</code> (または <code>Cmd/Ctrl+Y</code>) はテキスト入力中は OS のネイティブ動作 (フォーム単位の Undo) を優先します。タイムライン canvas など、フォーム外をクリックしてから操作してください。</li>
+<li>履歴サイズは全体設定で 1〜500 まで変更できます。長尺シナリオで履歴をたくさん残したいときは大きめにしてください。</li>
+</ul>
+<h2 id="_14">起動はするが書き出しキャッシュが肥大化する<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>projects/&lt;project_id&gt;/cache/</code> は安全に削除して問題ありません。GL プレビューの中間 PNG (<code>preview/</code>) と口パク解析データ (<code>lipsync/</code>) は次回開いたときに必要分だけ自動再生成されます。</li>
+<li>手動で空にするには <strong>アセット管理ダイアログ → キャッシュ タブ</strong> を使ってください。プロジェクト別 / 共有 / 全削除のいずれかを選べます。<code>thumbnail.png</code> は削除対象から外れているのでプロジェクト一覧表示は壊れません。</li>
+<li><strong>起動時に自動間引き</strong> する設定が既定で ON です (mtime が 30 日より古いものを削除)。期間は <code>全体設定 → キャッシュ</code> タブで変更できます (<code>1〜365</code> 日)。</li>
+<li>書き出し時の中間ファイル (rawvideo パイプ) は処理が完了すると自動で消えます。途中で強制終了した場合は <code>cache/</code> 以下に残骸が残ることがあるので、上記のキャッシュタブから掃除してください。</li>
+</ul>
+<h2 id="_15">効果音をループ + 区間指定で使うと、書き出しで指定区間を超えて鳴り続ける<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h2>
+<ul>
+<li>バージョン 2026-05-22 より前で、効果音に <strong>「ループ ON」+「素材内の頭出し (<code>audioOffsetSec</code> &gt; 0)」+「区間長 (<code>durationFrame</code>) が <code>素材残尺 - audioOffsetSec</code> より長い」</strong> という条件が揃ったときに、書き出し側で指定区間を最大「素材残尺」分だけ超えて鳴り続ける不具合がありました。プレビューでは正常に止まるため気付きにくい不具合です。</li>
+<li>現在は ffmpeg の <code>-stream_loop -1</code> + 入力側 <code>-ss</code> の組合せをやめて、フィルタ側 <code>atrim=start=offset:duration=region</code> に切り替えることで解消しています。最新版に更新後、もし同様の症状に遭遇したら、当該プロジェクトを開き直して再書き出ししてみてください (シナリオ側に変更は不要です)。</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="フッター" >
+        
+          
+          <a href="../technical/visualizer-plugin/" class="md-footer__link md-footer__link--prev" aria-label="前: オーディオビジュアライザ開発ガイド">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                前
+              </span>
+              <div class="md-ellipsis">
+                オーディオビジュアライザ開発ガイド
+              </div>
+            </div>
+          </a>
+        
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.code.copy","navigation.footer","navigation.indexes","navigation.sections","navigation.path","navigation.tracking","search.highlight","toc.follow"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"コピーしました","clipboard.copy":"クリップボードへコピー","search.result.more.one":"このページ内にもう1件見つかりました","search.result.more.other":"このページ内にあと#件見つかりました","search.result.none":"何も見つかりませんでした","search.result.one":"1件見つかりました","search.result.other":"#件見つかりました","search.result.placeholder":"検索キーワードを入力してください","search.result.term.missing":"検索に含まれない","select.version":"バージョン切り替え"},"version":null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.63456bd9.min.js"></script>
+      
+    
+  </body>
+</html>

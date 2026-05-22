@@ -1,0 +1,6 @@
+# Windows ネイティブツール (PowerShell 5.1 / cmd.exe) は LF だと動かないので
+# checkout 時に必ず CRLF に変換する。.bat は更に Shift_JIS 想定なので
+# 文字化け回避のため非 ASCII を含めない方針 (run_bench.bat 参照)。
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

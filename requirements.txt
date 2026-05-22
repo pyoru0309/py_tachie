@@ -1,0 +1,20 @@
+fastapi
+uvicorn
+# WebSocket 経路 (v2 export 本実装) で必須。
+# `uvicorn[standard]` を使えば一緒に入るが、Windows + 一部 pip 環境で extras が
+# 解決されず websockets 抜けが起きるため、ここで明示する。
+websockets
+python-multipart
+pillow
+psd-tools
+# numpy は visualizer プラグインの FFT / 解析、compositor の Pillow 内部処理
+# (remove_exact_white 等) で直接使う。psd-tools 経由の暗黙依存にせず明示する。
+numpy
+# OS/2.usWeightClass + name テーブルからフォントの正規 weight / family を取り出す
+# (filename ベースの推定だけだと "AwesomeFont-XYZ.otf" のような独自命名が
+# Regular にフォールバックしてしまうため)。
+fonttools
+# JS vendor 取得 (Noto Sans JP / three / mp4box) で使用。
+httpx
+# 配布用 import_manifest.yml の読み書きに使用 (Phase 5 で独自パーサから移行)。
+PyYAML>=6.0

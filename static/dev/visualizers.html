@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Visualizer Lab</title>
+    <link rel="stylesheet" href="/static/css/tokens.css" />
+    <link rel="stylesheet" href="/static/css/base.css" />
+    <link rel="stylesheet" href="/static/css/components.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("splite_anime_theme");
+          var dark = stored ? stored === "dark"
+            : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+        } catch (_) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
+    <style>
+      html, body { height: auto; min-height: 100%; overflow: auto; }
+      body {
+        padding: 18px 18px 40px;
+        max-width: 1480px;
+        margin: 0 auto;
+        font-size: 0.92rem;
+      }
+      h1 { font-size: 1.25rem; margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+      .lede { color: var(--text-muted); margin: 0 0 14px; line-height: 1.5; font-size: 0.84rem; }
+      .lab { display: grid; grid-template-columns: 1fr 360px; gap: 16px; align-items: start; }
+      @media (max-width: 1100px) { .lab { grid-template-columns: 1fr; } }
+
+      .preview-card {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
+      }
+      .preview-frame {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        background: #000;
+        border-radius: 4px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .preview-frame canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .preview-frame.checker {
+        background-image:
+          linear-gradient(45deg, #555 25%, transparent 25%),
+          linear-gradient(-45deg, #555 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, #555 75%),
+          linear-gradient(-45deg, transparent 75%, #555 75%);
+        background-size: 30px 30px;
+        background-position: 0 0, 0 15px, 15px -15px, -15px 0;
+        background-color: #888;
+      }
+      .preview-meta {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        align-items: center;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        margin-top: 8px;
+      }
+      .preview-meta strong { color: var(--text); }
+
+      .transport {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-top: 10px;
+      }
+      .transport input[type="range"] { flex: 1; }
+      .transport .frame-readout {
+        font-family: ui-monospace, Menlo, monospace;
+        min-width: 110px;
+        text-align: right;
+        font-size: 0.85rem;
+      }
+
+      .panel {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 14px;
+      }
+      .panel + .panel { margin-top: 12px; }
+      .panel h2 { font-size: 0.95rem; margin: 0 0 10px; font-weight: 600; }
+
+      .field { display: grid; grid-template-columns: 130px 1fr; gap: 6px 10px; align-items: center; }
+      .field + .field { margin-top: 6px; }
+      .field label { font-size: 0.84rem; color: var(--text-muted); }
+      .field input, .field select { width: 100%; }
+      .field-row { display: flex; gap: 8px; align-items: center; }
+      .field-row .swatch { width: 24px; height: 24px; border-radius: 4px; border: 1px solid var(--border); flex: 0 0 24px; }
+
+      .params-list { display: flex; flex-direction: column; gap: 6px; }
+      .params-list .param {
+        display: grid;
+        grid-template-columns: 130px 1fr 78px;
+        gap: 6px 10px;
+        align-items: center;
+      }
+      .params-list .param label { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .params-list .param .value { font-family: ui-monospace, Menlo, monospace; font-size: 0.78rem; text-align: right; color: var(--text-muted); }
+      .params-list .param input[type="range"] { width: 100%; }
+
+      /* カラーチップ: OS 既定の細線表示を避け、塗りつぶしのスウォッチを表示。
+         dev ページ全体に適用 (背景色ピッカーとパラメータカラー両方を統一)。 */
+      input[type="color"] {
+        appearance: none;
+        -webkit-appearance: none;
+        height: 28px;
+        padding: 2px;
+        border: 1px solid var(--border, #ccc);
+        border-radius: 4px;
+        background: var(--surface, #fff);
+        cursor: pointer;
+      }
+      input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+      input[type="color"]::-webkit-color-swatch {
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        border-radius: 3px;
+      }
+      input[type="color"]::-moz-color-swatch {
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        border-radius: 3px;
+      }
+      /* 背景色スウォッチは flex 内なので明示幅。params 内は cell 幅に合わせる。 */
+      #bgColorInput { width: 50px; flex: 0 0 50px; }
+      .params-list .param input[type="color"].param-color-input { width: 100%; }
+      .params-list .param .value.value-color {
+        font-family: ui-monospace, Menlo, monospace;
+        text-transform: uppercase;
+      }
+      /* 数値パラメータ: スライダーと連動する小さな入力欄 (右端)。 */
+      .params-list .param input.value-number {
+        width: 100%;
+        min-width: 0;
+        height: 22px;
+        padding: 1px 4px;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 0.78rem;
+        text-align: right;
+        border: 1px solid var(--border, #ccc);
+        border-radius: 3px;
+        background: var(--surface, #fff);
+      }
+      /* 数値入力のスピナーは省スペースのため抑制 (ホイールやキーボードは効く)。 */
+      .params-list .param input.value-number::-webkit-outer-spin-button,
+      .params-list .param input.value-number::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      .params-list .param input.value-number { -moz-appearance: textfield; }
+
+      .bg-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+      .bg-presets button {
+        padding: 4px 8px;
+        font-size: 0.78rem;
+      }
+
+      .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); font-size: 0.74rem; }
+      .pill.warn { background: #b85000; color: #fff; border-color: #b85000; }
+      .pill.err  { background: #c33; color: #fff; border-color: #c33; }
+      .pill.ok   { background: #0a7c30; color: #fff; border-color: #0a7c30; }
+
+      .log {
+        max-height: 180px;
+        overflow: auto;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 0.78rem;
+        line-height: 1.45;
+      }
+      .log .err { color: var(--danger, #c33); }
+      .log .warn { color: var(--warning, #b85000); }
+    </style>
+  </head>
+  <body>
+    <h1>
+      Visualizer Lab
+      <span id="status" class="pill">idle</span>
+    </h1>
+    <p class="lede">
+      ビジュアライザ プラグイン単体の動作確認用。プロジェクトを切り替えずに
+      パラメータ・音源・背景色を変えて挙動を見る。<br />
+      本ページは <code>SPLITE_DEV_TOOLS=1</code> または loopback 接続でのみ有効。
+      24fps 固定 (plugin が <code>GL_FRAME_RATE</code> を宣言していればそれを優先)。<br />
+      URL: <code>?plugin=&lt;key&gt;</code> / <code>?fixture=&lt;silence|sine|beat|sweep|noise|project_audio&gt;</code> / <code>?duration=&lt;sec&gt;</code> で初期状態を指定できる。プラグイン切替時に URL も自動更新するのでブックマーク可。
+    </p>
+
+    <div class="lab">
+      <!-- 左: プレビュー -->
+      <div>
+        <div class="preview-card">
+          <div id="previewFrame" class="preview-frame">
+            <canvas id="previewCanvas"></canvas>
+          </div>
+          <div class="transport">
+            <button id="playButton" class="primary">再生</button>
+            <input id="timelineRange" type="range" min="0" max="1" step="0.0001" value="0" />
+            <span id="frameReadout" class="frame-readout">0 / 0</span>
+          </div>
+          <div class="preview-meta">
+            <span>plugin: <strong id="metaPlugin">-</strong></span>
+            <span>fps: <strong id="metaFps">24</strong></span>
+            <span>frames: <strong id="metaFrames">-</strong></span>
+            <span>streams: <strong id="metaStreams">-</strong></span>
+            <span>fixture: <strong id="metaFixture">-</strong></span>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top: 12px;">
+          <h2>ログ</h2>
+          <div id="logBox" class="log"></div>
+        </div>
+      </div>
+
+      <!-- 右: コントロール -->
+      <div>
+        <div class="panel">
+          <h2>シーン</h2>
+          <div class="field">
+            <label for="pluginSelect">プラグイン</label>
+            <select id="pluginSelect"></select>
+          </div>
+          <div class="field">
+            <label for="durationInput">尺 (秒)</label>
+            <input id="durationInput" type="number" min="0.5" max="60" step="0.5" value="8" />
+          </div>
+          <div class="field">
+            <label for="audioFixtureSelect">音源</label>
+            <select id="audioFixtureSelect"></select>
+          </div>
+          <div class="field">
+            <label for="bgColorInput">背景色</label>
+            <div class="field-row">
+              <input id="bgColorInput" type="color" value="#000000" />
+              <input id="bgColorText" type="text" value="#000000" style="width: 90px;" />
+              <label class="checkbox-row" style="margin-left: 6px;">
+                <input id="bgTransparent" type="checkbox" />透過
+              </label>
+            </div>
+          </div>
+          <div class="bg-presets">
+            <button type="button" data-bg="#000000">黒</button>
+            <button type="button" data-bg="#ffffff">白</button>
+            <button type="button" data-bg="#777777">グレー</button>
+            <button type="button" data-bg="checker">透過チェック柄</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>パラメータ</h2>
+          <div id="paramsList" class="params-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 共通アセット音源 fixture を選んだときだけここに src がセットされる。
+         合成 fixture (silence/sine/beat/sweep/noise) のときは src を空にして無音。 -->
+    <audio id="previewAudio" loop preload="auto" hidden></audio>
+
+    <script type="module" src="/static/js/dev/visualizer-lab.js"></script>
+  </body>
+</html>

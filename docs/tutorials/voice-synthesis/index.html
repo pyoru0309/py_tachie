@@ -1,0 +1,1819 @@
+
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="立ち絵合成・シナリオプレビュー・動画書き出しツールの利用マニュアル">
+      
+      
+        <meta name="author" content="立ち絵システム">
+      
+      
+      
+        <link rel="prev" href="../import-character/">
+      
+      
+        <link rel="next" href="../export-video/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.33">
+    
+    
+      
+        <title>音声合成 (VOICEVOX / VOICEPEAK) を使う - 立ち絵システム ユーザーガイド</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.53a7feaf.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=LINE+Seed+JP:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"LINE Seed JP";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="ナビゲーション"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#voicevox-voicepeak" class="md-skip">
+          コンテンツにスキップ
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="ヘッダー">
+    <a href="../.." title="立ち絵システム ユーザーガイド" class="md-header__button md-logo" aria-label="立ち絵システム ユーザーガイド" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="ナビゲーション">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            立ち絵システム ユーザーガイド
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              音声合成 (VOICEVOX / VOICEPEAK) を使う
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="ダークモードに切替"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="ダークモードに切替" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="ライトモードに切替"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="ライトモードに切替" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="検索">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="検索">
+  <button type="button" class="md-search__button">
+    検索
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="ナビゲーション" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="立ち絵システム ユーザーガイド" class="md-nav__button md-logo" aria-label="立ち絵システム ユーザーガイド" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    立ち絵システム ユーザーガイド
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ホーム
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    チュートリアル
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    チュートリアル
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    はじめに
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../create-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクトを作成する
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../import-character/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    キャラクターをインポートする
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    音声合成 (VOICEVOX / VOICEPEAK) を使う
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    音声合成 (VOICEVOX / VOICEPEAK) を使う
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        前提
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. アプリのパスを確認 / 指定する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. ボイスを登録する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. キャラクターに声を紐付ける
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 編集画面で 1 カットだけ音声を作る
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-yaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. YAML 一括登録で大量に作る
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. YAML 一括登録で大量に作る">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#yaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        書き出される YAML の形
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        フィールドの意味
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        追加で書ける任意フィールド
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一括登録の手順
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        テキストモード (改行区切り)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pause_sec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pause_sec の典型的な使い方
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 再生時の音声プリフェッチ
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 音声合成のトラブルシュート
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 音声合成のトラブルシュート">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#voicevox" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        「ボイスを登録」を押しても VOICEVOX が反応しない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#voicepeak" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VOICEPEAK が検出されない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#voicevox-voice_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        「voicevox の voice_id を解決できませんでした」エラー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一括登録で一部のカットだけ感情が空になっている
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assetsaudiotts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        同じプロジェクトで合成しすぎて assets/audio/tts が膨らんだ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連ページ
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../export-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PNG / 動画を書き出す
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リファレンス
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    リファレンス
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    編集画面リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/title-editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    タイトル組版エディタ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/project-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクト設定リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    素材管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/file-structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ファイル構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    テクニカルガイド
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    テクニカルガイド
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/character-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    キャラクターモデルの推奨構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/psd-layer-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PSD レイヤー命名規則
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/scenario-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シナリオ形式
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/rendering-and-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    レンダリングと動画生成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/visualizer-plugin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    オーディオビジュアライザ開発ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    トラブルシュート
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        前提
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. アプリのパスを確認 / 指定する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. ボイスを登録する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. キャラクターに声を紐付ける
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 編集画面で 1 カットだけ音声を作る
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-yaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. YAML 一括登録で大量に作る
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. YAML 一括登録で大量に作る">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#yaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        書き出される YAML の形
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        フィールドの意味
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        追加で書ける任意フィールド
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一括登録の手順
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        テキストモード (改行区切り)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pause_sec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pause_sec の典型的な使い方
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 再生時の音声プリフェッチ
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 音声合成のトラブルシュート
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 音声合成のトラブルシュート">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#voicevox" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        「ボイスを登録」を押しても VOICEVOX が反応しない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#voicepeak" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VOICEPEAK が検出されない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#voicevox-voice_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        「voicevox の voice_id を解決できませんでした」エラー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一括登録で一部のカットだけ感情が空になっている
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assetsaudiotts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        同じプロジェクトで合成しすぎて assets/audio/tts が膨らんだ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連ページ
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="ナビゲーション" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    ホーム
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../getting-started/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    チュートリアル
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+<h1 id="voicevox-voicepeak">音声合成 (VOICEVOX / VOICEPEAK) を使う<a class="headerlink" href="#voicevox-voicepeak" title="Permanent link">&para;</a></h1>
+<p>立ち絵システムには、編集画面から <strong>VOICEVOX</strong> または <strong>VOICEPEAK</strong> を直接呼び出してセリフ音声を作る機能が組み込まれています。
+カットごとに「声」「感情」を選んで <code>音声を再生成</code> を押すだけで wav が生成され、そのカットの音声として紐付きます。
+セリフを書き出した YAML に <code>voice</code> を含めれば、一括で何十カットぶんの音声を作ることもできます。</p>
+<p>このチュートリアルでは、両アプリのセットアップから一括生成までの手順を一通り紹介します。</p>
+<h2 id="_1">前提<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<ul>
+<li>VOICEVOX または VOICEPEAK を <strong>手元の PC にインストール済み</strong> であること。</li>
+<li>VOICEVOX を使う場合は、合成中に VOICEVOX Engine が起動している必要があります (アプリを開いた状態 / 起動済みになっているとプログラムから利用可能)。立ち絵システム側からの自動起動も可能です。</li>
+<li>VOICEPEAK は CLI を使うので、アプリを起動していなくても動作します。</li>
+</ul>
+<p>立ち絵システムがどちらも検出できなかった場合、関連する UI (「ボイスを登録」「声」「感情」「音声を再生成」「YAML 一括登録の自動生成チェック」) は無効化されます。</p>
+<h2 id="1">1. アプリのパスを確認 / 指定する<a class="headerlink" href="#1" title="Permanent link">&para;</a></h2>
+<p>ヘッダーの <strong>全体設定</strong> → 左の <strong>音声読み上げ</strong> タブを開きます。</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>既定の自動検出先</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VOICEVOX アプリのパス</td>
+<td>macOS: <code>/Applications/VOICEVOX.app</code> / Windows: <code>C:\Users\&lt;ユーザー名&gt;\AppData\Local\Programs\VOICEVOX\VOICEVOX.exe</code></td>
+</tr>
+<tr>
+<td>VOICEVOX Engine の URL</td>
+<td><code>http://127.0.0.1:50021</code></td>
+</tr>
+<tr>
+<td>VOICEPEAK バイナリのパス</td>
+<td>macOS: <code>/Applications/voicepeak.app/Contents/MacOS/voicepeak</code> / Windows: <code>C:\Program Files\VOICEPEAK\voicepeak.exe</code></td>
+</tr>
+</tbody>
+</table>
+<p>入力欄の placeholder に「自動検出: ...」と出ていれば、空欄のままで自動検出パスが使われます。検出されなかったり、別の場所にインストールしている場合だけ絶対パスを書き込んでください。</p>
+<h2 id="2">2. ボイスを登録する<a class="headerlink" href="#2" title="Permanent link">&para;</a></h2>
+<p><code>音声読み上げ</code> タブの下にある <strong>ボイスを登録</strong> ボタンを押します。立ち絵システムは次を順に行います。</p>
+<ol>
+<li>VOICEVOX のアプリパスが検出済みで Engine が応答していなければ、自動でアプリを起動 → <code>/version</code> の応答を最大 20 秒待つ (mac は <code>open &lt;app&gt;</code>、Windows は detached プロセスとして Popen)。</li>
+<li>VOICEVOX <code>/speakers</code> から話者・スタイル一覧を取得。</li>
+<li>VOICEPEAK の CLI から <code>--list-narrator</code> と各話者の <code>--list-emotion</code> を取得。</li>
+<li>取得結果を <code>app_state/voice_catalog.json</code> に永続化。</li>
+<li>既存のキャラ紐付けに残っている古い voice ID 形式 (<code>voicevox:8</code> など) を、新形式 (<code>voicevox:四国めたん/ノーマル</code>) に自動マイグレートして書き戻す。</li>
+</ol>
+<p>成功すれば「音声カタログを更新しました（131 件）」のようなトーストが出ます。アプリのアップデートで話者が増減したり、VOICEPEAK の追加音源を購入した場合は、もう一度押し直してください。</p>
+<blockquote>
+<p>「ボイスを登録」の所要時間: VOICEVOX 起動が必要な場合は最大 20 秒、起動済みなら 1〜2 秒。VOICEPEAK の <code>--list-emotion</code> は話者ごとに 1 回ずつ呼ぶので 4〜5 秒かかります。</p>
+</blockquote>
+<h2 id="3">3. キャラクターに声を紐付ける<a class="headerlink" href="#3" title="Permanent link">&para;</a></h2>
+<p>ダッシュボードまたは編集画面から <strong>キャラ管理</strong> を開き、対象キャラをクリックして詳細ダイアログを開きます。
+<strong>音声アプリと紐付け</strong> セクションで次を選びます。</p>
+<ul>
+<li><strong>声</strong>: 例 <code>春日部つむぎ（ノーマル） (VOICEVOX)</code> / <code>Miyamai Moca (VOICEPEAK)</code></li>
+<li><strong>感情</strong>: VOICEPEAK の話者だけ有効。VOICEVOX には感情パラメータが無いので無効化されます。</li>
+</ul>
+<p>「未設定」のままにすればそのキャラには紐付けなし扱いになります。</p>
+<p>設定は <code>character_manifest.json</code> の <code>voice</code> フィールドとして永続化されます。共通キャラ・プロジェクト固有キャラのどちらでも紐付け可能です。</p>
+<h2 id="4-1">4. 編集画面で 1 カットだけ音声を作る<a class="headerlink" href="#4-1" title="Permanent link">&para;</a></h2>
+<p>「お芝居」タブの <strong>セリフ</strong> セクションに、<code>声</code> / <code>感情</code> セレクタと <strong>音声を再生成</strong> ボタンが並びます。</p>
+<ol>
+<li><strong>話者</strong> を選ぶ。紐付け済みのキャラなら、声と感情のセレクタが自動で同期します。</li>
+<li>その場で別の声に上書きすることも可能 (例: ナレーション用に話者と異なる声で読ませたい時)。</li>
+<li><strong>音声を再生成</strong> を押す。</li>
+<li>VOICEVOX が落ちていれば、立ち絵システムが起動を試みます (15 秒タイムアウト)。</li>
+<li>生成された wav は <code>projects/&lt;project_id&gt;/assets/audio/tts/&lt;cut番号&gt;-&lt;セリフ先頭&gt;-&lt;話者名&gt;-&lt;感情&gt;-&lt;YYMMDD-HHMMSS&gt;.wav</code> に保存され、そのカットの音声として紐付き、表示時間も wav の長さに合わせて自動更新されます。</li>
+</ol>
+<p><code>音声</code> セレクタで素材から手動で選んだ音声 (TTS 以外の素材) も従来どおり使えます。両者は併用可能です。</p>
+<h2 id="5-yaml">5. YAML 一括登録で大量に作る<a class="headerlink" href="#5-yaml" title="Permanent link">&para;</a></h2>
+<p>セリフを書き出した YAML を編集して <strong>カット一括追加</strong> から流し込むと、数十カットぶんの音声を一度に生成できます。
+ヘッダーの <strong>エクスポート</strong> で書き出される <code>projects/&lt;id&gt;/export/&lt;タイムスタンプ&gt;-serif.yaml</code> がそのまま雛形になります。</p>
+<h3 id="yaml">書き出される YAML の形<a class="headerlink" href="#yaml" title="Permanent link">&para;</a></h3>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># セリフ書き出し</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># 生成: 2026-05-06T15:25:42</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># プロジェクト: my_project</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># フィールド: index / speaker / voice / duration_sec / text</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># - speaker は cut 内の登場キャラ ID (character_XXXX)。絵の再現のため変更しない。</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># - voice はキャラ→音声アプリの紐付けから自動付与。形式は</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1">#   &#39;voicevox:四国めたん/ノーマル&#39; / &#39;voicepeak:Miyamai Moca&#39; のように</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1">#   先頭にアプリ名 prefix を含む。VOICEPEAK は感情を含めて</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1">#   &#39;voicepeak:Miyamai Moca/honwaka&#39; とも書ける。未紐付けは空欄。</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># - duration_sec は「お芝居」タブの『表示時間』を秒に直したもの。</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1"># - 一括追加で読み込むときに pause_sec: 0.5 を追記すればそのカットだけ尺を伸ばせる。</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">index</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">  </span><span class="nt">speaker</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">character_1777865535610_2</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">  </span><span class="nt">voice</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;voicevox:春日部つむぎ/ノーマル&#39;</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">duration_sec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2.50</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">  </span><span class="nt">text</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">    </span><span class="no">今日からこの教室で一緒に頑張ろう！</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">index</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">  </span><span class="nt">speaker</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">character_1777865535610_3</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">  </span><span class="nt">voice</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;voicepeak:Miyamai</span><span class="nv"> </span><span class="s">Moca/honwaka&#39;</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">  </span><span class="nt">duration_sec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.80</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">  </span><span class="nt">text</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="w">    </span><span class="no">ふんわり喋ります。</span>
+</span></code></pre></div>
+<h3 id="_2">フィールドの意味<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>index</code></td>
+<td>連番。書き出し時に自動採番されます。一括取り込み時は順序の確認用に使い、生成カットの ID には反映されません。</td>
+</tr>
+<tr>
+<td><code>speaker</code></td>
+<td>カット内の <strong>登場キャラインスタンス ID</strong> (<code>character_XXXX_n</code>)。絵の再現のためそのまま維持してください。編集画面の「キャラ配置」タブの <code>登場キャラ</code> ラベル横にも表示されます (クリックでコピー可)。</td>
+</tr>
+<tr>
+<td><code>voice</code></td>
+<td>アプリ名 prefix 付きの voice ID。<code>voicevox:{話者}/{スタイル名}</code> または <code>voicepeak:{話者}</code> (感情なし) / <code>voicepeak:{話者}/{感情}</code> (感情あり)。未紐付けカットは空欄。</td>
+</tr>
+<tr>
+<td><code>duration_sec</code></td>
+<td>「お芝居」タブの <strong>表示時間</strong> を秒に直したもの。手動編集で長さを調整可能。</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td>セリフ本文。YAML literal block (<code>|</code>) で改行を保持。</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>手書き時のポイント</strong>: voice には必ず <code>voicevox:</code> または <code>voicepeak:</code> prefix を付けてください。VOICEVOX の数値 ID (<code>voicevox:8</code> など) は順序依存で再現性が無いため、新規には使えません。VOICEPEAK で感情を指定するときは <code>voicepeak:Miyamai Moca/honwaka</code> のように <code>/</code> でつなぎます。</p>
+</blockquote>
+<h3 id="_3">追加で書ける任意フィールド<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pause_sec</code></td>
+<td>数値 (秒)。そのカットの表示時間に追加で「間」を足したいときに指定。例: 音声 2.0 秒 + pause 0.5 秒 → 表示時間 2.5 秒。</td>
+</tr>
+</tbody>
+</table>
+<p><code>emotion:</code> は廃止されました。VOICEPEAK の感情は voice に <code>/honwaka</code> のように含めてください。手書きで <code>emotion:</code> だけが書かれている場合は後方の保険として読み取ります。</p>
+<h3 id="_4">一括登録の手順<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<ol>
+<li>テンプレートにしたい現在のカットを選択 (キャラ配置 / 背景 / モーションがそのまま継承されます)。</li>
+<li>ヘッダーの <strong>エクスポート</strong> でセリフ YAML を書き出す。テキストエディタで開いて、追加カット分を編集 / 増やす。</li>
+<li>編集画面で <strong>+ ボタン → カットを一括追加</strong> を開く。</li>
+<li><strong>YAML から一括登録</strong> ラジオを選び、テキストエリアに YAML を貼り付ける。</li>
+<li><strong>音声を自動で作成する</strong> にチェックを入れる (VOICEVOX / VOICEPEAK が両方未検出ならこのチェックは無効になります)。</li>
+<li><strong>上記の内容で一括登録</strong> を押す。</li>
+</ol>
+<p>進捗エリアにカットごとの状況とログが流れます。voice 欠落のカットは生成スキップ (テキストだけのカットとして登録)、voice 形式が不正な行は警告に出てカット追加自体もスキップされます。</p>
+<h3 id="_5">テキストモード (改行区切り)<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p>YAML を書くのが大変なときは、<strong>テキスト</strong> タブから「1 行 = 1 セリフ」で流し込めます。</p>
+<ul>
+<li>行頭に <code>話者ID:セリフ</code> または <code>話者名:セリフ</code> と書くと、その行のカットの話者が自動で切り替わります。区切り文字は半角「:」と全角「：」のどちらでも構いません。同じ表示名のキャラが複数いる場合は、現在のカットで前面側のレイヤーにいる方が選ばれます。</li>
+<li>行頭にプレフィックスが無い行は、現在のカットの話者がそのまま使われます。</li>
+<li><strong>音声を自動で作成する</strong> をチェックすると、各カットの話者に紐付いた声 / 感情で wav を生成します。話者の音声紐付けが無いカットは生成スキップ (テキストだけ登録)。</li>
+<li><strong>指定秒数の余白を入れる</strong> をチェックすると 0.1 秒刻みで指定した秒数ぶん、各カットの表示時間を「音声長 + 指定秒数」に伸ばします (TTS と組み合わせると一拍置いたタイミングを作れます)。</li>
+</ul>
+<h3 id="pause_sec"><code>pause_sec</code> の典型的な使い方<a class="headerlink" href="#pause_sec" title="Permanent link">&para;</a></h3>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">index</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">speaker</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">character_xxx</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">voice</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;voicepeak:Miyamai</span><span class="nv"> </span><span class="s">Moca&#39;</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">pause_sec</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span><span class="w">    </span><span class="c1"># セリフ後に 1 秒の余韻</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">text</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="no">そう。それだけのこと。</span>
+</span></code></pre></div>
+<p>音声合成アプリ自身が「一拍空ける」を作れない場合があるので、カット側の表示時間を伸ばして無音区間を作る運用を想定しています。</p>
+<h2 id="6">6. 再生時の音声プリフェッチ<a class="headerlink" href="#6" title="Permanent link">&para;</a></h2>
+<p>カット切替の瞬間に音声が一瞬途切れる現象を抑えるため、ライブプレビューは現カット再生中に <strong>次のカットの wav を裏で先読み</strong> します。再生開始時にも残り全カットぶんの wav を <code>&lt;audio preload="auto"&gt;</code> で並列にロードします。</p>
+<ul>
+<li>TTS で再生成して URL が変わった場合、停止 / 再生時にプリフェッチキャッシュは破棄されるので、新しい wav が即時反映されます。</li>
+<li>一度生成した wav は素材として <code>projects/&lt;id&gt;/assets/audio/tts/</code> 配下に残り続けます。不要になった分は <strong>アセット管理</strong> から削除してください。</li>
+</ul>
+<h2 id="7">7. 音声合成のトラブルシュート<a class="headerlink" href="#7" title="Permanent link">&para;</a></h2>
+<h3 id="voicevox">「ボイスを登録」を押しても VOICEVOX が反応しない<a class="headerlink" href="#voicevox" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Engine の URL (<code>http://127.0.0.1:50021</code>) が正しいか確認。VOICEVOX の <code>設定 → エンジン設定</code> でポートを変えている場合は URL も書き換えてください。</li>
+<li>自動起動でアプリ立ち上げに 20 秒以上かかる環境では、もう一度ボタンを押すか、VOICEVOX を手動で起動してから押し直してください。</li>
+</ul>
+<h3 id="voicepeak">VOICEPEAK が検出されない<a class="headerlink" href="#voicepeak" title="Permanent link">&para;</a></h3>
+<ul>
+<li>macOS: <code>ls /Applications/voicepeak.app/Contents/MacOS/voicepeak</code> でファイルが存在するか確認。</li>
+<li>Windows: <code>C:\Program Files\VOICEPEAK\voicepeak.exe</code> (または別ドライブにインストールしている場合のフルパス) を「VOICEPEAK バイナリのパス」に明示。</li>
+<li>旧バージョンや破損ファイルだと <code>--list-narrator</code> が空を返すことがあるため、VOICEPEAK 本体のアップデートを試してください。</li>
+</ul>
+<h3 id="voicevox-voice_id">「voicevox の voice_id を解決できませんでした」エラー<a class="headerlink" href="#voicevox-voice_id" title="Permanent link">&para;</a></h3>
+<p><code>voicevox:9999/タミラル</code> のように、カタログにない <code>voice</code> を指定したケースです。<strong>ボイスを登録</strong> を押し直してカタログを最新化するか、YAML の <code>voice</code> を実在する組み合わせ (例: <code>voicevox:春日部つむぎ/ノーマル</code>) に書き換えてください。</p>
+<h3 id="_6">一括登録で一部のカットだけ感情が空になっている<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<p>VOICEPEAK の話者にその感情が無い場合、立ち絵システムは自動的に「ノーマル」にフォールバックします (合成自体は走り、wav は出力されます)。意図せずノーマルになっていたら、<code>/</code>-区切りの感情名と話者の組み合わせを確認してください。</p>
+<h3 id="assetsaudiotts">同じプロジェクトで合成しすぎて assets/audio/tts が膨らんだ<a class="headerlink" href="#assetsaudiotts" title="Permanent link">&para;</a></h3>
+<p><code>projects/&lt;project_id&gt;/assets/audio/tts/</code> を直接掃除しても問題ありません。プロジェクトのアセット管理ダイアログから個別削除も可能です。</p>
+<h2 id="_7">関連ページ<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<ul>
+<li>編集画面の各タブ・ボタンの意味: <a href="../../reference/editor/">編集画面リファレンス</a></li>
+<li>セリフ・テロップ・カットの永続化フォーマット: <a href="../../technical/scenario-format/">シナリオ形式</a></li>
+<li>音声素材の置き場所と対応拡張子: <a href="../../reference/assets/">素材管理</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="フッター" >
+        
+          
+          <a href="../import-character/" class="md-footer__link md-footer__link--prev" aria-label="前: キャラクターをインポートする">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                前
+              </span>
+              <div class="md-ellipsis">
+                キャラクターをインポートする
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../export-video/" class="md-footer__link md-footer__link--next" aria-label="次: PNG &#x2f; 動画を書き出す">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                次
+              </span>
+              <div class="md-ellipsis">
+                PNG / 動画を書き出す
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.footer","navigation.indexes","navigation.sections","navigation.path","navigation.tracking","search.highlight","toc.follow"],"search":"../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"コピーしました","clipboard.copy":"クリップボードへコピー","search.result.more.one":"このページ内にもう1件見つかりました","search.result.more.other":"このページ内にあと#件見つかりました","search.result.none":"何も見つかりませんでした","search.result.one":"1件見つかりました","search.result.other":"#件見つかりました","search.result.placeholder":"検索キーワードを入力してください","search.result.term.missing":"検索に含まれない","select.version":"バージョン切り替え"},"version":null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.63456bd9.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,54 @@
+schemaVersion: 1
+id: moca_py
+name: モカ
+removeWhite: false
+voice:
+  id: voicepeak:Miyamai Moca
+color: '#00bfff'
+ベース:
+- モカ/ボディ
+目:
+- モカ/目/目閉じ
+- モカ/目/半目開き
+- モカ/目/光る眼鏡1
+- モカ/目/光る眼鏡2
+- モカ/目/自信
+- モカ/目/開き
+- モカ/目/じと目
+口:
+- モカ/口/笑い
+- モカ/口/開き
+- モカ/口/へ
+- モカ/口/閉じ口
+前面:
+- モカ/髪飾り 2
+- モカ/黒眼鏡反射
+- モカ/赤眼鏡反射
+- モカ/黒眼鏡
+- モカ/赤眼鏡
+サムネイル: モカ/髪飾り 2,モカ/目/開き,モカ/口/開き,モカ/ボディ
+flags:
+  モカ/目/目閉じ:
+  - blinkClosed
+  モカ/目/半目開き:
+  - blinkHalf
+  モカ/目/開き:
+  - blinkOpen
+  モカ/口/笑い:
+  - lipOpen
+  モカ/口/開き:
+  - lipMid
+  モカ/口/閉じ口:
+  - lipClosed
+expressionPresets:
+- name: 表情1
+  isDefault: true
+  cheek: ''
+  eye: モカ_目_開き
+  mouth: モカ_口_閉じ口
+hairstylePresets:
+- name: 髪型1
+  isDefault: true
+  base: モカ_ボディ
+  bangs: ''
+  backHair: ''

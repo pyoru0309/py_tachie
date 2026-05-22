@@ -1,0 +1,46 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# ローカル作業データ (ユーザーごとに発生・公開リポでは追跡しない)
+projects/
+title_compositions/
+app_state/
+
+# 生成物 / キャッシュ
+outputs/
+cache/
+.cache/
+tmp/
+
+# JS ライブラリ (全体設定→環境からユーザーが導入)
+static/vendor/
+
+# Claude Code のローカル設定 (各開発者の手元設定)
+.claude/
+
+# zensical でビルドしたヘルプサイトはリポジトリに含める (GitHub Pages 配信用)
+!docs/
+!docs/**
+docs/.DS_Store
+
+# ローカル開発時のフォント・効果音 (ユーザーごとに別途インストール)
+assets/fonts/
+assets/sound_effects/
+
+# プロジェクト固有アセット (各 project 配下に作られるもの)
+projects/*/assets/
+projects/*/cache/
+projects/*/outputs/
+
+# 自動バックアップ (各環境のローカル)
+projects/*/backups/

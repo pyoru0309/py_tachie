@@ -1,0 +1,1989 @@
+
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="立ち絵合成・シナリオプレビュー・動画書き出しツールの利用マニュアル">
+      
+      
+        <meta name="author" content="立ち絵システム">
+      
+      
+      
+        <link rel="prev" href="../..">
+      
+      
+        <link rel="next" href="../create-project/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.33">
+    
+    
+      
+        <title>はじめに - 立ち絵システム ユーザーガイド</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.53a7feaf.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=LINE+Seed+JP:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"LINE Seed JP";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="ナビゲーション"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          コンテンツにスキップ
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="ヘッダー">
+    <a href="../.." title="立ち絵システム ユーザーガイド" class="md-header__button md-logo" aria-label="立ち絵システム ユーザーガイド" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="ナビゲーション">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            立ち絵システム ユーザーガイド
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              はじめに
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="ダークモードに切替"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="ダークモードに切替" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="ライトモードに切替"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="ライトモードに切替" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="検索">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="検索">
+  <button type="button" class="md-search__button">
+    検索
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="ナビゲーション" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="立ち絵システム ユーザーガイド" class="md-nav__button md-logo" aria-label="立ち絵システム ユーザーガイド" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    立ち絵システム ユーザーガイド
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ホーム
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    チュートリアル
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    チュートリアル
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    はじめに
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    はじめに
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        必要なもの
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ターミナル (コマンドライン) の開き方
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ターミナル (コマンドライン) の開き方">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#macos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macOS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-git" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Git のインストール
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Git のインストール">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#macos_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macOS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Python のインストール
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Python のインストール">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#macos_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macOS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-ffmpeg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. ffmpeg のインストール
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. ffmpeg のインストール">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#macos_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macOS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        共通の動作確認
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. ソースコードを取得
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Python 仮想環境を作る
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Python 仮想環境を作る">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#macos-linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macOS / Linux
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows-powershell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows (PowerShell)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. サーバを起動する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-js" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. (任意) JS ライブラリと日本語フォントをローカル化
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        最初に見る画面
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        基本の作業順
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        終了方法
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        次回以降の起動
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../create-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクトを作成する
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../import-character/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    キャラクターをインポートする
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../voice-synthesis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    音声合成 (VOICEVOX / VOICEPEAK) を使う
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../export-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PNG / 動画を書き出す
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リファレンス
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    リファレンス
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    編集画面リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/title-editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    タイトル組版エディタ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/project-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクト設定リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    素材管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/file-structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ファイル構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    テクニカルガイド
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    テクニカルガイド
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/character-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    キャラクターモデルの推奨構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/psd-layer-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PSD レイヤー命名規則
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/scenario-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シナリオ形式
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/rendering-and-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    レンダリングと動画生成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/visualizer-plugin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    オーディオビジュアライザ開発ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    トラブルシュート
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        必要なもの
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ターミナル (コマンドライン) の開き方
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ターミナル (コマンドライン) の開き方">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#macos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macOS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-git" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Git のインストール
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Git のインストール">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#macos_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macOS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Python のインストール
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Python のインストール">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#macos_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macOS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-ffmpeg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. ffmpeg のインストール
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. ffmpeg のインストール">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#macos_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macOS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        共通の動作確認
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. ソースコードを取得
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Python 仮想環境を作る
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Python 仮想環境を作る">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#macos-linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macOS / Linux
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows-powershell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows (PowerShell)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. サーバを起動する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-js" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. (任意) JS ライブラリと日本語フォントをローカル化
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        最初に見る画面
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        基本の作業順
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        終了方法
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        次回以降の起動
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="ナビゲーション" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    ホーム
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="././" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    チュートリアル
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+<h1 id="_1">はじめに<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<p>このチュートリアルでは、立ち絵システムをまっさらな環境にセットアップして、ブラウザで編集画面を開くまでの手順を説明します。
+ComfyUI のようなワンクリックインストーラはまだ用意していないので、Git・Python・ffmpeg を順に入れていく形になります。</p>
+<blockquote>
+<p>ソースコード: <a href="https://github.com/pyoru0309/py_tachie/">https://github.com/pyoru0309/py_tachie/</a></p>
+</blockquote>
+<h2 id="_2">必要なもの<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>種類</th>
+<th>何をする</th>
+<th>必要なバージョン</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Git</td>
+<td>ソースコードを取得する</td>
+<td>最新の安定版</td>
+</tr>
+<tr>
+<td>Python</td>
+<td>サーバ本体を動かす</td>
+<td><strong>3.11 以上</strong> (3.12 / 3.14 で動作確認)</td>
+</tr>
+<tr>
+<td>ffmpeg / ffprobe</td>
+<td>動画書き出し・音声解析</td>
+<td>最新の安定版 (NVENC を使うなら GPL ビルド)</td>
+</tr>
+<tr>
+<td>ブラウザ</td>
+<td>UI を開く</td>
+<td>Chrome / Edge / Safari の最新版</td>
+</tr>
+</tbody>
+</table>
+<p>最低 8 GB、長尺シナリオは 16 GB 以上のメモリを推奨します。
+動作確認している構成は次のとおりです。</p>
+<table>
+<thead>
+<tr>
+<th>構成</th>
+<th>OS</th>
+<th>CPU</th>
+<th>GPU</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>macOS</td>
+<td>macOS 15 (Sequoia)</td>
+<td>Apple M1 Pro 以上</td>
+<td>内蔵 (VideoToolbox)</td>
+</tr>
+<tr>
+<td>Windows</td>
+<td>Windows 11</td>
+<td>Intel Core i7-12700H</td>
+<td>NVIDIA GeForce RTX 3060 Laptop</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_3">ターミナル (コマンドライン) の開き方<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p>これから実行するコマンドはすべて「ターミナル」と呼ばれる文字入力の窓に打ち込みます。
+普段使っていない場合の開き方は次のとおりです。</p>
+<h3 id="macos">macOS<a class="headerlink" href="#macos" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Spotlight 検索</strong>: <code>Cmd + Space</code> を押して <code>terminal</code> または <code>ターミナル</code> と入力 → Enter。</li>
+<li><strong>Launchpad</strong>: <code>その他</code> → <code>ターミナル</code>。</li>
+<li><strong>Finder</strong>: <code>アプリケーション</code> → <code>ユーティリティ</code> → <code>ターミナル.app</code>。</li>
+</ul>
+<p>文字を貼り付けるときは <code>Cmd + V</code>、コピーは <code>Cmd + C</code> です。</p>
+<h3 id="windows">Windows<a class="headerlink" href="#windows" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>スタートメニュー</strong>: スタート → <code>ターミナル</code> (Windows 11) または <code>Windows PowerShell</code> (Windows 10) を開く。</li>
+<li><strong>Win + X</strong>: <code>Windows 11</code> ならメニューから <code>ターミナル</code> を選べる。</li>
+<li><strong>コマンドプロンプト派</strong>: スタートで <code>cmd</code> と入力。</li>
+</ul>
+<p>このガイドでは PowerShell の例を載せます。コマンドプロンプトでも <code>Activate.ps1</code> を <code>activate.bat</code> に置き換えれば同じ手順で動きます。</p>
+<h2 id="1-git">1. Git のインストール<a class="headerlink" href="#1-git" title="Permanent link">&para;</a></h2>
+<p>ソースコードを GitHub から取ってくるためのツールです。</p>
+<h3 id="macos_1">macOS<a class="headerlink" href="#macos_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>ターミナルで <code>git --version</code> を実行。</li>
+<li>入っていなければ自動的に Xcode Command Line Tools のインストールダイアログが出るので、<code>インストール</code> を押します (数分〜十数分かかります)。</li>
+<li>Homebrew を使っている場合は <code>brew install git</code> でも OK です。</li>
+</ul>
+<h3 id="windows_1">Windows<a class="headerlink" href="#windows_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>winget install Git.Git</code> (Windows 11 の <code>winget</code> 経由) が一番簡単です。</li>
+<li>それ以外は <a href="https://git-scm.com/download/win">https://git-scm.com/download/win</a> から <code>Git for Windows</code> インストーラを実行してください。途中の選択肢は基本そのまま <code>Next</code> で問題ありません。</li>
+</ul>
+<p>インストール後、ターミナルを開き直して <code>git --version</code> で動作確認します。</p>
+<h2 id="2-python">2. Python のインストール<a class="headerlink" href="#2-python" title="Permanent link">&para;</a></h2>
+<p>立ち絵システムは Python 3.11 以上で動きます。<code>python3 --version</code> (または <code>python --version</code>) で確認してください。</p>
+<h3 id="macos_2">macOS<a class="headerlink" href="#macos_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>標準の Python 3 が古い (3.10 以下) 場合は <a href="https://www.python.org/downloads/macos/">https://www.python.org/downloads/macos/</a> の公式インストーラ、または <code>brew install python@3.12</code> をおすすめします。</li>
+<li>インストール後にターミナルを開き直して <code>python3 --version</code> を確認。</li>
+</ul>
+<h3 id="windows_2">Windows<a class="headerlink" href="#windows_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>winget install Python.Python.3.12</code> が一番簡単です。</li>
+<li>それ以外は <a href="https://www.python.org/downloads/windows/">https://www.python.org/downloads/windows/</a> の公式インストーラを使ってください。</li>
+<li>インストーラ起動時に <strong>「Add python.exe to PATH」のチェックを必ず入れる</strong> こと。これを忘れるとターミナルから <code>python</code> が呼べません。</li>
+<li>インストール後にターミナルを開き直して <code>py -3.12 --version</code> または <code>python --version</code> を確認。</li>
+</ul>
+<h2 id="3-ffmpeg">3. ffmpeg のインストール<a class="headerlink" href="#3-ffmpeg" title="Permanent link">&para;</a></h2>
+<p>動画書き出しと音声解析に必須です。立ち絵システムは PATH 上の <code>ffmpeg</code> / <code>ffprobe</code> を自動検出しますが、見つからない場合は後述の <code>全体設定</code> で絶対パスを指定する方法もあります。</p>
+<h3 id="macos_3">macOS<a class="headerlink" href="#macos_3" title="Permanent link">&para;</a></h3>
+<p><strong>Homebrew を使う方法 (推奨)</strong>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>brew<span class="w"> </span>install<span class="w"> </span>ffmpeg
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>ffmpeg<span class="w"> </span>-version
+</span></code></pre></div>
+<p><code>brew</code> が入っていない場合は <a href="https://brew.sh/index_ja">https://brew.sh/index_ja</a> の指示に従ってまず Homebrew を入れてください。</p>
+<p><strong>公式バイナリを使う方法</strong>:</p>
+<ul>
+<li><a href="https://evermeet.cx/ffmpeg/">https://evermeet.cx/ffmpeg/</a> から <code>ffmpeg-&lt;version&gt;.zip</code> と <code>ffprobe-&lt;version&gt;.zip</code> を取得。</li>
+<li>展開した <code>ffmpeg</code> / <code>ffprobe</code> を <code>/usr/local/bin/</code> か <code>~/bin/</code> に置きます。</li>
+<li><code>chmod +x ffmpeg ffprobe</code> で実行権限を付与。</li>
+<li>初回実行時に Gatekeeper でブロックされた場合は、<code>システム設定</code> → <code>プライバシーとセキュリティ</code> の下のほうに「許可」ボタンが出るので押します。</li>
+</ul>
+<h3 id="windows_3">Windows<a class="headerlink" href="#windows_3" title="Permanent link">&para;</a></h3>
+<p><strong><code>winget</code> を使う方法 (推奨、Windows 11)</strong>:</p>
+<div class="language-powershell highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">winget</span> <span class="n">install</span> <span class="n">Gyan</span><span class="p">.</span><span class="n">FFmpeg</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">ffmpeg</span> <span class="n">-version</span>
+</span></code></pre></div>
+<p>ターミナルを開き直してから <code>ffmpeg -version</code> を実行してください。</p>
+<p><strong>手動でインストールする方法</strong>:</p>
+<ol>
+<li><a href="https://www.gyan.dev/ffmpeg/builds/">https://www.gyan.dev/ffmpeg/builds/</a> から <code>ffmpeg-release-essentials.zip</code> (NVENC を使うなら <code>ffmpeg-release-full.7z</code>) をダウンロードします。</li>
+<li>展開して、中身のフォルダを <code>C:\ffmpeg\</code> に置きます (例: <code>C:\ffmpeg\bin\ffmpeg.exe</code> / <code>C:\ffmpeg\bin\ffprobe.exe</code>)。</li>
+<li>ユーザー権限の場所に置きたいなら <code>%USERPROFILE%\tools\ffmpeg\</code> でも構いません。</li>
+<li><strong>環境変数 PATH に <code>bin</code> フォルダを追加</strong> します。</li>
+<li>スタート → <code>環境変数</code> → <code>システム環境変数の編集</code> → <code>環境変数</code> ボタン。</li>
+<li>「ユーザーの環境変数」の <code>Path</code> を選んで <code>編集</code> → <code>新規</code> → <code>C:\ffmpeg\bin</code> を追加 → <code>OK</code> で閉じる。</li>
+<li>ターミナルを開き直し、<code>ffmpeg -version</code> で動作確認。</li>
+<li>PATH をどうしても通せない場合は、起動後に立ち絵システム本体の <code>全体設定 → ffmpeg のパス</code> に <code>ffmpeg.exe</code> の絶対パスを入れれば PATH なしでも動きます。</li>
+</ol>
+<blockquote>
+<p><strong>NVENC を使う場合</strong>: GPL ビルド (<code>gyan.dev</code> の <code>essentials</code> / <code>full</code> はどちらも GPL) を選んでください。LGPL ビルドだと UI に NVENC エンコーダが出てきません。</p>
+</blockquote>
+<h3 id="_4">共通の動作確認<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>ffmpeg<span class="w"> </span>-version
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>ffprobe<span class="w"> </span>-version
+</span></code></pre></div>
+<p>両方ともバージョン番号 (例: <code>ffmpeg version 7.1</code>) が表示されれば OK です。</p>
+<h2 id="4">4. ソースコードを取得<a class="headerlink" href="#4" title="Permanent link">&para;</a></h2>
+<p>GitHub から <code>git clone</code> で取得します。
+ホームフォルダの直下、または任意の作業フォルダで実行してください。</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/pyoru0309/py_tachie.git
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nb">cd</span><span class="w"> </span>py_tachie
+</span></code></pre></div>
+<blockquote>
+<p><strong>インストール場所のおすすめ</strong>:</p>
+<ul>
+<li>macOS: <code>~/Documents/py_tachie/</code> または <code>~/projects/py_tachie/</code></li>
+<li>Windows: <code>C:\Users\&lt;あなたのユーザー名&gt;\Documents\py_tachie\</code> (パスに日本語やスペースが入らない場所が無難)</li>
+</ul>
+<p>後述する <code>projects/</code> フォルダ (制作データ) もこの中に作られます。
+制作データを別ドライブに置きたい場合は、起動後に <code>全体設定 → プロジェクトフォルダ</code> で別パスを指定できます。</p>
+</blockquote>
+<h2 id="5-python">5. Python 仮想環境を作る<a class="headerlink" href="#5-python" title="Permanent link">&para;</a></h2>
+<p>依存ライブラリを他の Python プロジェクトと混ぜないために、仮想環境 (<code>.venv</code>) を作ります。</p>
+<h3 id="macos-linux">macOS / Linux<a class="headerlink" href="#macos-linux" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+</span></code></pre></div>
+<h3 id="windows-powershell">Windows (PowerShell)<a class="headerlink" href="#windows-powershell" title="Permanent link">&para;</a></h3>
+<div class="language-powershell highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">py</span> <span class="p">-</span><span class="n">3</span><span class="p">.</span><span class="n">12</span> <span class="n">-m</span> <span class="n">venv</span> <span class="p">.</span><span class="n">venv</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="p">.\.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">Activate</span><span class="p">.</span><span class="n">ps1</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">pip</span> <span class="n">install</span> <span class="n">-r</span> <span class="n">requirements</span><span class="p">.</span><span class="n">txt</span>
+</span></code></pre></div>
+<p><code>Activate.ps1</code> が実行ポリシーで止められる場合は次のいずれかで対処します。</p>
+<ul>
+<li>一時的に Bypass で起動: <code>PowerShell -ExecutionPolicy Bypass</code></li>
+<li>コマンドプロンプトで <code>activate.bat</code> を使う: <code>.\.venv\Scripts\activate.bat</code></li>
+</ul>
+<p>仮想環境が有効になっていると、プロンプトの先頭に <code>(.venv)</code> が表示されます。</p>
+<h2 id="6">6. サーバを起動する<a class="headerlink" href="#6" title="Permanent link">&para;</a></h2>
+<p>推奨は次の 1 行です。</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>python<span class="w"> </span>-m<span class="w"> </span>app
+</span></code></pre></div>
+<p>これは <code>app/__main__.py</code> 経由の uvicorn 薄ラッパで、動画書き出しの WebSocket が圧縮で潰れないよう <code>ws_per_message_deflate=False</code> を強制し、<code>reload=True</code> で開発時のホットリロードも有効にします。</p>
+<p>オプションを指定したい場合:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>python<span class="w"> </span>-m<span class="w"> </span>app<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span><span class="w">          </span><span class="c1"># 別ポートで起動</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>python<span class="w"> </span>-m<span class="w"> </span>app<span class="w"> </span>--host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w">       </span><span class="c1"># LAN に公開</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>python<span class="w"> </span>-m<span class="w"> </span>app<span class="w"> </span>--no-reload<span class="w">          </span><span class="c1"># autoreload を切る (本番想定)</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>python<span class="w"> </span>-m<span class="w"> </span>app<span class="w"> </span>--workers<span class="w"> </span><span class="m">2</span><span class="w">          </span><span class="c1"># ワーカー数を上書き (reload は自動 OFF)</span>
+</span></code></pre></div>
+<p>uvicorn を直接呼ぶ場合は次の通り (動画書き出しの圧縮事故を避けるため <code>--ws-per-message-deflate false</code> が必要)。</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>python<span class="w"> </span>-m<span class="w"> </span>uvicorn<span class="w"> </span>app.main:app<span class="w"> </span>--host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--ws-per-message-deflate<span class="w"> </span><span class="nb">false</span>
+</span></code></pre></div>
+<p>ターミナルに <code>Uvicorn running on http://127.0.0.1:8000</code> という行が出れば成功です。
+ブラウザで次の URL を開きます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>http://127.0.0.1:8000/
+</span></code></pre></div>
+<p>ヘルプドキュメント (このガイドのビルド済み HTML) は次の URL でも確認できます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>http://127.0.0.1:8000/help/
+</span></code></pre></div>
+<p>GitHub Pages で公開された後は、同じ内容を Web 上でも閲覧できます。</p>
+<h2 id="7-js">7. (任意) JS ライブラリと日本語フォントをローカル化<a class="headerlink" href="#7-js" title="Permanent link">&para;</a></h2>
+<p>描画エンジンと動画書き出しで使う three.js / mp4box.js は、既定では <code>static/vendor/</code> のローカル版を見て、無ければ jsdelivr の CDN にフォールバックします。社内環境などインターネット非接続で運用する場合は、最初に 1 回だけ取得しておきましょう。</p>
+<ol>
+<li>ブラウザで <a href="http://127.0.0.1:8000/">http://127.0.0.1:8000/</a> を開く。</li>
+<li>ヘッダーの <strong>全体設定</strong> (歯車アイコン) → 左側の <strong>環境</strong> タブ。</li>
+<li><strong>JS ライブラリのインストール</strong> ボタンを押す (npm registry / jsdelivr から取得 → <code>static/vendor/three/&lt;ver&gt;/</code> と <code>static/vendor/mp4box/&lt;ver&gt;/</code> に展開)。</li>
+<li>すぐ下の <strong>Noto Sans JP をインストール</strong> で日本語フォントを <code>assets/fonts/NotoSansJP/</code> に展開。</li>
+</ol>
+<p>「CDN を使う」チェックを付けると、ローカル版があっても CDN を強制利用します (デバッグ用)。</p>
+<h2 id="_5">最初に見る画面<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<p>起動後はプロジェクト一覧またはダッシュボードが表示されます。プロジェクトが存在しない場合は、ヘッダーの <code>新規</code> から最初のプロジェクトを作成してください。</p>
+<p>編集画面の構成は次のとおりです。</p>
+<ul>
+<li><strong>上部ヘッダー</strong>: プロジェクト切替、素材再スキャン、キャラ管理、PSD インポート、PNG 出力、MP4 出力、設定、テーマ切替。</li>
+<li><strong>左/中央</strong>: 1920×1080 のライブプレビュー (canvas)。波形と dB メーター、再生/停止ボタンが下に並びます。</li>
+<li><strong>右パネル</strong>: 選択中アイテム (カット or テロップ) に応じて中身が差し替わる編集パネル。<code>キャラ配置</code> タブと <code>お芝居</code> タブが並びます。</li>
+<li><strong>下部タイムライン</strong>: ruler / 波形 / カット / テロップを 1 枚の canvas に描画。シーンごとに切替可能。</li>
+</ul>
+<h2 id="_6">基本の作業順<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<ol>
+<li>プロジェクトを作成または選択する。</li>
+<li>ダッシュボードからキャラクター素材 (PSD・PNG/WebP・ZIP) を取り込む。</li>
+<li>シーンに動画背景や BGM を設定する。</li>
+<li>カットを追加し、キャラ配置・話者・セリフ・モーションを編集する。</li>
+<li>テロップを追加し、タイムラインで開始・終了・スタイルを整える。</li>
+<li>再生ヘッドを動かしてライブプレビューで確認する。</li>
+<li>PNG または MP4 を書き出す。</li>
+</ol>
+<h2 id="_7">終了方法<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<ul>
+<li>ブラウザを閉じる。</li>
+<li>サーバを起動しているターミナルで <code>Ctrl + C</code> を押す (<code>Cmd + C</code> ではなく <strong>Ctrl + C</strong>)。</li>
+<li>仮想環境を抜けたいときは <code>deactivate</code> と入力する。</li>
+</ul>
+<p>シナリオは編集ごとに自動保存され、再生ヘッド位置もプロジェクトに保存されます。次回起動時には最後に開いたプロジェクトが自動で開き、再生ヘッドが当時のフレームへ復元されます。</p>
+<h2 id="_8">次回以降の起動<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<p>セットアップ後の起動は次の 3 行だけです。</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nb">cd</span><span class="w"> </span>py_tachie
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="c1"># macOS / Linux</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="c1"># Windows</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>.<span class="se">\.</span>venv<span class="se">\S</span>cripts<span class="se">\A</span>ctivate.ps1
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>python<span class="w"> </span>-m<span class="w"> </span>app
+</span></code></pre></div>
+<p>ソースを最新版に更新するには <code>git pull</code> を実行してから依存を入れ直します (<code>pip install -r requirements.txt</code>)。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="フッター" >
+        
+          
+          <a href="../.." class="md-footer__link md-footer__link--prev" aria-label="前: ホーム">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                前
+              </span>
+              <div class="md-ellipsis">
+                ホーム
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../create-project/" class="md-footer__link md-footer__link--next" aria-label="次: プロジェクトを作成する">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                次
+              </span>
+              <div class="md-ellipsis">
+                プロジェクトを作成する
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.footer","navigation.indexes","navigation.sections","navigation.path","navigation.tracking","search.highlight","toc.follow"],"search":"../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"コピーしました","clipboard.copy":"クリップボードへコピー","search.result.more.one":"このページ内にもう1件見つかりました","search.result.more.other":"このページ内にあと#件見つかりました","search.result.none":"何も見つかりませんでした","search.result.one":"1件見つかりました","search.result.other":"#件見つかりました","search.result.placeholder":"検索キーワードを入力してください","search.result.term.missing":"検索に含まれない","select.version":"バージョン切り替え"},"version":null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.63456bd9.min.js"></script>
+      
+    
+  </body>
+</html>

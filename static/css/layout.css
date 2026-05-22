@@ -1,0 +1,850 @@
+/* アプリシェル・ワークスペース・コントロールパネル・タイムライン・ダッシュボード */
+
+.app-shell {
+  display: grid;
+  grid-template-columns: minmax(520px, 1fr) minmax(420px, 680px);
+  /* timeline-dock の内訳: header(38 ボタン+toolbar) + cut-list(~84) + timeline-scroll(canvas 186 + ボーダー 2 + 横スクロールバー 14 = 202) ≒ 324px。
+     dock の padding(12+14=26) と gap(8*2=16) で +42px 見て 366px。
+     2026-05-17 SE / 動画レイヤー帯を 24px → 36px (telop と同じ太さ) に揃えたので
+     352 → 376。
+     ※ timeline-scroll の flex-basis (202px) と組で機能する。両方を上げないと
+        動画レイヤー帯が overflow:hidden で切れる / 逆に余白が出る。 */
+  grid-template-rows: minmax(0, 1fr) 376px;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.workspace {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  padding: 18px 22px 14px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* トップバー */
+.preview-bar {
+  margin-bottom: 10px;
+}
+
+.top-actions,
+.transport-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.top-actions {
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px;
+  box-shadow: var(--shadow-sm);
+}
+
+.top-actions button {
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.top-actions .icon-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+}
+
+.top-actions .icon-button .button-icon {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+}
+
+.top-actions-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  flex: 0 0 auto;
+}
+
+.project-select {
+  width: min(220px, 100%);
+  min-width: 160px;
+  padding-block: 5px;
+  font-size: 12px;
+  height: 30px;
+}
+
+.transport-bar {
+  flex: 0 0 auto;
+  margin-top: 10px;
+}
+
+/* ループトグル: off=グレー, cut=Repeat One + accent, scene=Repeat + accent */
+.loop-toggle {
+  color: var(--fg-faint);
+}
+.loop-toggle[data-loop-mode="cut"],
+.loop-toggle[data-loop-mode="scene"] {
+  color: var(--accent);
+  border-color: var(--accent-ring);
+}
+
+.audio-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 240px;
+  max-width: 380px;
+  min-width: 180px;
+  margin-left: 6px;
+}
+
+.audio-meter-track {
+  position: relative;
+  width: 100%;
+  height: 14px;
+  background: var(--surface-3, rgba(0, 0, 0, 0.18));
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.16));
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.audio-meter-fill {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  background: linear-gradient(90deg, #4d8cff 0%, #5fc46b 60%, #ffb454 80%, #ff5d5d 100%);
+  transition: width 60ms linear;
+  border-radius: 8px 0 0 8px;
+}
+
+.audio-meter-mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  pointer-events: none;
+}
+
+.audio-meter-mark.silence {
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+
+.audio-meter-mark.open {
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+
+.audio-meter-legend {
+  display: flex;
+  gap: 12px;
+  font-size: 10px;
+  color: var(--fg-muted, rgba(255, 255, 255, 0.6));
+  letter-spacing: 0.04em;
+}
+
+.audio-meter-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.audio-meter-legend-item .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #4d8cff;
+}
+
+.audio-meter-legend-item .dot.mid { background: #ffb454; }
+.audio-meter-legend-item .dot.open { background: #ff5d5d; }
+
+/* メーター track 内に dbFloor / dbCeil 値を小さく重ねて両端を読めるようにする */
+.audio-meter-scale-tick {
+  position: absolute;
+  bottom: 1px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1;
+  color: var(--fg-muted, rgba(255, 255, 255, 0.7));
+  background: rgba(0, 0, 0, 0.35);
+  padding: 1px 3px;
+  border-radius: 3px;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.audio-meter-scale-tick.scale-min { left: 2px; }
+.audio-meter-scale-tick.scale-max { right: 2px; }
+
+.audio-meter-readout-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.audio-meter-readout {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted, rgba(255, 255, 255, 0.7));
+}
+
+.audio-meter-db {
+  font-weight: 600;
+  color: var(--fg, rgba(255, 255, 255, 0.92));
+  min-width: 3.5em;
+  text-align: right;
+}
+
+.audio-meter-unit,
+.audio-meter-norm-label {
+  font-size: 10px;
+}
+
+.audio-meter-readout-sep {
+  opacity: 0.4;
+}
+
+.audio-meter-norm {
+  font-weight: 600;
+  color: var(--fg, rgba(255, 255, 255, 0.92));
+  min-width: 2.4em;
+  text-align: right;
+}
+
+/* プレビュー */
+.preview-stage {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  place-items: center;
+  padding: 4px 0;
+  container-type: size;
+}
+
+.preview-frame {
+  /* container query 単位で 16:9 を厳密に維持。
+     border (1px×2) ぶんを引いて、content-box が画像と一致するように。
+     幅上限は撤廃し、ワークスペースが許す限り 1920px まで拡大する。 */
+  box-sizing: content-box;
+  position: relative;
+  width: min(calc(100cqw - 2px), calc((100cqh - 2px) * 16 / 9), 1920px);
+  aspect-ratio: 16 / 9;
+  height: auto;
+  background-color: #0a0c10;
+  background-image:
+    linear-gradient(45deg, #2a2f36 25%, transparent 25%),
+    linear-gradient(-45deg, #2a2f36 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #2a2f36 75%),
+    linear-gradient(-45deg, transparent 75%, #2a2f36 75%);
+  background-size: 24px 24px;
+  background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.preview-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.preview-frame canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: transparent;
+}
+
+.preview-frame canvas[hidden] {
+  display: none;
+}
+
+.empty-preview {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(232, 236, 242, 0.92);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: center;
+  padding: 16px;
+  background: rgba(8, 12, 18, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+/* コントロールパネル（右） */
+.control-panel {
+  min-height: 0;
+  overflow: auto;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  padding: 18px;
+}
+
+.panel-section {
+  padding: 0 0 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-section:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.panel-section h2 {
+  margin-bottom: 4px;
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.preset-name-field {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* タイムライン */
+.timeline-dock {
+  grid-column: 1 / -1;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  padding: 12px 22px 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timeline-dock > .cut-list {
+  flex: 0 0 auto;
+}
+
+.timeline-dock > .timeline-container {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.timeline-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.cut-list {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  /* カットが増えても dock の縦予算 (≒ 330/360px) を食い潰さないよう、横スクロールバー
+     領域を常に確保する。`overflow-x: scroll` で常時表示にしておけば、カット数の増減で
+     cut-list の高さがガタつかず timeline-scroll の下端が overflow:hidden で
+     切られる再発を防げる。 */
+  overflow-x: scroll;
+  scrollbar-gutter: stable;
+  padding: 4px 2px 6px;
+  scroll-snap-type: x proximity;
+}
+
+.cut-item {
+  flex: 0 0 230px;
+  /* flex item の既定 `min-width: auto` は nowrap な .cut-title の min-content
+     (= 折り返さない元テキスト全幅) で計算されるため、flex-basis 230px を超えて
+     カードが横方向に膨らんでしまう。`min-width: 0` で min-content クランプを
+     切り、`max-width` で flex-basis を上限に固定する。 */
+  min-width: 0;
+  max-width: 230px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  scroll-snap-align: start;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.cut-item:hover {
+  border-color: var(--border-strong);
+}
+
+.cut-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.cut-item.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 50%, var(--surface-2));
+  /* outer ring (box-shadow 0 0 0 1px) を使うと、cut-list の常時表示スクロールバーと
+     重なる位置に描かれて bottom 辺が消えてしまう。inset 表現に変えると border-box
+     の内側で完結し、scrollbar の影響を受けない。 */
+  box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 1px var(--accent-ring);
+}
+
+.cut-item.range-selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 28%, var(--surface-2));
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
+}
+
+.cut-item.dragging {
+  opacity: 0.5;
+}
+
+.cut-item.cut-drop-before {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.cut-item.cut-drop-after {
+  box-shadow: inset -3px 0 0 var(--accent);
+}
+
+.cut-title {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cut-meta {
+  margin-top: 4px;
+  color: var(--fg-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.add-cut-card {
+  display: inline-flex;
+  flex: 0 0 168px;
+  align-self: stretch;
+  min-height: 0;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  color: var(--fg-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+
+.add-cut-card:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface);
+}
+
+.timeline-overview-spacer { display: none; }
+
+/* シナリオ直下に常設する Canvas タイムライン (Phase D-2) */
+.timeline-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.timeline-container.is-empty {
+  opacity: 0.85;
+}
+
+.timeline-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.timeline-zoom-label {
+  min-width: 64px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+}
+
+.timeline-playhead-info {
+  margin-left: 12px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--fg);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  min-width: 150px;
+  text-align: center;
+  cursor: text;
+  user-select: none;
+}
+
+.timeline-playhead-info:hover,
+.timeline-playhead-info:focus-visible {
+  background: var(--surface-2);
+  border-color: var(--border);
+  outline: none;
+}
+
+.timeline-playhead-info-input {
+  margin-left: 12px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  color: var(--fg);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  width: 110px;
+  text-align: center;
+}
+
+/* キャンバス本体 (186px = ruler22+wave46+telop36+se36+vl36+cut10) ＋ 横スクロールバー (14px)
+   ＋ ボーダー (2px) で 202px。.timeline-dock の overflow:hidden に下端が切られない
+   よう、flex-shrink を許可して親が狭いときは縮む形にする（縮んだ場合でもスクロール
+   バーは最下端に必ず残る）。2026-05-17 SE/VL 24→36 に揃えて 178 → 202。 */
+.timeline-scroll {
+  position: relative;
+  width: 100%;
+  flex: 0 1 202px;
+  min-height: 60px;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  scrollbar-width: thin;
+}
+
+/* macOS のオーバーレイ式スクロールバーは要素に hover しないと表示されない。
+   -webkit-appearance: none + 明示的な背景色で「常時表示」のレガシースクロールバーに切替える。 */
+.timeline-scroll::-webkit-scrollbar {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--surface-2);
+}
+
+.timeline-scroll::-webkit-scrollbar-track {
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+}
+
+.timeline-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong, var(--border));
+  border-radius: 7px;
+  border: 3px solid var(--surface-2);
+  min-width: 40px;
+}
+
+.timeline-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+.timeline-scroll::-webkit-scrollbar-corner {
+  background: var(--surface-2);
+}
+
+.timeline-scroll:focus-within {
+  border-color: var(--accent-ring);
+}
+
+.timeline-spacer {
+  position: relative;
+  width: 1px;
+  height: 1px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.timeline-canvas {
+  position: sticky;
+  left: 0;
+  top: 0;
+  display: block;
+  height: 100%;
+  margin-top: -1px;
+  outline: none;
+  cursor: default;
+  user-select: none;
+}
+
+.timeline-canvas:focus {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: -2px;
+}
+
+.add-cut-plus {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 22px;
+  line-height: 1;
+}
+
+/* プロジェクトダッシュボード */
+.project-dashboard {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  overflow: auto;
+  background: var(--bg);
+  padding: 28px;
+}
+
+.dashboard-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.dashboard-header,
+.dashboard-actions,
+.dashboard-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dashboard-header {
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.dashboard-header h1 {
+  font-size: 22px;
+}
+
+.dashboard-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.dashboard-tools {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 180px 190px;
+  margin-bottom: 18px;
+}
+
+.dashboard-tools label {
+  margin-top: 0;
+}
+
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.project-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 10px;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.project-card:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.project-card.active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent-ring);
+}
+
+.project-thumb {
+  display: grid;
+  aspect-ratio: 16 / 9;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-3);
+  color: var(--fg-muted);
+  font-size: 11px;
+}
+
+.project-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.project-card-title {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-card-meta {
+  color: var(--fg-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.project-card-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.dashboard-empty {
+  grid-column: 1 / -1;
+  padding: 28px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--fg-muted);
+  text-align: center;
+}
+
+/* キャラクター管理ダイアログ */
+.character-manager-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  gap: 18px;
+  min-height: 360px;
+}
+
+.character-manager-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  padding-right: 12px;
+}
+
+.character-manager-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--fg);
+  padding: 9px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.character-manager-item:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+}
+
+.character-manager-item.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface-2));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.character-manager-item strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.character-manager-item span {
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.character-manager-item small {
+  display: block;
+  color: var(--fg-faint);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.character-manager-tabs {
+  margin-bottom: 12px;
+}
+
+.character-manager-editor {
+  min-width: 0;
+}
+
+.character-manager-editor label {
+  min-width: 0;
+}
+
+.character-manager-editor .inline-fields {
+  grid-template-columns: repeat(3, minmax(110px, 1fr));
+}
+
+.character-import-box {
+  display: grid;
+  gap: 10px;
+}
+
+.character-import-box input[type="file"] {
+  padding: 7px;
+}
+
+.character-import-box button {
+  justify-self: start;
+  min-width: 132px;
+}
+

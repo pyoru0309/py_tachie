@@ -1,0 +1,2376 @@
+
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="立ち絵合成・シナリオプレビュー・動画書き出しツールの利用マニュアル">
+      
+      
+        <meta name="author" content="立ち絵システム">
+      
+      
+      
+        <link rel="prev" href="../rendering-and-video/">
+      
+      
+        <link rel="next" href="../../troubleshooting/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.33">
+    
+    
+      
+        <title>オーディオビジュアライザ開発ガイド - 立ち絵システム ユーザーガイド</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.53a7feaf.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=LINE+Seed+JP:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"LINE Seed JP";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="ナビゲーション"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          コンテンツにスキップ
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="ヘッダー">
+    <a href="../.." title="立ち絵システム ユーザーガイド" class="md-header__button md-logo" aria-label="立ち絵システム ユーザーガイド" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="ナビゲーション">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            立ち絵システム ユーザーガイド
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              オーディオビジュアライザ開発ガイド
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="ダークモードに切替"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="ダークモードに切替" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="ライトモードに切替"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="ライトモードに切替" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="検索">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="検索">
+  <button type="button" class="md-search__button">
+    検索
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="ナビゲーション" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="立ち絵システム ユーザーガイド" class="md-nav__button md-logo" aria-label="立ち絵システム ユーザーガイド" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    立ち絵システム ユーザーガイド
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ホーム
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    チュートリアル
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    チュートリアル
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    はじめに
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/create-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクトを作成する
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/import-character/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    キャラクターをインポートする
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/voice-synthesis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    音声合成 (VOICEVOX / VOICEPEAK) を使う
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/export-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PNG / 動画を書き出す
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リファレンス
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    リファレンス
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    編集画面リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/title-editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    タイトル組版エディタ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/project-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクト設定リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    素材管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/file-structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ファイル構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    テクニカルガイド
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    テクニカルガイド
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../character-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    キャラクターモデルの推奨構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../psd-layer-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PSD レイヤー命名規則
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenario-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シナリオ形式
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rendering-and-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    レンダリングと動画生成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    オーディオビジュアライザ開発ガイド
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    オーディオビジュアライザ開発ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        全体像
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ファイル構成
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        サーバ側プラグインの contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="サーバ側プラグインの contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#params" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PARAMS の書き方
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gl_data_streamsparams-audio-time_grid_sec-fps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gl_data_streams(params, audio, time_grid_sec, fps)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#audiocontext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AudioContext のヘルパ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gl-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ブラウザ側 GL プラグインの contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ブラウザ側 GL プラグインの contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ctx-createvisualizerlayer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ctx (createVisualizerLayer の引数)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ctxbackground" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ctx.background (背景情報)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_kitjs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        共通ヘルパ _kit.js
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#framestate-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        frameState (update の引数)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        標準実装パターン
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="標準実装パターン">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        必須の落とし穴 (整理済みノウハウ)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#per-cut-binary-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        サーバ側で per-cut binary stream を書き出す
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="サーバ側で per-cut binary stream を書き出す">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        data stream のサイズ感
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scene-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scene への配置と layer 制御
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        開発フロー
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="開発フロー">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#devvisualizers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /dev/visualizers/ の有効化
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        既存プラグインの一覧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="既存プラグインの一覧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scene-bpm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scene の BPM を受け取る
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        トラブルシュート
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="トラブルシュート">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プラグインが UI に出てこない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ライブプレビューでは出るが書き出しで出ない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#canvas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Canvas に描いた絵が真っ黒 / 透明 / 反転する
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dbfs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dBFS の値域がおかしい
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    トラブルシュート
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        全体像
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ファイル構成
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        サーバ側プラグインの contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="サーバ側プラグインの contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#params" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PARAMS の書き方
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gl_data_streamsparams-audio-time_grid_sec-fps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gl_data_streams(params, audio, time_grid_sec, fps)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#audiocontext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AudioContext のヘルパ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gl-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ブラウザ側 GL プラグインの contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ブラウザ側 GL プラグインの contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ctx-createvisualizerlayer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ctx (createVisualizerLayer の引数)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ctxbackground" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ctx.background (背景情報)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_kitjs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        共通ヘルパ _kit.js
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#framestate-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        frameState (update の引数)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        標準実装パターン
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="標準実装パターン">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        必須の落とし穴 (整理済みノウハウ)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#per-cut-binary-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        サーバ側で per-cut binary stream を書き出す
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="サーバ側で per-cut binary stream を書き出す">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        data stream のサイズ感
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scene-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scene への配置と layer 制御
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        開発フロー
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="開発フロー">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#devvisualizers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /dev/visualizers/ の有効化
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        既存プラグインの一覧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="既存プラグインの一覧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scene-bpm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scene の BPM を受け取る
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        トラブルシュート
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="トラブルシュート">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プラグインが UI に出てこない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ライブプレビューでは出るが書き出しで出ない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#canvas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Canvas に描いた絵が真っ黒 / 透明 / 反転する
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dbfs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dBFS の値域がおかしい
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="ナビゲーション" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    ホーム
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../character-model/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    テクニカルガイド
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+<h1 id="_1">オーディオビジュアライザ開発ガイド<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<p>立ち絵システムの <strong>オーディオビジュアライザ</strong> は、シーン内に「波形」「スペクトログラム」「カウントダウン」のような時間連動レイヤを差し込む仕組みです。プラグイン形式で実装でき、<code>plugins/visualizers/&lt;key&gt;.py</code> と <code>static/js/visualizers/&lt;key&gt;.js</code> の 2 ファイルを 1 セットで追加すれば UI から選択できます。</p>
+<p>このページは、新しいビジュアライザを書きたい開発者向けの実装ガイドです。</p>
+<h2 id="_2">全体像<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<p>描画は WebGL/three.js (ブラウザ側 GL シーン) に統一されています。プラグインは <strong>GL plugin の <code>createVisualizerLayer</code> を実装することが必須</strong> で、ライブプレビュー / 動画書き出し / サムネのすべてに同じ経路で反映されます。</p>
+<p>旧 Python <code>render(ctx) -&gt; PIL.Image.Image</code> (Pillow + Canvas2D) 経路は撤去済みです。サーバ側プラグインは「ユーザ向け UI スキーマ (NAME / PARAMS / GL_MODULE) の宣言」と「(任意) 音声解析データを per-cut の binary stream として焼き出す <code>gl_data_streams</code>」だけを担当します。</p>
+<h2 id="_3">ファイル構成<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p>新しい <code>awesomeviz</code> プラグインを足すなら、最低 2 ファイル:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>plugins/visualizers/awesomeviz.py     # サーバ側 (UI スキーマ + 解析データ)
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>static/js/visualizers/awesomeviz.js   # ブラウザ側 (GL plugin、createVisualizerLayer)
+</span></code></pre></div>
+<p><code>awesomeviz.py</code> の上端で <code>GL_MODULE = "/static/js/visualizers/awesomeviz.js"</code> を宣言すると、サーバが「このプラグインは GL 経路を持っている」と判定し、scene-bundle の <code>viz.gl.module</code> にこのパスを乗せます。ブラウザは動的 import → <code>createVisualizerLayer(ctx)</code> を呼んで Object3D を生成します。</p>
+<p>サーバ側プラグインは起動時に <strong><code>plugins/visualizers/*.py</code> を自動走査</strong> (<code>app.visualizer.discover_plugins</code>) します。ファイル名先頭が <code>_</code> のものは無視されます。</p>
+<h2 id="contract">サーバ側プラグインの contract<a class="headerlink" href="#contract" title="Permanent link">&para;</a></h2>
+<p>最低限以下の <strong>モジュール変数</strong> を露出してください。</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># plugins/visualizers/awesomeviz.py</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">KEY</span> <span class="o">=</span> <span class="s2">&quot;awesomeviz&quot;</span>          <span class="c1"># 内部キー (シナリオに保存される)</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">NAME</span> <span class="o">=</span> <span class="s2">&quot;Awesome Visualizer&quot;</span>  <span class="c1"># UI 表示名</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">PARAMS</span> <span class="o">=</span> <span class="p">[</span><span class="o">...</span><span class="p">]</span>               <span class="c1"># ユーザー設定可能なパラメータ仕様</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">GL_MODULE</span> <span class="o">=</span> <span class="s2">&quot;/static/js/visualizers/awesomeviz.js&quot;</span>   <span class="c1"># 必須</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">GL_VERSION</span> <span class="o">=</span> <span class="mi">1</span>                                        <span class="c1"># 任意 (省略時 1)</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">GL_FRAME_RATE</span> <span class="o">=</span> <span class="mi">24</span>                                    <span class="c1"># 任意。plugin が希望する更新粒度 (省略時は project の characterAnimationFps)</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># 音声解析が必要な場合のみ実装する (任意)</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="k">def</span><span class="w"> </span><span class="nf">gl_data_streams</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">audio</span><span class="p">,</span> <span class="n">time_grid_sec</span><span class="p">,</span> <span class="n">fps</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">]:</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="o">...</span>
+</span></code></pre></div>
+<p><code>GL_MODULE</code> が宣言されていないプラグインは UI に出さずスキップされます (起動ログに <code>[visualizer] skipping &lt;file&gt;: GL_MODULE が定義されていません</code> が出ます)。</p>
+<h3 id="params"><code>PARAMS</code> の書き方<a class="headerlink" href="#params" title="Permanent link">&para;</a></h3>
+<p>UI に表示するフォーム項目を宣言します。<code>type</code> は次のいずれかです。</p>
+<table>
+<thead>
+<tr>
+<th>type</th>
+<th>入力 UI</th>
+<th>値の型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>number</code></td>
+<td>スライダ + 数値</td>
+<td><code>float</code> (<code>min</code> / <code>max</code> / <code>step</code> 任意)</td>
+</tr>
+<tr>
+<td><code>color</code></td>
+<td>カラーピッカー + HEX 入力</td>
+<td><code>str</code> (<code>"#rrggbb"</code>)</td>
+</tr>
+<tr>
+<td><code>select</code></td>
+<td>ドロップダウン</td>
+<td><code>str</code>、<code>options=[{"value", "label"}]</code> で選択肢を列挙</td>
+</tr>
+<tr>
+<td><code>font</code></td>
+<td>フォント family セレクタ</td>
+<td><code>str</code> (内部 ID、空文字 <code>""</code> でプロジェクト既定)</td>
+</tr>
+<tr>
+<td><code>font_weight</code></td>
+<td>フォント太さセレクタ</td>
+<td><code>str</code> (内部 ID、<code>"regular"</code> / <code>"bold"</code> 等)</td>
+</tr>
+</tbody>
+</table>
+<p>例:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">PARAMS</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="p">{</span><span class="s2">&quot;key&quot;</span><span class="p">:</span> <span class="s2">&quot;color&quot;</span><span class="p">,</span>      <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;color&quot;</span><span class="p">,</span>  <span class="s2">&quot;default&quot;</span><span class="p">:</span> <span class="s2">&quot;#ffffff&quot;</span><span class="p">,</span> <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;色&quot;</span><span class="p">},</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="p">{</span><span class="s2">&quot;key&quot;</span><span class="p">:</span> <span class="s2">&quot;lineWidth&quot;</span><span class="p">,</span>  <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;number&quot;</span><span class="p">,</span> <span class="s2">&quot;min&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;max&quot;</span><span class="p">:</span> <span class="mi">32</span><span class="p">,</span> <span class="s2">&quot;step&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>     <span class="s2">&quot;default&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>        <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;線の太さ (px)&quot;</span><span class="p">},</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="p">{</span><span class="s2">&quot;key&quot;</span><span class="p">:</span> <span class="s2">&quot;mode&quot;</span><span class="p">,</span>       <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;select&quot;</span><span class="p">,</span> <span class="s2">&quot;default&quot;</span><span class="p">:</span> <span class="s2">&quot;outer&quot;</span><span class="p">,</span>   <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;向き&quot;</span><span class="p">,</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>     <span class="s2">&quot;options&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>         <span class="p">{</span><span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;outer&quot;</span><span class="p">,</span> <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;外側のみ&quot;</span><span class="p">},</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>         <span class="p">{</span><span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;both&quot;</span><span class="p">,</span>  <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;内外両側&quot;</span><span class="p">},</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>     <span class="p">]},</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">]</span>
+</span></code></pre></div>
+<p><code>default</code> を必ず設定してください。サーバ側の <code>merge_params</code> は <code>PARAMS</code> の defaults を base にユーザー入力で上書きするため、<code>PARAMS</code> に列挙されていないキーは UI に出ず、<code>ctx.params</code> にも入りません。</p>
+<h3 id="gl_data_streamsparams-audio-time_grid_sec-fps"><code>gl_data_streams(params, audio, time_grid_sec, fps)</code><a class="headerlink" href="#gl_data_streamsparams-audio-time_grid_sec-fps" title="Permanent link">&para;</a></h3>
+<p>per-cut で「フレームごとに事前解析した値」をブラウザに渡したいとき (FFT スペクトル / 波形 PCM / オンセット envelope 等) に実装します。音声不要の plugin (countdown 等) では未定義で OK。</p>
+<p>引数:</p>
+<table>
+<thead>
+<tr>
+<th>名前</th>
+<th>型</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>params</code></td>
+<td><code>dict[str, Any]</code></td>
+<td>ユーザ入力 (defaults とマージ済)</td>
+</tr>
+<tr>
+<td><code>audio</code></td>
+<td><code>AudioContext</code> または <code>None</code></td>
+<td>scene 内の連続 PCM (mono float32 [-1, 1])。<code>audio.window(t, L)</code> / <code>audio.spectrum_db(t, ...)</code> / <code>audio.amplitude_db(t, ...)</code> などで切り出す</td>
+</tr>
+<tr>
+<td><code>time_grid_sec</code></td>
+<td><code>np.ndarray</code></td>
+<td>per-cut の各フレーム秒 (<code>cut_start_sec + i / fps</code> の配列)</td>
+</tr>
+<tr>
+<td><code>fps</code></td>
+<td><code>int</code></td>
+<td>解析 fps (= <code>GL_FRAME_RATE</code> または project の characterAnimationFps)</td>
+</tr>
+</tbody>
+</table>
+<p>戻り値: <code>{stream_name: np.ndarray (float32)}</code> または <code>{stream_name: {"data": ndarray, "dtype": "int8" | ..., "scale": float, "offset": float}}</code>。</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">gl_data_streams</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">audio</span><span class="p">,</span> <span class="n">time_grid_sec</span><span class="p">,</span> <span class="n">fps</span><span class="p">):</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;time_grid_sec[i] (cut 内の各フレーム秒) ごとに解析を走らせて Float32 配列を返す。&quot;&quot;&quot;</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">n_frames</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">time_grid_sec</span><span class="p">)</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">bands</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bands&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">96</span><span class="p">))</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="k">if</span> <span class="n">audio</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">n_frames</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;spectrum&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_frames</span><span class="p">),</span> <span class="n">bands</span><span class="p">),</span> <span class="o">-</span><span class="mf">120.0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)}</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">out</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">n_frames</span><span class="p">,</span> <span class="n">bands</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">time_grid_sec</span><span class="p">):</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>        <span class="n">out</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">audio</span><span class="o">.</span><span class="n">spectrum_db</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">t</span><span class="p">),</span> <span class="n">n_bands</span><span class="o">=</span><span class="n">bands</span><span class="p">)</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;spectrum&quot;</span><span class="p">:</span> <span class="n">out</span><span class="p">}</span>
+</span></code></pre></div>
+<h3 id="audiocontext">AudioContext のヘルパ<a class="headerlink" href="#audiocontext" title="Permanent link">&para;</a></h3>
+<p><code>AudioContext</code> は scene 全体の連続 PCM (mono float32 [-1, 1]) を保持し、以下のヘルパが使えます (詳細は <code>app/visualizer.py</code>):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># 低レベル</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">audio</span><span class="o">.</span><span class="n">window</span><span class="p">(</span><span class="n">time_sec</span><span class="p">,</span> <span class="n">length_sec</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>   <span class="c1"># mono float32 PCM 窓</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">audio</span><span class="o">.</span><span class="n">amplitude_db</span><span class="p">(</span><span class="n">time_sec</span><span class="p">,</span> <span class="n">length_sec</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>  <span class="c1"># RMS dBFS (-120..0)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">audio</span><span class="o">.</span><span class="n">spectrum_db</span><span class="p">(</span><span class="n">time_sec</span><span class="p">,</span> <span class="n">n_bands</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span> <span class="n">window_sec</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>                  <span class="n">fmin</span><span class="o">=</span><span class="mf">30.0</span><span class="p">,</span> <span class="n">fmax</span><span class="o">=</span><span class="mf">14000.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>  <span class="c1"># log ビン化 dBFS</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># 共通ヘルパ (プラグインで再実装されがちなものを集約)</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="n">audio</span><span class="o">.</span><span class="n">normalized_spectrum</span><span class="p">(</span><span class="n">time_sec</span><span class="p">,</span> <span class="n">n_bands</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span> <span class="n">window_sec</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>                          <span class="n">fmin</span><span class="o">=</span><span class="mf">30.0</span><span class="p">,</span> <span class="n">fmax</span><span class="o">=</span><span class="mf">14000.0</span><span class="p">,</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>                          <span class="n">db_floor</span><span class="o">=-</span><span class="mf">75.0</span><span class="p">,</span> <span class="n">db_ceil</span><span class="o">=-</span><span class="mf">20.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="c1"># spectrum_db を [db_floor, db_ceil] で 0..1 に正規化したもの</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="n">audio</span><span class="o">.</span><span class="n">energy_bands</span><span class="p">(</span><span class="n">time_sec</span><span class="p">,</span> <span class="n">n_subbands</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="c1"># [full, lo, mid, hi] の正規化エネルギー (n_subbands=1 なら [full] だけ)</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="c1"># 時間軸全体に対するヘルパ (gl_data_streams 内で使う)</span>
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="n">audio</span><span class="o">.</span><span class="n">onset_envelope</span><span class="p">(</span><span class="n">time_grid_sec</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>  <span class="c1"># (N,) 自己正規化済み (0..1)</span>
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="n">audio</span><span class="o">.</span><span class="n">beat_grid</span><span class="p">(</span><span class="n">time_grid_sec</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">0.55</span><span class="p">,</span>
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>                <span class="n">min_interval_sec</span><span class="o">=</span><span class="mf">0.18</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>  <span class="c1"># (N,) 0/1 のビートフラグ</span>
+</span></code></pre></div>
+<p><code>window(t, L)</code> は「時刻 t の右端から L 秒前」の窓を切り出します。<code>spectrum_db</code> は内部で Hann 窓 + rfft + log 軸ビン化までやります。</p>
+<p><code>audio</code> が <code>None</code> (= 「ビジュアライザ用音源」がカット側で設定されていない) の場合は <strong>音量ゼロ相当のストリーム</strong> (例: 全要素 <code>-120.0</code> の spectrum) を返すと、ブラウザ側でも自然にフォールバック表示できます。</p>
+<h2 id="gl-contract">ブラウザ側 GL プラグインの contract<a class="headerlink" href="#gl-contract" title="Permanent link">&para;</a></h2>
+<p>ファイル <code>/static/js/visualizers/&lt;key&gt;.js</code> で次を export してください。</p>
+<div class="language-js highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">createVisualizerLayer</span><span class="p">(</span><span class="nx">ctx</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nx">object3D</span><span class="p">,</span><span class="w">           </span><span class="c1">// THREE.Object3D。scene にそのまま add される</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nx">update</span><span class="p">(</span><span class="nx">frameState</span><span class="p">),</span><span class="w"> </span><span class="c1">// 毎フレーム呼ばれる。texture.needsUpdate = true で反映</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nx">dispose</span><span class="p">(),</span><span class="w">          </span><span class="c1">// scene 切替時に呼ばれる。geom / mat / texture の解放</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="p">};</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">}</span>
+</span></code></pre></div>
+<h3 id="ctx-createvisualizerlayer"><code>ctx</code> (createVisualizerLayer の引数)<a class="headerlink" href="#ctx-createvisualizerlayer" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>キー</th>
+<th>型</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>THREE</code></td>
+<td><code>module</code></td>
+<td>three.js モジュール (バージョン整合のため呼び側から渡す)</td>
+</tr>
+<tr>
+<td><code>renderer</code></td>
+<td><code>THREE.WebGLRenderer</code></td>
+<td>メインレンダラ (普段は使わなくて OK)</td>
+</tr>
+<tr>
+<td><code>width</code> / <code>height</code></td>
+<td><code>1920</code> / <code>1080</code></td>
+<td>canvas サイズ (固定)</td>
+</tr>
+<tr>
+<td><code>params</code></td>
+<td><code>object</code></td>
+<td>ユーザー入力 (Python の <code>PARAMS</code> と同じキー)</td>
+</tr>
+<tr>
+<td><code>audioData</code></td>
+<td><code>{ [streamName]: Float32Array }</code></td>
+<td>サーバが書き出した per-cut バイナリ (旧 plugin 互換、復号済 float32)</td>
+</tr>
+<tr>
+<td><code>streamShapes</code></td>
+<td><code>{ [streamName]: number[] }</code></td>
+<td>各ストリームの shape (例 <code>spectrum: [N_frames, bands]</code>)</td>
+</tr>
+<tr>
+<td><code>streamMeta</code></td>
+<td><code>{ [streamName]: { array, dtype, scale, offset } }</code></td>
+<td>圧縮 dtype を扱う新 plugin 向け。<code>_kit.js</code> の <code>sliceStreamRow</code> / <code>readStreamScalar</code> と組み合わせる</td>
+</tr>
+<tr>
+<td><code>frameDurationSec</code></td>
+<td><code>number</code></td>
+<td>visualizer 更新粒度 (例 <code>1/12</code>)</td>
+</tr>
+<tr>
+<td><code>frameCount</code></td>
+<td><code>number</code></td>
+<td>cut 内の visualizer フレーム数</td>
+</tr>
+<tr>
+<td><code>cutStartSec</code></td>
+<td><code>number</code></td>
+<td>scene 内での cut 開始秒</td>
+</tr>
+<tr>
+<td><code>sceneTotalSec</code></td>
+<td><code>number</code></td>
+<td>scene 全体の長さ (countdown 等で使う)</td>
+</tr>
+<tr>
+<td><code>fontResolver(familyId, weightId)</code></td>
+<td>callable</td>
+<td><code>{family: cssStack, weight: "400"}</code> を返す</td>
+</tr>
+<tr>
+<td><code>background</code></td>
+<td><code>object</code></td>
+<td>自分より下のレイヤーの見た目情報 (色 / 平均色 / 輝度 / 反対色 / source)。詳細は次節</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ctxbackground"><code>ctx.background</code> (背景情報)<a class="headerlink" href="#ctxbackground" title="Permanent link">&para;</a></h3>
+<p>「自分より下のレイヤー (= 背景画像 / 動画 / 単色)」を要約した情報。加算合成を避けたいか、影を足すか、色を一段濃くするか、など plugin 側で <strong>背景に応じて自動調整</strong> するために使う。</p>
+<div class="language-js highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nx">ctx</span><span class="p">.</span><span class="nx">background</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nx">color</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;#ffffff&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w">            </span><span class="c1">// 単色背景 (solid) のときだけ HEX、そうでなければ null</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nx">averageColor</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;#c8c8d0&quot;</span><span class="p">,</span><span class="w">            </span><span class="c1">// 画像/動画はサムネイルから平均色、単色なら同値</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nx">luminance</span><span class="o">:</span><span class="w"> </span><span class="mf">0..1</span><span class="p">,</span><span class="w">                    </span><span class="c1">// WCAG 相対輝度 (sRGB ガンマ補正済)</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nx">isLight</span><span class="o">:</span><span class="w"> </span><span class="kc">true</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w">              </span><span class="c1">// luminance &gt; 0.5</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nx">contrastColor</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;#111111&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;#f4f4f4&quot;</span><span class="p">,</span><span class="w"> </span><span class="c1">// 視認性が確保される反対色 (近似)</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span><span class="nx">source</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;solid&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;image&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;video&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;mixed&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;unknown&quot;</span><span class="p">,</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="p">};</span>
+</span></code></pre></div>
+<p>実装は <code>static/js/visualizers/_kit.js</code> の以下のヘルパを使って計算される (プラグインからも import 可):</p>
+<div class="language-js highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">import</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nx">backgroundInfoFromColor</span><span class="p">,</span><span class="w">    </span><span class="c1">// (hex, { source }) → 上記 dict</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nx">backgroundInfoFromImage</span><span class="p">,</span><span class="w">    </span><span class="c1">// (HTMLImageElement | HTMLVideoElement | HTMLCanvasElement, { source, sampleSize }) → 上記 dict</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nx">defaultBackgroundInfo</span><span class="p">,</span><span class="w">      </span><span class="c1">// gray (luminance=0.5) フォールバック</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nx">relativeLuminance</span><span class="p">,</span><span class="w">          </span><span class="c1">// (r, g, b) → 0..1</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nx">pickContrastColor</span><span class="p">,</span><span class="w">          </span><span class="c1">// (luminance) → &quot;#111111&quot; or &quot;#f4f4f4&quot;</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;/static/js/visualizers/_kit.js&quot;</span><span class="p">;</span>
+</span></code></pre></div>
+<p>サンプリング戦略:
+- <strong>単色</strong>: HEX を直接 luminance 計算 (即時)
+- <strong>画像</strong>: 16x16 のオフスクリーン canvas に縮小描画 → 平均 RGB (scene 構築時 1 回)
+- <strong>動画</strong>: 同じく 16x16 サンプリング (現状 1 回。動的更新は将来課題)
+- <strong>読めない (CORS / 未ロード)</strong>: gray (luminance=0.5) にフォールバック</p>
+<p>利用例 (背景が明るすぎる場所では加算合成を抑える):</p>
+<div class="language-js highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">bg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">ctx</span><span class="p">.</span><span class="nx">background</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">isLight</span><span class="o">:</span><span class="w"> </span><span class="kc">false</span><span class="w"> </span><span class="p">};</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">blendMode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">bg</span><span class="p">.</span><span class="nx">isLight</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="nx">THREE</span><span class="p">.</span><span class="nx">NormalBlending</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nx">THREE</span><span class="p">.</span><span class="nx">AdditiveBlending</span><span class="p">;</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="c1">// テキスト系 plugin で「背景を見て自動で文字色を選ぶ」ときも、参考までに:</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="kd">const</span><span class="w"> </span><span class="nx">autoTextColor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">bg</span><span class="p">.</span><span class="nx">contrastColor</span><span class="p">;</span><span class="w">  </span><span class="c1">// ユーザが明示的に色を指定していない時のフォールバック向け</span>
+</span></code></pre></div>
+<h3 id="_kitjs">共通ヘルパ <code>_kit.js</code><a class="headerlink" href="#_kitjs" title="Permanent link">&para;</a></h3>
+<p>繰り返し書きがちなパターンを <code>static/js/visualizers/_kit.js</code> にまとめてあります。新規プラグインは積極的に使ってください (既存プラグインは挙動互換のためそのまま)。</p>
+<div class="language-js highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">import</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nx">createCanvasPlane</span><span class="p">,</span><span class="w"> </span><span class="nx">disposeCanvasPlane</span><span class="p">,</span><span class="w">    </span><span class="c1">// CanvasTexture + DoubleSide plane の生成 / 解放</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nx">numParam</span><span class="p">,</span><span class="w"> </span><span class="nx">clamp</span><span class="p">,</span><span class="w"> </span><span class="nx">clamp01</span><span class="p">,</span><span class="w">                  </span><span class="c1">// 0 を有効値として扱う数値取り出し</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="nx">hexToColor</span><span class="p">,</span><span class="w"> </span><span class="nx">hexToRgba</span><span class="p">,</span><span class="w">                     </span><span class="c1">// HEX → THREE.Color / &quot;rgba(...)&quot; 文字列</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span><span class="nx">decodeStreamArray</span><span class="p">,</span><span class="w">                         </span><span class="c1">// ArrayBuffer + meta → TypedArray (dtype 復号)</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span><span class="nx">sliceStreamRow</span><span class="p">,</span><span class="w"> </span><span class="nx">readStreamScalar</span><span class="p">,</span><span class="w">          </span><span class="c1">// stream の frameIdx 行 / スカラー値を取り出す</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;/static/js/visualizers/_kit.js&quot;</span><span class="p">;</span>
+</span></code></pre></div>
+<p>CanvasTexture を使う典型的な plugin は次のように書けます。</p>
+<div class="language-js highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">createCanvasPlane</span><span class="p">,</span><span class="w"> </span><span class="nx">disposeCanvasPlane</span><span class="p">,</span><span class="w"> </span><span class="nx">numParam</span><span class="p">,</span><span class="w"> </span><span class="nx">hexToRgba</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;/static/js/visualizers/_kit.js&quot;</span><span class="p">;</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">createVisualizerLayer</span><span class="p">(</span><span class="nx">ctx</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">plane</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">createCanvasPlane</span><span class="p">(</span><span class="nx">ctx</span><span class="p">.</span><span class="nx">THREE</span><span class="p">,</span><span class="w"> </span><span class="nx">ctx</span><span class="p">.</span><span class="nx">width</span><span class="p">,</span><span class="w"> </span><span class="nx">ctx</span><span class="p">.</span><span class="nx">height</span><span class="p">);</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span><span class="c1">// plane: { canvas, c2d, texture, geom, material, mesh }</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span><span class="kd">function</span><span class="w"> </span><span class="nx">update</span><span class="p">(</span><span class="nx">frameState</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">    </span><span class="nx">plane</span><span class="p">.</span><span class="nx">c2d</span><span class="p">.</span><span class="nx">clearRect</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="nx">plane</span><span class="p">.</span><span class="nx">canvas</span><span class="p">.</span><span class="nx">width</span><span class="p">,</span><span class="w"> </span><span class="nx">plane</span><span class="p">.</span><span class="nx">canvas</span><span class="p">.</span><span class="nx">height</span><span class="p">);</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">    </span><span class="nx">plane</span><span class="p">.</span><span class="nx">c2d</span><span class="p">.</span><span class="nx">fillStyle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">hexToRgba</span><span class="p">(</span><span class="nx">ctx</span><span class="p">.</span><span class="nx">params</span><span class="p">.</span><span class="nx">color</span><span class="p">,</span><span class="w"> </span><span class="nx">numParam</span><span class="p">(</span><span class="nx">ctx</span><span class="p">.</span><span class="nx">params</span><span class="p">.</span><span class="nx">opacity</span><span class="p">,</span><span class="w"> </span><span class="mf">0.9</span><span class="p">));</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">    </span><span class="nx">plane</span><span class="p">.</span><span class="nx">c2d</span><span class="p">.</span><span class="nx">fillRect</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="nx">plane</span><span class="p">.</span><span class="nx">canvas</span><span class="p">.</span><span class="nx">width</span><span class="p">,</span><span class="w"> </span><span class="nx">plane</span><span class="p">.</span><span class="nx">canvas</span><span class="p">.</span><span class="nx">height</span><span class="p">);</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">    </span><span class="nx">plane</span><span class="p">.</span><span class="nx">texture</span><span class="p">.</span><span class="nx">needsUpdate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="p">;</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">  </span><span class="kd">function</span><span class="w"> </span><span class="nx">dispose</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">disposeCanvasPlane</span><span class="p">(</span><span class="nx">plane</span><span class="p">);</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">object3D</span><span class="o">:</span><span class="w"> </span><span class="nx">plane</span><span class="p">.</span><span class="nx">mesh</span><span class="p">,</span><span class="w"> </span><span class="nx">update</span><span class="p">,</span><span class="w"> </span><span class="nx">dispose</span><span class="w"> </span><span class="p">};</span>
+</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="p">}</span>
+</span></code></pre></div>
+<h3 id="framestate-update"><code>frameState</code> (update の引数)<a class="headerlink" href="#framestate-update" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>キー</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>elapsedSec</code></td>
+<td><strong>cut-local</strong> 経過秒 (= playback の量子化済み)。<code>0</code> で cut 先頭</td>
+</tr>
+<tr>
+<td><code>sceneSec</code></td>
+<td>scene 内通算秒 = <code>cutStartSec + elapsedSec</code>。countdown 等「scene 全体の残時間」を扱う場合はこちら</td>
+</tr>
+<tr>
+<td><code>frameIdx</code></td>
+<td>cut-local visualizer frame idx (= <code>floor(elapsedSec / frameDurationSec)</code>)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>重要</strong>: <code>elapsedSec</code> は cut-local です (2026-05-05 整理。<code>feedback_gl_visualizer_elapsedsec_is_cut_local.md</code>)。scene 全体の通算秒が欲しい時は必ず <code>sceneSec</code> を使ってください。<code>gl_data_streams</code> 側の time_grid も <code>cut_start_sec + i / fps</code> で per-cut N_frames 行を焼くので、<code>frameIdx</code> は <strong>cut-local index</strong> です。</p>
+</blockquote>
+<h3 id="_4">標準実装パターン<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<p>オフスクリーン canvas に描いて CanvasTexture として GL plane に貼るのが基本パターンです。</p>
+<div class="language-js highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">createVisualizerLayer</span><span class="p">(</span><span class="nx">ctx</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">THREE</span><span class="p">,</span><span class="w"> </span><span class="nx">width</span><span class="p">,</span><span class="w"> </span><span class="nx">height</span><span class="p">,</span><span class="w"> </span><span class="nx">params</span><span class="p">,</span><span class="w"> </span><span class="nx">audioData</span><span class="p">,</span><span class="w"> </span><span class="nx">streamShapes</span><span class="p">,</span><span class="w"> </span><span class="nx">frameCount</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">ctx</span><span class="p">;</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">canvas</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">document</span><span class="p">.</span><span class="nx">createElement</span><span class="p">(</span><span class="s2">&quot;canvas&quot;</span><span class="p">);</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">  </span><span class="nx">canvas</span><span class="p">.</span><span class="nx">width</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">width</span><span class="p">;</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">  </span><span class="nx">canvas</span><span class="p">.</span><span class="nx">height</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">height</span><span class="p">;</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">c2d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">canvas</span><span class="p">.</span><span class="nx">getContext</span><span class="p">(</span><span class="s2">&quot;2d&quot;</span><span class="p">);</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">texture</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">THREE</span><span class="p">.</span><span class="nx">CanvasTexture</span><span class="p">(</span><span class="nx">canvas</span><span class="p">);</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">  </span><span class="nx">texture</span><span class="p">.</span><span class="nx">colorSpace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">THREE</span><span class="p">.</span><span class="nx">SRGBColorSpace</span><span class="p">;</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">  </span><span class="nx">texture</span><span class="p">.</span><span class="nx">flipY</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">  </span><span class="nx">texture</span><span class="p">.</span><span class="nx">minFilter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">THREE</span><span class="p">.</span><span class="nx">LinearFilter</span><span class="p">;</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">  </span><span class="nx">texture</span><span class="p">.</span><span class="nx">magFilter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">THREE</span><span class="p">.</span><span class="nx">LinearFilter</span><span class="p">;</span>
+</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">  </span><span class="nx">texture</span><span class="p">.</span><span class="nx">generateMipmaps</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>
+</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">  </span><span class="c1">// Y-down OrthographicCamera + DoubleSide (3D 反転対策)</span>
+</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">geom</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">THREE</span><span class="p">.</span><span class="nx">PlaneGeometry</span><span class="p">(</span><span class="nx">canvas</span><span class="p">.</span><span class="nx">width</span><span class="p">,</span><span class="w"> </span><span class="nx">canvas</span><span class="p">.</span><span class="nx">height</span><span class="p">);</span>
+</span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">mat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">THREE</span><span class="p">.</span><span class="nx">MeshBasicMaterial</span><span class="p">({</span>
+</span><span id="__span-11-19"><a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="w">    </span><span class="nx">map</span><span class="o">:</span><span class="w"> </span><span class="nx">texture</span><span class="p">,</span>
+</span><span id="__span-11-20"><a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="w">    </span><span class="nx">transparent</span><span class="o">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+</span><span id="__span-11-21"><a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a><span class="w">    </span><span class="nx">depthTest</span><span class="o">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+</span><span id="__span-11-22"><a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="w">    </span><span class="nx">depthWrite</span><span class="o">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+</span><span id="__span-11-23"><a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="w">    </span><span class="nx">toneMapped</span><span class="o">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+</span><span id="__span-11-24"><a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a><span class="w">    </span><span class="nx">side</span><span class="o">:</span><span class="w"> </span><span class="nx">THREE</span><span class="p">.</span><span class="nx">DoubleSide</span><span class="p">,</span>
+</span><span id="__span-11-25"><a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a><span class="w">    </span><span class="nx">forceSinglePass</span><span class="o">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+</span><span id="__span-11-26"><a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a><span class="w">  </span><span class="p">});</span>
+</span><span id="__span-11-27"><a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">mesh</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">THREE</span><span class="p">.</span><span class="nx">Mesh</span><span class="p">(</span><span class="nx">geom</span><span class="p">,</span><span class="w"> </span><span class="nx">mat</span><span class="p">);</span>
+</span><span id="__span-11-28"><a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a><span class="w">  </span><span class="nx">mesh</span><span class="p">.</span><span class="nx">position</span><span class="p">.</span><span class="nx">set</span><span class="p">(</span><span class="nx">canvas</span><span class="p">.</span><span class="nx">width</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="nx">canvas</span><span class="p">.</span><span class="nx">height</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">);</span>
+</span><span id="__span-11-29"><a id="__codelineno-11-29" name="__codelineno-11-29" href="#__codelineno-11-29"></a><span class="w">  </span><span class="nx">mesh</span><span class="p">.</span><span class="nx">frustumCulled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
+</span><span id="__span-11-30"><a id="__codelineno-11-30" name="__codelineno-11-30" href="#__codelineno-11-30"></a>
+</span><span id="__span-11-31"><a id="__codelineno-11-31" name="__codelineno-11-31" href="#__codelineno-11-31"></a><span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="nx">lastFrameIdx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mf">1</span><span class="p">;</span>
+</span><span id="__span-11-32"><a id="__codelineno-11-32" name="__codelineno-11-32" href="#__codelineno-11-32"></a><span class="w">  </span><span class="kd">function</span><span class="w"> </span><span class="nx">update</span><span class="p">(</span><span class="nx">frameState</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-33"><a id="__codelineno-11-33" name="__codelineno-11-33" href="#__codelineno-11-33"></a><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Math</span><span class="p">.</span><span class="nx">max</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="nb">Math</span><span class="p">.</span><span class="nx">floor</span><span class="p">(</span><span class="nb">Number</span><span class="p">(</span><span class="nx">frameState</span><span class="o">?</span><span class="p">.</span><span class="nx">frameIdx</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="mf">0</span><span class="p">));</span>
+</span><span id="__span-11-34"><a id="__codelineno-11-34" name="__codelineno-11-34" href="#__codelineno-11-34"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">idx</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="nx">lastFrameIdx</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="p">;</span><span class="w">  </span><span class="c1">// 再描画スキップ</span>
+</span><span id="__span-11-35"><a id="__codelineno-11-35" name="__codelineno-11-35" href="#__codelineno-11-35"></a><span class="w">    </span><span class="nx">lastFrameIdx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">idx</span><span class="p">;</span>
+</span><span id="__span-11-36"><a id="__codelineno-11-36" name="__codelineno-11-36" href="#__codelineno-11-36"></a>
+</span><span id="__span-11-37"><a id="__codelineno-11-37" name="__codelineno-11-37" href="#__codelineno-11-37"></a><span class="w">    </span><span class="nx">c2d</span><span class="p">.</span><span class="nx">clearRect</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="nx">canvas</span><span class="p">.</span><span class="nx">width</span><span class="p">,</span><span class="w"> </span><span class="nx">canvas</span><span class="p">.</span><span class="nx">height</span><span class="p">);</span>
+</span><span id="__span-11-38"><a id="__codelineno-11-38" name="__codelineno-11-38" href="#__codelineno-11-38"></a><span class="w">    </span><span class="c1">// ... ここで audioData[*] と params から canvas に描く ...</span>
+</span><span id="__span-11-39"><a id="__codelineno-11-39" name="__codelineno-11-39" href="#__codelineno-11-39"></a><span class="w">    </span><span class="nx">texture</span><span class="p">.</span><span class="nx">needsUpdate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="p">;</span><span class="w">  </span><span class="c1">// 1 回 upload</span>
+</span><span id="__span-11-40"><a id="__codelineno-11-40" name="__codelineno-11-40" href="#__codelineno-11-40"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-11-41"><a id="__codelineno-11-41" name="__codelineno-11-41" href="#__codelineno-11-41"></a>
+</span><span id="__span-11-42"><a id="__codelineno-11-42" name="__codelineno-11-42" href="#__codelineno-11-42"></a><span class="w">  </span><span class="kd">function</span><span class="w"> </span><span class="nx">dispose</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-43"><a id="__codelineno-11-43" name="__codelineno-11-43" href="#__codelineno-11-43"></a><span class="w">    </span><span class="nx">geom</span><span class="p">.</span><span class="nx">dispose</span><span class="p">();</span>
+</span><span id="__span-11-44"><a id="__codelineno-11-44" name="__codelineno-11-44" href="#__codelineno-11-44"></a><span class="w">    </span><span class="nx">mat</span><span class="p">.</span><span class="nx">dispose</span><span class="p">();</span>
+</span><span id="__span-11-45"><a id="__codelineno-11-45" name="__codelineno-11-45" href="#__codelineno-11-45"></a><span class="w">    </span><span class="nx">texture</span><span class="p">.</span><span class="nx">dispose</span><span class="p">();</span>
+</span><span id="__span-11-46"><a id="__codelineno-11-46" name="__codelineno-11-46" href="#__codelineno-11-46"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-11-47"><a id="__codelineno-11-47" name="__codelineno-11-47" href="#__codelineno-11-47"></a>
+</span><span id="__span-11-48"><a id="__codelineno-11-48" name="__codelineno-11-48" href="#__codelineno-11-48"></a><span class="w">  </span><span class="c1">// 初期 1 frame は最初に焼いておく (透明のまま render される事故を防ぐ)</span>
+</span><span id="__span-11-49"><a id="__codelineno-11-49" name="__codelineno-11-49" href="#__codelineno-11-49"></a><span class="w">  </span><span class="nx">update</span><span class="p">({</span><span class="w"> </span><span class="nx">frameIdx</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="w"> </span><span class="p">});</span>
+</span><span id="__span-11-50"><a id="__codelineno-11-50" name="__codelineno-11-50" href="#__codelineno-11-50"></a>
+</span><span id="__span-11-51"><a id="__codelineno-11-51" name="__codelineno-11-51" href="#__codelineno-11-51"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">object3D</span><span class="o">:</span><span class="w"> </span><span class="nx">mesh</span><span class="p">,</span><span class="w"> </span><span class="nx">update</span><span class="p">,</span><span class="w"> </span><span class="nx">dispose</span><span class="w"> </span><span class="p">};</span>
+</span><span id="__span-11-52"><a id="__codelineno-11-52" name="__codelineno-11-52" href="#__codelineno-11-52"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>バー、粒子、リボンのように WebGL のジオメトリで直接表現したい場合も、同じ
+contract のまま <code>THREE.Object3D</code> / <code>THREE.InstancedMesh</code> / <code>THREE.Points</code> /
+<code>THREE.Mesh</code> を返せます。この場合は canvas upload を行わず、<code>update()</code> で
+<code>BufferAttribute.needsUpdate</code>、<code>instanceMatrix.needsUpdate</code>、shader uniform などを
+更新してください。<code>depthTest: false</code> / <code>depthWrite: false</code> / <code>transparent: true</code> /
+<code>toneMapped: false</code> / <code>side: THREE.DoubleSide</code> は CanvasTexture 版と同じく指定するのが
+安全です。</p>
+<h4 id="_5">必須の落とし穴 (整理済みノウハウ)<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>DoubleSide + forceSinglePass</strong> を必ず指定。Y-down OrthographicCamera で plane が裏面になる事故を吸収する。</li>
+<li><strong><code>texture.colorSpace = THREE.SRGBColorSpace</code></strong> + <strong><code>texture.flipY = false</code></strong>。これが無いと色が暗くなる / 上下反転する。</li>
+<li><strong><code>texture.needsUpdate = true</code></strong> を canvas 描画後に必ず呼ぶ。これを忘れると初期 1 frame しか upload されない。</li>
+<li><strong><code>renderOrder</code> は scene-builder が <code>viz.layer</code> に従って上書きする</strong>。plugin 内で <code>mesh.renderOrder = ...</code> を設定しても無視されます。</li>
+<li><strong>複数 Mesh をまとめる時は <code>THREE.Group</code> ではなく <code>THREE.Object3D</code> を使う</strong>。<code>THREE.Group</code> だと three.js の <code>projectObject</code> が <code>groupOrder = group.renderOrder</code> を子孫に伝播させ、<code>reversePainterSortStable</code> が <code>groupOrder</code> を <code>renderOrder</code> より優先するため、scene-builder が <code>viz.layer</code> に従って Group に renderOrder=50/900/1500 を立てた瞬間に子孫が同じ groupOrder へ昇格し、テロップ (groupOrder=0, renderOrder=3000) より後段にソートされて画面前面に出てしまう。<code>new THREE.Object3D()</code> は <code>isGroup</code> フラグが立たないので groupOrder 伝播を起こさない。</li>
+<li><strong><code>mesh.frustumCulled = false</code></strong>。1080p plane が画面端で勝手にカリングされないように。</li>
+<li><strong>再描画スキップ</strong>: <code>update</code> は毎フレーム呼ばれるので、<code>lastFrameIdx</code> 等で「変化が無ければ何もしない」を入れる (CanvasTexture の upload は重い)。</li>
+</ul>
+<h2 id="per-cut-binary-stream">サーバ側で per-cut binary stream を書き出す<a class="headerlink" href="#per-cut-binary-stream" title="Permanent link">&para;</a></h2>
+<p>GL plugin が必要とする「per-frame の解析データ」は、サーバ側プラグインの <code>gl_data_streams(params, audio, time_grid_sec, fps)</code> で生成します。</p>
+<p>サーバは戻り値を <code>projects/&lt;id&gt;/cache/viz/&lt;token&gt;_&lt;stream&gt;.bin</code> に書き出し、scene-bundle の <code>viz.gl.streams</code> に <code>{spectrum: {url, dtype: "float32", shape: [n_frames, bands]}}</code> として乗せます。<code>token</code> には plugin / params / audio / cut が含まれているため、設定が変わらなければ HTTP cache が効いて 2 度目以降の fetch はサーバに飛びません。</p>
+<p>ブラウザ側は <code>audioData["spectrum"]</code> (Float32Array、フラット) と <code>streamShapes["spectrum"]</code> (<code>[n_frames, bands]</code>) を受け取り、フレームごとに行を切り出して描画します。</p>
+<div class="language-js highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">audioData</span><span class="o">?</span><span class="p">.</span><span class="nx">spectrum</span><span class="p">;</span><span class="w">        </span><span class="c1">// Float32Array (flat)</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">bands</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">streamShapes</span><span class="o">?</span><span class="p">.</span><span class="nx">spectrum</span><span class="o">?</span><span class="p">.[</span><span class="mf">1</span><span class="p">]</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="mf">64</span><span class="p">;</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="kd">function</span><span class="w"> </span><span class="nx">readSpectrumRow</span><span class="p">(</span><span class="nx">frameIdx</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">off</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">frameIdx</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">bands</span><span class="p">;</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">spec</span><span class="o">?</span><span class="p">.</span><span class="nx">subarray</span><span class="p">(</span><span class="nx">off</span><span class="p">,</span><span class="w"> </span><span class="nx">off</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nx">bands</span><span class="p">)</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="p">}</span>
+</span></code></pre></div>
+<h3 id="data-stream">data stream のサイズ感<a class="headerlink" href="#data-stream" title="Permanent link">&para;</a></h3>
+<p>転送容量を意識してください (CDN を介さないローカル fetch とはいえ、長尺シーンでは効きます)。</p>
+<ul>
+<li>24 fps × 10 s × 96 bands × 4 bytes = <strong>0.09 MB / cut</strong> (典型的な spectrum)</li>
+<li>24 fps × 10 s × 1920 samples × 4 bytes = <strong>1.8 MB / cut</strong> (波形を等倍 ship)</li>
+</ul>
+<p>100 MB を超えそうな場合は次の手段で抑えます。</p>
+<ol>
+<li><strong>更新粒度を落とす</strong>。プラグインで <code>GL_FRAME_RATE = 12</code> を宣言すると visualizer の time_grid が 12fps 相当で構築されます。書き出し fps とは独立。countdown 等は 12fps で十分。</li>
+<li><strong>圧縮 dtype</strong> で ship する。<code>gl_data_streams</code> の戻り値は <code>np.ndarray</code> だけでなく <strong>dict</strong> を返すこともできます。</li>
+</ol>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">gl_data_streams</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">audio</span><span class="p">,</span> <span class="n">time_grid_sec</span><span class="p">,</span> <span class="n">fps</span><span class="p">):</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="n">spec</span> <span class="o">=</span> <span class="n">audio</span><span class="o">.</span><span class="n">normalized_spectrum</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>  <span class="c1"># 0..1 の float32</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="c1"># int8 で ship: 0..1 → 0..127 にスケール、復号は browser 側で v = stored * (1/127) + 0</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">quantized</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">spec</span> <span class="o">*</span> <span class="mf">127.0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int8</span><span class="p">)</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="k">return</span> <span class="p">{</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>        <span class="s2">&quot;spectrum&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>            <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="n">quantized</span><span class="p">,</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>            <span class="s2">&quot;dtype&quot;</span><span class="p">:</span> <span class="s2">&quot;int8&quot;</span><span class="p">,</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>            <span class="s2">&quot;scale&quot;</span><span class="p">:</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="mf">127.0</span><span class="p">,</span>
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>            <span class="s2">&quot;offset&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>        <span class="p">},</span>
+</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>    <span class="p">}</span>
+</span></code></pre></div>
+<p>サポートしている dtype: <code>float32</code> (既定) / <code>float16</code> / <code>int16</code> / <code>int8</code> / <code>uint8</code>。ブラウザ側は <code>streamMeta[name].array</code> で TypedArray、<code>audioData[name]</code> では復号済み Float32Array が取れます (旧 plugin 互換)。</p>
+<ol>
+<li><code>bands</code> / sample width 自体を減らす (見た目に妥協が要る)。</li>
+</ol>
+<h2 id="scene-layer">scene への配置と layer 制御<a class="headerlink" href="#scene-layer" title="Permanent link">&para;</a></h2>
+<p>ビジュアライザは scene の Z 軸方向で 3 段階のいずれかに配置できます (シナリオ側で <code>viz.layer</code> フィールドとして保存)。</p>
+<table>
+<thead>
+<tr>
+<th><code>viz.layer</code></th>
+<th>描画位置</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>above_bg</code> (既定)</td>
+<td>背景の上、キャラの下</td>
+<td>スペクトログラム背景、波形装飾</td>
+</tr>
+<tr>
+<td><code>above_chars</code></td>
+<td>キャラの上、前景の下</td>
+<td>全画面エフェクト</td>
+</tr>
+<tr>
+<td><code>above_fg</code></td>
+<td>前景の上、テロップの下</td>
+<td>カウントダウンなど最前面</td>
+</tr>
+</tbody>
+</table>
+<p>UI 側 (右パネルの <code>演出</code> タブ) で選択できます。プラグイン側からはこの層配置に責任を持ちません (= <code>mesh.renderOrder</code> は scene-builder が上書き)。</p>
+<h2 id="_6">開発フロー<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong><code>plugins/visualizers/&lt;key&gt;.py</code> を新規作成</strong>。<code>KEY</code> / <code>NAME</code> / <code>PARAMS</code> / <code>GL_MODULE</code> (必須) / <code>gl_data_streams</code> (音声解析が必要な場合のみ) を実装する。</li>
+<li><strong><code>static/js/visualizers/&lt;key&gt;.js</code> を作成</strong> して <code>createVisualizerLayer(ctx)</code> を export する。</li>
+<li>サーバ起動 (既に起動中ならホットリロードでなく <strong>再起動が必要</strong>。<code>POST /api/cache/empty</code> は <code>cache/preview/</code> 等の中間ファイルを消すためのもので、<code>discover_plugins()</code> の <code>_DISCOVER_CACHE</code> (プラグイン本体のロード結果) はクリアしないため、新プラグインを認識させる用途には使えない)。</li>
+<li><strong><code>/dev/visualizers/</code> を開く</strong>。プラグイン単体で「シーン設定 / 背景 / 音源」のノイズを排除した状態で動作確認。</li>
+<li>音源 fixture: <code>silence</code> / <code>sine 440Hz</code> / <code>beat (120BPM)</code> / <code>sweep 50-8000Hz</code> / <code>noise</code> / <code>現在のプロジェクトの BGM</code></li>
+<li>背景: 黒 / 白 / グレー / 透過チェック柄、任意の HEX</li>
+<li>24fps 固定 (plugin に <code>GL_FRAME_RATE</code> があればそれを優先)</li>
+<li>パラメータは PARAMS から自動生成</li>
+<li>編集画面 → 右パネル → <code>演出</code> タブ → 「ビジュアライザ追加」で実シーンに乗せて確認。</li>
+<li>動画書き出しで最終確認。</li>
+</ol>
+<h3 id="devvisualizers"><code>/dev/visualizers/</code> の有効化<a class="headerlink" href="#devvisualizers" title="Permanent link">&para;</a></h3>
+<p>ガード: <code>SPLITE_DEV_TOOLS=1</code> または loopback 接続 (<code>127.0.0.1</code> / <code>::1</code>) のときだけ有効です。リモートからアクセスしたい場合だけ環境変数で開けます。</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nv">SPLITE_DEV_TOOLS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python3<span class="w"> </span>-m<span class="w"> </span>uvicorn<span class="w"> </span>app.main:app<span class="w"> </span>--host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span>
+</span></code></pre></div>
+<p>API としては <code>POST /api/dev/visualizer/preview</code> が本体です。本番の <code>layerData.visualizer</code> と同じ形 (pluginKey / frameDurationSec / frameCount / cutStartSec / sceneTotalSec / gl: { module, version, params, streams }) を返すので、scene-builder の代わりに最小の <code>THREE.Scene</code> を作って <code>createVisualizerLayer(ctx)</code> を呼ぶだけで再利用できます。</p>
+<h2 id="_7">既存プラグインの一覧<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<p>参考実装は <code>plugins/visualizers/</code> 配下です。</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>名前</th>
+<th>用途</th>
+<th>主な学び</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>wave</code></td>
+<td>オーディオ波形</td>
+<td>中央線 + 振幅</td>
+<td><code>audio.window</code> の使い方、per-frame 1920 サンプルの ship 例</td>
+</tr>
+<tr>
+<td><code>circle_spectrum</code></td>
+<td>サークルスペクトログラム</td>
+<td>円周バー</td>
+<td><code>audio.spectrum_db</code> の使い方、log ビン化、dB → 長さ正規化</td>
+</tr>
+<tr>
+<td><code>countdown</code></td>
+<td>カウントダウン</td>
+<td>時刻表示</td>
+<td>音声不要 (<code>gl_data_streams</code> なし)、<code>frameState.sceneSec</code> の使い方、フォント解決</td>
+</tr>
+<tr>
+<td><code>bar_spectrum</code></td>
+<td>バー・スペクトラム</td>
+<td>横並びバー</td>
+<td><code>InstancedMesh</code> で per-frame の matrix / color だけ更新する例</td>
+</tr>
+<tr>
+<td><code>geometric_particles</code></td>
+<td>ジオメトリック・パーティクル</td>
+<td>点群 + 直線ネットワーク</td>
+<td><code>Points</code> / <code>LineSegments</code> で軽量な音反応パーティクルを作る例</td>
+</tr>
+<tr>
+<td><code>wave_ribbon</code></td>
+<td>ウェーブ・リボン</td>
+<td>大きなソフト波線</td>
+<td>三角形リボン + <code>ShaderMaterial</code> で太く柔らかい線を作る例</td>
+</tr>
+<tr>
+<td><code>floating_particles</code></td>
+<td>ふわふわパーティクル (サンプル)</td>
+<td>浮遊粒子が音で拍動・onset で弾ける</td>
+<td><strong><code>_kit.js</code> を使う最小サンプル</strong>。<code>GL_FRAME_RATE=12</code>、<code>int8 + scale</code> 圧縮 stream、<code>energy_bands</code> / <code>onset_envelope</code> の利用例</td>
+</tr>
+<tr>
+<td><code>bokeh_gradient</code></td>
+<td>ぼかし円とグラデーション</td>
+<td>2 色グラデ + 浮遊するボケ円 + スターダスト</td>
+<td>音声なしの装飾系。<code>ShaderMaterial</code> 1 plane で大きなボケ円を vec4 uniform 配列に、<code>InstancedMesh</code> で小さな星粒を per-instance <code>aInstAlpha</code> に分けて描画</td>
+</tr>
+<tr>
+<td><code>falling_particles</code></td>
+<td>降りそそぐパーティクル (星屑 / 雪 / 雨)</td>
+<td>星屑 / 雪 / 雨が一定方向に降る (浮遊も可)</td>
+<td><code>uShape</code> 分岐で 1 InstancedMesh から 3 形状を描画、<code>((t*v + phase*span) mod span)</code> で wrap、雨は plane を <code>angle</code> で回転</td>
+</tr>
+<tr>
+<td><code>led_grid</code></td>
+<td>LED グリッド</td>
+<td>BPM に合わせて光るドットマトリクス</td>
+<td>フルスクリーン fragment shader で <code>floor(uv * grid)</code> セル分割 + ハッシュ関数で per-cell color / pulse 決定。<code>ctx.sceneBpm</code> を読みつつ <code>params.bpm &gt; 0</code> で上書き</td>
+</tr>
+<tr>
+<td><code>glow_shapes</code></td>
+<td>光る図形 (角丸四角 / 円 / 三角 / 星)</td>
+<td>ネオン輪郭の図形が一定方向に流れる + 背景パターン</td>
+<td>SDF (<code>sdRoundedBox</code> / <code>sdCircle</code> / <code>sdEquilateralTriangle</code> / <code>sdStar5</code>) を <code>vShapeId</code> で分岐、per-instance に色・線幅をバラつかせる例。背景模様 (水玉 / 格子 / 横線 / 縦線) も同梱</td>
+</tr>
+<tr>
+<td><code>wave_ribbons</code></td>
+<td>ウェーブリボン (ジオメトリック背景)</td>
+<td>半透明の斜めリボンがゆっくり波打つ「光のサテン」風背景</td>
+<td>vec4 uniform 配列で最大 16 本のリボンを 1 fragment shader で順次 <code>over</code> 合成。位相だけ <code>phase0 + speed*t</code> で更新する低 CPU パターン</td>
+</tr>
+</tbody>
+</table>
+<p>新しいプラグインを書き始めるときは、最も用途が近いものをコピーして編集するのが早いです。<code>_kit.js</code> を使う前提で書き始めるなら <strong><code>floating_particles</code> をテンプレート</strong> にするのが最短です。</p>
+<h3 id="scene-bpm">scene の BPM を受け取る<a class="headerlink" href="#scene-bpm" title="Permanent link">&para;</a></h3>
+<p><code>createVisualizerLayer(ctx)</code> の <code>ctx.sceneBpm</code> には、シーンの「基本」タブで設定された BPM 値が乗ります (未設定なら <code>0</code>)。BPM に同期したアニメーション (フラッシュ / 切替 / シーケンス) はこの値を読んで「params.bpm が 0 ならシーン値を使う」というセンチネル設計にしておくと、シーン全体で BPM を一括変更でき、必要に応じて個別ビジュアライザで上書きもできます。<code>led_grid</code> の実装が参考になります。</p>
+<h2 id="_8">トラブルシュート<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<h3 id="ui">プラグインが UI に出てこない<a class="headerlink" href="#ui" title="Permanent link">&para;</a></h3>
+<ul>
+<li>ファイル名が <code>_</code> で始まっていないか確認 (<code>_test.py</code> などは除外される)。</li>
+<li>サーバを再起動してください (キャッシュ全削除 <code>POST /api/cache/empty</code> は中間 PNG / WAV を消すだけで、プラグイン本体のロード結果はクリアしないため再起動が必要)。</li>
+<li><code>KEY</code> / <code>NAME</code> のどちらかが欠けている、または <code>GL_MODULE</code> が無いと discover に弾かれる (サーバログに <code>[visualizer] skipping &lt;file&gt;: GL_MODULE が定義されていません</code> または <code>failed to load plugin ...</code> が出る)。</li>
+</ul>
+<h3 id="_9">ライブプレビューでは出るが書き出しで出ない<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<ul>
+<li>ライブプレビューと動画書き出しは同じ GL plugin 経路で動くため、原則「ライブで出るなら書き出しでも出る」はず。差が出る場合は次を疑う:</li>
+<li><code>gl_data_streams</code> 内の例外はサイレントに落ちる (空 streams が返る) ので、サーバログ (<code>[visualizer] plugin &lt;key&gt; gl_data_streams raised: ...</code>) を確認。</li>
+<li>書き出し fps と plugin の <code>GL_FRAME_RATE</code> が大きく食い違うと、stream の <code>frameCount</code> が極端に少なく / 多くなる。<code>frameCount</code> を update 内で defensive にハンドル。</li>
+</ul>
+<h3 id="canvas">Canvas に描いた絵が真っ黒 / 透明 / 反転する<a class="headerlink" href="#canvas" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>texture.needsUpdate = true</code> の呼び忘れ (初期 1 frame しか upload されない)。</li>
+<li><code>texture.flipY = false</code> の指定漏れ → 上下反転。</li>
+<li><code>material.side = THREE.DoubleSide</code> + <code>forceSinglePass: true</code> の漏れ → 裏面で透明になる。</li>
+<li><code>texture.colorSpace = THREE.SRGBColorSpace</code> の漏れ → 全体的に暗くなる。</li>
+</ul>
+<h3 id="dbfs">dBFS の値域がおかしい<a class="headerlink" href="#dbfs" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>audio.spectrum_db</code> は <code>-120 .. 0</code> 程度の dBFS を返す。<code>dbFloor = -75</code>, <code>dbCeil = -20</code> あたりが典型的な可視化レンジ (これより上だとサチる、下だと無音時にバーが揺れる)。</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="フッター" >
+        
+          
+          <a href="../rendering-and-video/" class="md-footer__link md-footer__link--prev" aria-label="前: レンダリングと動画生成">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                前
+              </span>
+              <div class="md-ellipsis">
+                レンダリングと動画生成
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../troubleshooting/" class="md-footer__link md-footer__link--next" aria-label="次: トラブルシュート">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                次
+              </span>
+              <div class="md-ellipsis">
+                トラブルシュート
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.footer","navigation.indexes","navigation.sections","navigation.path","navigation.tracking","search.highlight","toc.follow"],"search":"../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"コピーしました","clipboard.copy":"クリップボードへコピー","search.result.more.one":"このページ内にもう1件見つかりました","search.result.more.other":"このページ内にあと#件見つかりました","search.result.none":"何も見つかりませんでした","search.result.one":"1件見つかりました","search.result.other":"#件見つかりました","search.result.placeholder":"検索キーワードを入力してください","search.result.term.missing":"検索に含まれない","select.version":"バージョン切り替え"},"version":null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.63456bd9.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,58 @@
+[project]
+site_name = "立ち絵システム ユーザーガイド"
+site_description = "立ち絵合成・シナリオプレビュー・動画書き出しツールの利用マニュアル"
+site_author = "立ち絵システム"
+docs_dir = "user_guide"
+site_dir = "docs"
+use_directory_urls = true
+dev_addr = "127.0.0.1:8080"
+nav = [
+  {"ホーム" = "index.md"},
+  {"チュートリアル" = [
+    "tutorials/getting-started.md",
+    "tutorials/create-project.md",
+    "tutorials/import-character.md",
+    "tutorials/voice-synthesis.md",
+    "tutorials/export-video.md"
+  ]},
+  {"リファレンス" = [
+    "reference/editor.md",
+    "reference/title-editor.md",
+    "reference/project-settings.md",
+    "reference/assets.md",
+    "reference/file-structure.md"
+  ]},
+  {"テクニカルガイド" = [
+    "technical/character-model.md",
+    "technical/psd-layer-rules.md",
+    "technical/scenario-format.md",
+    "technical/rendering-and-video.md",
+    "technical/visualizer-plugin.md"
+  ]},
+  {"トラブルシュート" = "troubleshooting.md"}
+]
+
+[project.theme]
+variant = "modern"
+language = "ja"
+font.text = "LINE Seed JP"
+features = [
+  "content.code.copy",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.sections",
+  "navigation.path",
+  "navigation.tracking",
+  "search.highlight",
+  "toc.follow"
+]
+
+[[project.theme.palette]]
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "ダークモードに切替"
+
+[[project.theme.palette]]
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "ライトモードに切替"

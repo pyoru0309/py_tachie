@@ -1,0 +1,3376 @@
+
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="立ち絵合成・シナリオプレビュー・動画書き出しツールの利用マニュアル">
+      
+      
+        <meta name="author" content="立ち絵システム">
+      
+      
+      
+        <link rel="prev" href="../../tutorials/export-video/">
+      
+      
+        <link rel="next" href="../title-editor/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.33">
+    
+    
+      
+        <title>編集画面リファレンス - 立ち絵システム ユーザーガイド</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.53a7feaf.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=LINE+Seed+JP:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"LINE Seed JP";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="ナビゲーション"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          コンテンツにスキップ
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="ヘッダー">
+    <a href="../.." title="立ち絵システム ユーザーガイド" class="md-header__button md-logo" aria-label="立ち絵システム ユーザーガイド" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="ナビゲーション">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            立ち絵システム ユーザーガイド
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              編集画面リファレンス
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="ダークモードに切替"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="ダークモードに切替" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="ライトモードに切替"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="ライトモードに切替" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="検索">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="検索">
+  <button type="button" class="md-search__button">
+    検索
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="ナビゲーション" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="立ち絵システム ユーザーガイド" class="md-nav__button md-logo" aria-label="立ち絵システム ユーザーガイド" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    立ち絵システム ユーザーガイド
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ホーム
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    チュートリアル
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    チュートリアル
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    はじめに
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/create-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクトを作成する
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/import-character/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    キャラクターをインポートする
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/voice-synthesis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    音声合成 (VOICEVOX / VOICEPEAK) を使う
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/export-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PNG / 動画を書き出す
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リファレンス
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    リファレンス
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    編集画面リファレンス
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    編集画面リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        上部ヘッダー
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ライブプレビュー
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ライブプレビュー">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャラのドラッグ&amp;ドロップ配置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        トランスポートバー（再生ボタン周り）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ループ再生モード
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        右パネル: 編集タブ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="右パネル: 編集タブ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャラ配置タブ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        お芝居タブ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="お芝居タブ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        セリフ枠のブレンドモード
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        演出タブ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="演出タブ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        背景・場面
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャラクター
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ビジュアライザ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        テロップ編集パネル
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="テロップ編集パネル">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        登場 / 退場 / 持続モーション (通常テロップ・MV 文字 共通)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mv_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MV 文字 + 視覚エフェクト (グループ・最下段)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        効果音編集パネル
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        動画レイヤー編集パネル
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="動画レイヤー編集パネル">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        録画素材を取り込むときの再エンコードチェック
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        タイムライン
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="タイムライン">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        磁力スナップ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bgm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        シーン設定ダイアログの BGM タブ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カットカードの表示
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カット一覧のスクロールと自動追従
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カットカードのクリック動作
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        タイムライン上部のクイックボタン
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カットの選択・並び替え・複製・削除
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        タイムラインアイテムの選択
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カットへのリンク
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="カットへのリンク">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        リンクの貼り方 / 解除
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        可視化
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        注意点
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ショートカットキー
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ショートカットキー">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        全般
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カット編集
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        テロップ編集
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_35" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        効果音編集
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_36" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        再生・タイムライン
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#os" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OS 標準（変更不可）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_37" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ショートカットの変更
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_38" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ダッシュボード
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_39" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        全体設定
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../title-editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    タイトル組版エディタ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../project-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクト設定リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    素材管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../file-structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ファイル構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    テクニカルガイド
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    テクニカルガイド
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/character-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    キャラクターモデルの推奨構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/psd-layer-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PSD レイヤー命名規則
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/scenario-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シナリオ形式
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/rendering-and-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    レンダリングと動画生成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/visualizer-plugin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    オーディオビジュアライザ開発ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    トラブルシュート
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        上部ヘッダー
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ライブプレビュー
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ライブプレビュー">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャラのドラッグ&amp;ドロップ配置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        トランスポートバー（再生ボタン周り）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ループ再生モード
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        右パネル: 編集タブ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="右パネル: 編集タブ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャラ配置タブ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        お芝居タブ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="お芝居タブ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        セリフ枠のブレンドモード
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        演出タブ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="演出タブ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        背景・場面
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャラクター
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ビジュアライザ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        テロップ編集パネル
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="テロップ編集パネル">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        登場 / 退場 / 持続モーション (通常テロップ・MV 文字 共通)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mv_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MV 文字 + 視覚エフェクト (グループ・最下段)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        効果音編集パネル
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        動画レイヤー編集パネル
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="動画レイヤー編集パネル">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        録画素材を取り込むときの再エンコードチェック
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        タイムライン
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="タイムライン">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        磁力スナップ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bgm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        シーン設定ダイアログの BGM タブ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カットカードの表示
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カット一覧のスクロールと自動追従
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カットカードのクリック動作
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        タイムライン上部のクイックボタン
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カットの選択・並び替え・複製・削除
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        タイムラインアイテムの選択
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カットへのリンク
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="カットへのリンク">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        リンクの貼り方 / 解除
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        可視化
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        注意点
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ショートカットキー
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ショートカットキー">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        全般
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カット編集
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        テロップ編集
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_35" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        効果音編集
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_36" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        再生・タイムライン
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#os" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OS 標準（変更不可）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_37" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ショートカットの変更
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_38" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ダッシュボード
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_39" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        全体設定
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="ナビゲーション" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    ホーム
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="././" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    リファレンス
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+<h1 id="_1">編集画面リファレンス<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<p>編集画面は、上部ヘッダー / ライブプレビュー / 右パネル / 下部タイムラインで構成されています。</p>
+<h2 id="_2">上部ヘッダー<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>プロジェクト名</td>
+<td>クリックするとプロジェクト一覧 / 切替メニューが開く</td>
+</tr>
+<tr>
+<td>ダッシュボード</td>
+<td>プロジェクト全体の管理画面に戻る</td>
+</tr>
+<tr>
+<td>素材再スキャン</td>
+<td>背景・音声・装飾 PNG・フォント・キャラクター素材を再読み込み</td>
+</tr>
+<tr>
+<td>キャラ管理</td>
+<td>キャラクター定義の編集・インポート・削除</td>
+</tr>
+<tr>
+<td>PSD インポート</td>
+<td>PSD アップロード → ツリー確認 → 取り込み</td>
+</tr>
+<tr>
+<td>PNG 出力</td>
+<td>選択中カットを PNG として保存</td>
+</tr>
+<tr>
+<td>MP4 出力</td>
+<td>シナリオ全体を動画として保存 (書き出しダイアログを開く)</td>
+</tr>
+<tr>
+<td>設定</td>
+<td>プロジェクト設定 (文字 / セリフ枠 / 動画 / 口パク解析)</td>
+</tr>
+<tr>
+<td>全体設定</td>
+<td>アプリ全体の設定 (ffmpeg / プロジェクトフォルダ / 動画プリセット / Undo 履歴 / quietMode / バックアップ / キャッシュ自動間引き)</td>
+</tr>
+<tr>
+<td>テーマ</td>
+<td>ライト / ダーク切替。<code>prefers-color-scheme</code> で初期化、<code>localStorage</code> に永続化</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_3">ライブプレビュー<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p>中央のライブプレビューには、選択中フレームの合成結果が表示されます。</p>
+<ul>
+<li><code>再生</code> / <code>停止</code>: 再生ヘッドの位置からシーン末尾まで通し再生。Space キーでも切り替え可。</li>
+<li>波形 + dB メーター: セリフ音声と BGM のミックス。口パク解析の入力を視覚化。</li>
+<li>動画背景 (<code>videoTrack</code>) があるシーンでは WebGL シーンに <code>VideoTexture</code> として取り込まれ、キャラ・セリフ・テロップ・ビジュアライザが同じ GL canvas 上で合成される。</li>
+<li>再生ヘッド位置はプロジェクトに保存され、再起動後にカット位置から復元される。</li>
+</ul>
+<h3 id="_4">キャラのドラッグ&amp;ドロップ配置<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<p>停止中のプレビュー上でキャラクターを <strong>直接ドラッグして配置</strong> できます (<code>キャラ配置</code> タブを開いているとき)。</p>
+<ul>
+<li>キャラをクリックすると、右パネルの「登場キャラ」セレクタも自動でそのキャラに切り替わります。</li>
+<li>ドラッグ中は X / Y 入力もリアルタイムで追従し、ドロップしたタイミングで <code>updateSelectedCutFromCurrent</code> + 自動保存 + Undo 履歴が走ります。</li>
+<li>キャラが重なっている場合は、見た目で <strong>前面のキャラを優先</strong> してつかみます。</li>
+<li>再生中はドラッグ操作を受け付けません (誤操作防止)。</li>
+</ul>
+<p>ライブプレビュー / 静止 still render は GL canvas で直接描画され、キャラレイヤー PNG (<code>projects/&lt;project_id&gt;/cache/preview/</code>) は state hash でファイル名が固定なので、設定が変わらなければ再生成されません。</p>
+<h3 id="_5">トランスポートバー（再生ボタン周り）<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p>再生ボタンの両脇には、再生ヘッドを動かすボタンとループトグルが並びます。</p>
+<table>
+<thead>
+<tr>
+<th>ボタン</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18.41 16.59 13.82 12l4.59-4.59L17 6l-6 6 6 6zM6 6h2v12H6z"/></svg></span> 先頭へ</td>
+<td>再生ヘッドをシナリオ先頭 (0 秒) に移動</td>
+</tr>
+<tr>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18.41 7.41 17 6l-6 6 6 6 1.41-1.41L13.83 12zm-6 0L11 6l-6 6 6 6 1.41-1.41L7.83 12z"/></svg></span> 1 秒戻す</td>
+<td>再生ヘッドを 1 秒 (= プロジェクト FPS 分のフレーム) 戻す</td>
+</tr>
+<tr>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15.41 16.58 10.83 12l4.58-4.59L14 6l-6 6 6 6z"/></svg></span> 1 フレーム戻す</td>
+<td>再生ヘッドを 1 フレーム戻す</td>
+</tr>
+<tr>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 5.14v14l11-7z"/></svg></span> 再生 / 停止</td>
+<td>再生開始 / 停止トグル</td>
+</tr>
+<tr>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8.59 16.58 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></span> 1 フレーム進める</td>
+<td>再生ヘッドを 1 フレーム進める</td>
+</tr>
+<tr>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.59 7.41 7 6l6 6-6 6-1.41-1.41L10.17 12zm6 0L13 6l6 6-6 6-1.41-1.41L16.17 12z"/></svg></span> 1 秒進める</td>
+<td>再生ヘッドを 1 秒進める</td>
+</tr>
+<tr>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.59 7.41 10.18 12l-4.59 4.59L7 18l6-6-6-6zM16 6h2v12h-2z"/></svg></span> 終端へ</td>
+<td>再生ヘッドをシナリオ終端 (= 末尾カット末尾 / テロップ末尾の最大) に移動</td>
+</tr>
+<tr>
+<td><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 17H7v-3l-4 4 4 4v-3h12v-6h-2M7 7h10v3l4-4-4-4v3H5v6h2z"/></svg></span> ループトグル</td>
+<td>クリックで「なし → カット内 → シーン全体」を循環。<span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 17H7v-3l-4 4 4 4v-3h12v-6h-2M7 7h10v3l4-4-4-4v3H5v6h2z"/></svg></span> (なし / シーン) と <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 15V9h-1l-2 1v1h1.5v4m5.5 2H7v-3l-4 4 4 4v-3h12v-6h-2M7 7h10v3l4-4-4-4v3H5v6h2z"/></svg></span> (カット) でアイコンが変わり、有効時はアクセントカラーで表示</td>
+</tr>
+</tbody>
+</table>
+<p><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18.41 16.59 13.82 12l4.59-4.59L17 6l-6 6 6 6zM6 6h2v12H6z"/></svg></span> <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18.41 7.41 17 6l-6 6 6 6 1.41-1.41L13.83 12zm-6 0L11 6l-6 6 6 6 1.41-1.41L7.83 12z"/></svg></span> <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.59 7.41 7 6l6 6-6 6-1.41-1.41L10.17 12zm6 0L13 6l6 6-6 6-1.41-1.41L16.17 12z"/></svg></span> <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.59 7.41 10.18 12l-4.59 4.59L7 18l6-6-6-6zM16 6h2v12h-2z"/></svg></span> のどれを使っても、ジャンプ先がいま編集中のカットと違うときは自動で右パネルにそのカットが読み込まれます（<code>Home</code> / <code>End</code> キーも同じ挙動になりました）。</p>
+<h3 id="_6">ループ再生モード<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<p>再生開始後、シナリオ末尾まで来たときの挙動はループトグルで切り替えます。</p>
+<table>
+<thead>
+<tr>
+<th>モード</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>なし (<code>off</code>)</td>
+<td>末尾まで再生したら停止（従来挙動）</td>
+</tr>
+<tr>
+<td>カット内 (<code>cut</code>)</td>
+<td>1 カット再生し終わるたびに、そのカット先頭へ戻って繰り返す</td>
+</tr>
+<tr>
+<td>シーン全体 (<code>scene</code>)</td>
+<td>シナリオ通し再生し終わるたびに、先頭カットへ戻って繰り返す</td>
+</tr>
+</tbody>
+</table>
+<p>ループ境界では BGM と音声が一旦止まって即座に再起動します（再生ヘッドの基準を取り直すため）。<code>R</code> キーでもトグルできます。</p>
+<h2 id="_7">右パネル: 編集タブ<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<p>右パネルは選択中アイテム (カット or テロップ) の種別に応じて中身が差し替わります。テロップが選択されているときはテロップ用の編集 UI、それ以外はカット用の <code>キャラ配置</code> / <code>お芝居</code> / <code>演出</code> の 3 タブが表示されます。</p>
+<h3 id="_8">キャラ配置タブ<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>登場キャラ</td>
+<td>カット内で編集中のキャラを選ぶ。ラベル横にカット内インスタンス ID (<code>character_XXXX_n</code>) が表示され、クリックでクリップボードへコピーできる (セリフ書き出し YAML の <code>speaker</code> 値と突合できる)</td>
+</tr>
+<tr>
+<td>前へ / 後ろへ</td>
+<td>カット内のキャラ描画順を変更</td>
+</tr>
+<tr>
+<td>削除</td>
+<td>カットから選択中キャラを外す (素材自体は残る)</td>
+</tr>
+<tr>
+<td>追加</td>
+<td><code>素材キャラ</code> で選んだキャラをカットに追加。セレクタの表示は「表示名（CID: id / 共通 or プロジェクト / READ ONLY）」形式で、同じ表示名でも別キャラ ID なら CID で区別できる</td>
+</tr>
+<tr>
+<td>置換元 / 置換先</td>
+<td>「キャラ素材を置き換え」用のセレクタ。<code>素材キャラ</code> と同じ CID 付き表記</td>
+</tr>
+<tr>
+<td>X / Y</td>
+<td>配置座標 (プレビュー上の直接ドラッグでも変更可)</td>
+</tr>
+<tr>
+<td>拡大率</td>
+<td>表示倍率</td>
+</tr>
+<tr>
+<td>左右反転</td>
+<td>キャラ本体レイヤー (ベース・前髪・後ろ髪・目・口・前面) のみを中心軸で左右反転する。光彩・ドロップシャドウは固定の向きを保ったまま反転後のシルエットから生成される。<code>scale</code> を負数化する方式とは異なるため、X/Y 計算や中央寄せロジックを壊さない</td>
+</tr>
+<tr>
+<td>白背景を透過扱いにする</td>
+<td>キャラ単位設定。runtime で <code>#FFFFFF</code> を α=0 に置き換える。PSD インポート時に「白背景を透過」チェックを ON にして素材へ焼き込んであるキャラはここを OFF にしても結果は変わらない</td>
+</tr>
+<tr>
+<td>左右中央 / 初期位置 / 同一キャラに一括適用</td>
+<td>中央寄せ / 既定値へ復帰 / 他カットの同 <code>characterId</code> キャラへ X/Y/拡大率/白背景 をチェック式で一括反映</td>
+</tr>
+<tr>
+<td>体 / 頬 / 目 / 口 / 髪型 / 前面</td>
+<td>キャラ素材を選ぶ。前面 (<code>front/</code>) は複数同時表示可。「髪型」はアセット定義のプリセット (ベース+前髪+後ろ髪) を 1 個のセレクタで選ぶ (<a href="../../technical/character-model/#hairstyle-presets">詳細</a>)。髪型セレクタの右に「目を前髪より前に出す」チェックボックスが並ぶ</td>
+</tr>
+<tr>
+<td>eyeAboveBangs</td>
+<td>目を前髪より前に重ねる (カット単位フラグ)</td>
+</tr>
+<tr>
+<td>表情プリセット</td>
+<td>頬 + 目 + 口 の組み合わせを呼出し / 保存 / 削除。アセット由来は <code>(アセット)</code> 表示・削除不可、デフォルトは <code>★</code> 付き (<a href="../../technical/character-model/#expression-presets">詳細</a>)</td>
+</tr>
+<tr>
+<td>キャラクターを表示</td>
+<td>このキャラを表示するかどうか</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_9">お芝居タブ<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<p>カット 1 つに紐付くセリフ・音声をまとめて編集します。順序: 音声 + 秒数 → 話者 → 声 / 感情 / 音声を再生成 → 本文 → 文字スタイル → セリフ文字エフェクト → 文字設定を一括反映 / 同一話者に一括反映 → 文字枠スタイル → トグル → 文字枠を一括設定。背景・モーション・キャラクター効果は隣の <code>演出</code> タブに移動しています。</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>音声</td>
+<td>カットで再生する音声素材を選ぶ</td>
+</tr>
+<tr>
+<td>秒数 (フレーム)</td>
+<td>カットの表示フレーム数。1 frame 単位</td>
+</tr>
+<tr>
+<td>話者</td>
+<td>セリフを話しているキャラを選ぶ。紐付け済みなら下の「声」「感情」が自動同期</td>
+</tr>
+<tr>
+<td>声 / 感情</td>
+<td>VOICEVOX / VOICEPEAK で音声合成するときの声と感情 (VOICEPEAK のみ感情有効)。話者と独立に上書き可</td>
+</tr>
+<tr>
+<td>音声を再生成</td>
+<td>上記の声 / 感情 + 本文で wav を再合成し、カットの音声と表示時間を更新する</td>
+</tr>
+<tr>
+<td>セリフ本文</td>
+<td>表示するテキスト (改行可)。日本語の禁則処理に対応しており、行頭に句読点 (<code>、 。</code>) や閉じ括弧 (<code>） 」</code>) が来そうなときは前行末にぶら下げ、行末に開き括弧 (<code>（ 「</code>) が来そうなときは次行頭へ送ります</td>
+</tr>
+<tr>
+<td>文字サイズ / 書体 / 太さ / 文字揃え / 行数</td>
+<td>テキストスタイル。文字揃えは <code>左揃え</code> / <code>中央揃え</code></td>
+</tr>
+<tr>
+<td>帯の濃さ / テキスト色 / アウトライン色 / アウトライン幅</td>
+<td>セリフ枠とテキスト装飾</td>
+</tr>
+<tr>
+<td>セリフ文字に光彩</td>
+<td>セリフ本文 (文字) の外側にぼかし発光を載せる (<code>色</code> + <code>ぼかし</code> + <code>強度</code>)。プロジェクト設定の <code>dialogueGlow</code> 既定値を上書きするカット単位設定</td>
+</tr>
+<tr>
+<td>セリフ文字にドロップシャドウ</td>
+<td>セリフ本文 (文字) の下に影を落とす (<code>色</code> + <code>ぼかし</code> + <code>強度</code> + <code>X 方向</code> / <code>Y 方向</code> オフセット)。プロジェクト設定の <code>dialogueDropShadow</code> 既定値を上書きするカット単位設定</td>
+</tr>
+<tr>
+<td>文字設定を一括反映</td>
+<td>現在のカットの「文字サイズ / 書体 / 太さ / 文字色 / アウトライン / アウトライン色 / 文字揃え / 文字間 / セリフ光彩 / セリフドロップシャドウ」を、他カットへチェック式で一括反映</td>
+</tr>
+<tr>
+<td>同一話者に文字設定を一括反映</td>
+<td>上記と同じ反映ダイアログを、<strong>現在のカットの話者と同じ <code>characterId</code> を持つカットだけ</strong> に適用する。セリフ枠 (枠位置 / 行数 / 帯の濃さ等) は対象外</td>
+</tr>
+<tr>
+<td>枠位置</td>
+<td><code>top</code> / <code>bottom</code> / <code>left</code> / <code>right</code> / <code>center</code></td>
+</tr>
+<tr>
+<td>セリフ枠を表示 / 話者名を表示 / キャラクターを表示</td>
+<td>表示トグル</td>
+</tr>
+<tr>
+<td>文字枠を一括設定</td>
+<td>「枠位置 / 行間 / 行数 / セリフ枠 / 話者名」を他カットへ一括反映</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_10">セリフ枠のブレンドモード<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h4>
+<p>セリフ枠の <strong>背景色</strong> と <strong>ボーダー色</strong> は、それぞれの明度から自動でブレンドモードが決まります。</p>
+<table>
+<thead>
+<tr>
+<th>色の明度</th>
+<th>ブレンドモード</th>
+<th>効果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>明るめ (luminance &gt; 0.5)</td>
+<td>スクリーン</td>
+<td>背景色を「足して飽和させる」方向に合成。白に近い枠が背景に浮かびつつ抜ける</td>
+</tr>
+<tr>
+<td>暗め (luminance ≤ 0.5)</td>
+<td>乗算</td>
+<td>背景色を「掛けて暗くする」方向に合成。黒に近い枠が背景の色味を残したまま落ち着く</td>
+</tr>
+</tbody>
+</table>
+<p><code>帯の濃さ (boxOpacity)</code> を <code>0</code> にすると背景・ボーダーともに完全透明 (= 何も合成しない) になります。ボーダーの不透明度は <code>boxOpacity</code> に連動するため、「濃さ 0」で枠全体がきれいに消えます。文字 (本文 / 話者名) / 装飾 PNG は従来どおり通常合成です。</p>
+<p>「声」「感情」「音声を再生成」は VOICEVOX / VOICEPEAK のどちらも検出されていないときは無効化されます。詳細は <a href="../../tutorials/voice-synthesis/">音声合成 (VOICEVOX / VOICEPEAK) を使う</a> を参照。</p>
+<h3 id="_11">演出タブ<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h3>
+<p>カット単位の「背景・場面」と「キャラクター効果」をまとめて編集します。</p>
+<h4 id="_12">背景・場面<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>モーション</td>
+<td>横シェイク / 縦シェイク / 拡大 (カット単位の単純変位)</td>
+</tr>
+<tr>
+<td>背景</td>
+<td>カットの静止画背景を選ぶ (<code>videoTrack</code> がない場合に使用)。新規プロジェクトの既定値は <strong>なし（透過）</strong>。プロジェクトに登録済みの背景画像がある場合でも、明示的に選ぶまでは透過のまま</td>
+</tr>
+<tr>
+<td>背景ぼかし (px)</td>
+<td>背景に Gaussian blur を掛ける (0 で無効)</td>
+</tr>
+<tr>
+<td>背景色 / 背景色 不透明度</td>
+<td>背景画像が未指定のときに表示される単色塗りつぶし。既定は完全透明 (<code>opacity = 0</code>)。背景画像 / 動画背景を指定するとそちらが優先される</td>
+</tr>
+<tr>
+<td>前景</td>
+<td>キャラの上に重ねる装飾（<code>foregrounds/</code> から選択）</td>
+</tr>
+<tr>
+<td>背景・場面を一括適用</td>
+<td>上記項目を、チェックを入れた項目だけ他カットへ一括反映（背景色と不透明度はペアで反映）</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_13">キャラクター<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h4>
+<p>このカットに登場するキャラクター全員に対する追加エフェクトです。3 種は独立に ON / OFF できます。</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>色フィルター（乗算）</td>
+<td>指定色を乗算合成 (<code>color</code> + <code>opacity</code>)</td>
+</tr>
+<tr>
+<td>光彩</td>
+<td>外光彩 (<code>color</code> + <code>blurPx</code> + <code>opacity</code>)</td>
+</tr>
+<tr>
+<td>ドロップシャドウ</td>
+<td>影 (<code>color</code> + <code>blurPx</code> + <code>opacity</code> + <code>X 方向</code> / <code>Y 方向</code> オフセット)</td>
+</tr>
+<tr>
+<td>キャラクター効果を一括適用</td>
+<td>上記 3 ブロックを「有効/無効・色・強度・オフセット」ごと丸ごと、チェックを入れたブロック単位で他カットへ反映</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_14">ビジュアライザ<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h4>
+<p>シーンに 1 つ重ねられる装飾レイヤです。<code>演出</code> タブの「ビジュアライザ追加」から選択でき、レイヤ位置 (背景の上 / キャラの上 / 前景の上) も切り替えできます。組み込みプリセットの代表例:</p>
+<table>
+<thead>
+<tr>
+<th>プリセット</th>
+<th>用途</th>
+<th>音/BPM 連動</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>バー・スペクトラム</code></td>
+<td>横並びの細いバーで音量スペクトルを可視化 (汎用版)</td>
+<td>音 ✓</td>
+</tr>
+<tr>
+<td><code>オーディオ波形</code></td>
+<td>中央線 + 振幅で生波形</td>
+<td>音 ✓</td>
+</tr>
+<tr>
+<td><code>サークルスペクトログラム</code></td>
+<td>円周バーで FFT を可視化</td>
+<td>音 ✓</td>
+</tr>
+<tr>
+<td><code>ウェーブ・リボン</code></td>
+<td>大きなソフト波線が音で揺れる</td>
+<td>音 ✓</td>
+</tr>
+<tr>
+<td><code>ふわふわパーティクル</code></td>
+<td>浮遊粒子が kick で拍動・onset で弾ける</td>
+<td>音 ✓</td>
+</tr>
+<tr>
+<td><code>ジオメトリック・パーティクル</code></td>
+<td>点群 + 直線ネットワーク</td>
+<td>音 ✓</td>
+</tr>
+<tr>
+<td><code>カウントダウン</code></td>
+<td>シーン残時間の数字表示 (フォント / 色設定可)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>ぼかし円とグラデーション</code></td>
+<td>2 色グラデ背景 + ふんわり浮遊する大きなボケ円 + 小さな星粒</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>降りそそぐパーティクル (星屑 / 雪 / 雨)</code></td>
+<td>星屑 / 雪 / 雨 を選んで一定方向に降る (上下方向選択 + 傾き角度可)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>LED グリッド</code></td>
+<td>LED スクリーンを拡大したような光るドットマトリクス。色・角丸・ボケ量・点灯セル率を調整可</td>
+<td><strong>BPM ✓</strong> (シーンの「基本」タブの BPM を使用、プラグイン側で上書きも可)</td>
+</tr>
+<tr>
+<td><code>光る図形 (角丸四角 / 円 / 三角 / 星)</code></td>
+<td>ネオン輪郭の図形が一定方向に流れる。背景に水玉 / 格子 / 横線 / 縦線 を置く設定も同梱</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>ウェーブリボン (ジオメトリック背景)</code></td>
+<td>半透明の斜めリボンがゆっくり波打つ「光のサテン」風背景</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>各プリセットには色・サイズ・速度・角度・乱数シード等の調整パラメータが付いており、シーンに乗せた後で右パネルから即座に変更できます。新しいプリセットを書きたい開発者向けの情報は <code>technical/visualizer-plugin.md</code> を参照してください。</p>
+<h3 id="_15">テロップ編集パネル<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h3>
+<p>タイムラインのテロップ帯でテロップを選択すると、右パネルがテロップ用に切り替わります。</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>開始 / 終了 / 長さ</td>
+<td>フレーム単位で編集</td>
+</tr>
+<tr>
+<td>位置</td>
+<td><code>上</code> / <code>中央</code> / <code>下</code> / <code>座標指定</code>。<code>座標指定</code> を選ぶと直下に X / Y 入力欄が表示される</td>
+</tr>
+<tr>
+<td>本文</td>
+<td>テロップ文字列 (改行可)</td>
+</tr>
+<tr>
+<td>書体 / 太さ / サイズ</td>
+<td>フォント設定</td>
+</tr>
+<tr>
+<td>文字色 / アウトライン色 / アウトライン幅</td>
+<td>スタイル</td>
+</tr>
+<tr>
+<td>文字揃え / 文字間 (1/1000em) / 行間 (px)</td>
+<td>同じ段に 3 列で並ぶ。文字揃えは <code>左揃え</code> / <code>中央</code> / <code>右揃え</code></td>
+</tr>
+<tr>
+<td>光彩 / ドロップシャドウ</td>
+<td>各カードで <code>有効化</code> トグル + 色 / ぼかし / 強度 / オフセットを編集。常時展開 (アコーディオンなし)</td>
+</tr>
+<tr>
+<td>一括追加</td>
+<td>区切り文字 (改行 / 句読点) で複数テロップを一気に作成</td>
+</tr>
+<tr>
+<td>既定値に保存 / すべてのテロップに反映</td>
+<td>プロジェクトの <code>telopDefaults</code> と一括スタイル反映</td>
+</tr>
+</tbody>
+</table>
+<h4 id="mv">登場 / 退場 / 持続モーション (通常テロップ・MV 文字 共通)<a class="headerlink" href="#mv" title="Permanent link">&para;</a></h4>
+<p>テロップ編集パネル下部に「登場アニメ」「退場アニメ」「持続モーション」「描画レイヤー」のセクションがあります。これらは <strong>通常テロップ・MV 文字どちらでも有効</strong> です。</p>
+<ul>
+<li><strong>登場アニメ</strong> プリセット: <code>フェード (透明度のみ)</code> / <code>フェードスライド</code> / <code>タイプライター</code> / <code>pop_per_char</code> 等</li>
+<li><strong>退場アニメ</strong> プリセット: <code>フェード (透明度のみ)</code> / <code>フェードスライド</code> 等</li>
+<li><strong>フェード (透明度のみ)</strong> は位置を一切動かさず alpha のみ補間します。スライドさせたくない控えめなテロップに向いています。</li>
+</ul>
+<h4 id="mv_1">MV 文字 + 視覚エフェクト (グループ・最下段)<a class="headerlink" href="#mv_1" title="Permanent link">&para;</a></h4>
+<p>最下段の「MV 文字 / 視覚エフェクト」グループは <strong>MV 文字モード時のみ反映</strong> されます。上の登場/退場/持続モーション/描画レイヤーが Caption でも効くのに対し、視覚エフェクト (<code>neon_glow</code> / <code>rgb_shift</code> / <code>glitch_scan</code> 等) は MV 文字専用です。</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MV 文字に変換 / Caption に戻す</td>
+<td>テロップ種別を切り替える。MV に切り替えると視覚エフェクトの選択が有効化される。Caption に戻すと <code>effectPreset</code> / <code>effectParams</code> は無効化される</td>
+</tr>
+<tr>
+<td>視覚エフェクト プリセット</td>
+<td><code>neon_glow</code> / <code>rgb_shift</code> / <code>glitch_scan</code> 等。Caption 状態では disabled</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_16">効果音編集パネル<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h3>
+<p>タイムラインの効果音帯 (テロップ帯のすぐ下) で効果音を選択すると、右パネルが効果音用に切り替わります。スキーマは <code>scene.soundEffects[]</code> で、<code>{ id, src, startFrame, volume }</code> のみを持つ最小構成です。</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>効果音アセット</td>
+<td>アセット管理の「効果音」カテゴリに登録した素材から選択</td>
+</tr>
+<tr>
+<td>開始時間</td>
+<td>フレーム単位 (MM:SS.FF) で編集。配置はマウスドラッグでもタイムライン上で変更可</td>
+</tr>
+<tr>
+<td>音量</td>
+<td>0.0–2.0 (BGM トラックと同じレンジ)</td>
+</tr>
+</tbody>
+</table>
+<p>長さ (<code>durationFrame</code> 相当) はアセットの長さがそのまま使われるため編集できません。タイムライン上ではアセットの長さに応じたチップ幅で表示されます (取得済みのものから順に幅が確定)。フェードイン / アウトはサポートしていません。シーン頭から <code>startFrame</code> の時刻に到達した瞬間に再生し、自然に終了します。</p>
+<p>同じ時刻に複数の効果音を重ねて配置することもできます。<code>scene.soundEffects[]</code> は scene 単位の配列なので、カットを複製しても効果音は付随しません。</p>
+<h3 id="_17">動画レイヤー編集パネル<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
+<p>タイムライン最下段の動画レイヤー帯で動画レイヤーを選択すると、右パネルが動画レイヤー用に切り替わります。背景動画 (<code>videoTrack</code>) と違い、シーン中の任意区間に置けて、フェードイン / フェードアウトや配置位置・拡縮を指定できる短いクリップ向けのレイヤーです (タイトル動画、トランジション、解説動画など)。スキーマは <code>scene.videoLayers[]</code> です。</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>動画アセット</td>
+<td>アセット管理の「動画」カテゴリに登録した素材から選択</td>
+</tr>
+<tr>
+<td>開始時間</td>
+<td>シーン頭からの配置位置 (MM:SS.FF)</td>
+</tr>
+<tr>
+<td>素材内 開始秒 / 終了秒</td>
+<td>trim 範囲。タイムライン上の長さはこの差分から派生 (<code>durationFrame</code> は持たない)</td>
+</tr>
+<tr>
+<td>アスペクト処理 (fit)</td>
+<td><code>contain</code> (内接 / 余白あり) / <code>cover</code> (全面 / クロップ) / <code>fill</code> (引き伸ばし)</td>
+</tr>
+<tr>
+<td>縮尺率</td>
+<td>fit 適用後の追加倍率 (縦横比維持、0.05〜4.0)</td>
+</tr>
+<tr>
+<td>位置 X / Y</td>
+<td>中央アンカーからのピクセルオフセット (+X=右、+Y=下、±2000)</td>
+</tr>
+<tr>
+<td>レイヤー (z 位置)</td>
+<td><code>前景の上</code> (キャラ・前景イラストの手前) または <code>背景の上</code> (キャラの後ろ) の 2 択</td>
+</tr>
+<tr>
+<td>不透明度</td>
+<td>0.0–1.0 (フェードを掛ける前のベース)</td>
+</tr>
+<tr>
+<td>フェードイン / フェードアウト</td>
+<td>チェックボックスで有効化、秒数を独立指定 (開始だけ / 終了だけも可)。<strong>映像 (alpha) と音声 (volume) の両方</strong> に同じカーブで掛かるので、音声側は別途指定する必要はありません</td>
+</tr>
+<tr>
+<td>音声をミュート / 音量</td>
+<td>動画に音声トラックがあれば書き出しの amix に合流。音声無しの動画は自動でスキップ</td>
+</tr>
+</tbody>
+</table>
+<p>タイムライン上の操作も SE と同じく <code>Shift+D</code> で複製・<code>Backspace</code> で削除・<code>↑</code>/<code>↓</code> で隣接選択ができます。同一 <code>レイヤー</code> (BG / FG) 内でも <strong>時間軸の重なりは許容</strong>（クロスフェード用途で意図的に重ねられます）。同 layer 内で重なったときの z 順は <strong>配列順</strong>（後ろの要素ほど手前）で、編集パネル右の <strong>「重なり順」前へ / 後ろへ ボタン</strong> で入れ替えます。異なる <code>レイヤー</code> を組み合わせれば「背景の上で映像が流れている裏でキャラの前にトランジション動画」のような重ね合わせも可能です。</p>
+<p>書き出しでは映像はそのまま GL に焼かれ、音声は ffmpeg amix で BGM / 効果音と合流します。フェード / 不透明度は GL plane の alpha に毎フレーム反映されます。</p>
+<h4 id="_18">録画素材を取り込むときの再エンコードチェック<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h4>
+<p>NVIDIA ShadowPlay などのゲーム録画ツールで作られた MP4 は、フレームドロップ箇所で <strong>PTS (Presentation Timestamp) が飛ぶ</strong> ことがあります（映像トラックの名目尺と実際の音声サンプル数がずれる）。このまま動画レイヤーに使うと、プレビュー中盤以降の音ズレや、書き出し時の <code>apad</code> / <code>atrim</code> のはみ出しといった症状が出ます。</p>
+<p>立ち絵システムは動画レイヤーで素材を選択した直後・動画レイヤー追加直後に <strong>PTS gap の検査</strong> を自動で走らせます (<code>/api/video/probe-gaps</code>)。合計 gap が 50 ms を越えたとき、再エンコード推奨ダイアログが開きます。</p>
+<p>ダイアログには、</p>
+<ul>
+<li><strong>名目尺 / 実音長</strong> (= 映像トラックが申告する duration と、実際の音声サンプル数から求めた duration)</li>
+<li><strong>検出された gap の箇所数 / 合計秒数</strong></li>
+<li><strong>エンコーダ プリセット</strong> (HW / balanced / quality)</li>
+</ul>
+<p>が表示されます。HW プリセットは検出された専用回路がある環境でのみ表示され、既定で選択されます（macOS=VideoToolbox / NVIDIA=NVENC / Intel iGPU=QSV / Linux=VA-API）。</p>
+<p><code>再エンコードする</code> を押すと進捗ダイアログに切り替わり、<code>ffmpeg -vsync cfr</code> + <code>aresample=async=1000</code> で <strong>同一フォルダに <code>&lt;元ファイル名&gt;.fixed.mp4</code></strong> と sidecar の <code>&lt;元ファイル名&gt;.fixed.mp4.json</code> が出力され、動画レイヤーの参照先が自動で <code>.fixed.mp4</code> に切り替わります。元ファイルは残るので、再度開いたときは sidecar の SHA を見て「すでに修正済み」と判定し、ダイアログは出ません。</p>
+<ul>
+<li><code>キャンセル</code> を選んだ場合は元ファイルのままレイヤーに取り込みますが、上記の症状が出る可能性があります。</li>
+<li>再エンコードは GPU エンコーダがあれば実時間より高速、ソフトウェア (libx264) でも 1080p 60fps 程度なら実時間の数倍速で済みます。</li>
+<li>gap が無い（または極小の）素材ではダイアログ自体が開かないため、通常運用では特に意識する必要はありません。</li>
+</ul>
+<h2 id="_19">タイムライン<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h2>
+<p>下部のタイムラインは ruler / 波形 / テロップ / 効果音 / 動画レイヤー / カットを 1 枚の canvas に描画します。シーン切替プルダウンで対象シーンを切り替えます。</p>
+<ul>
+<li>カットを選ぶと、そのカットの状態が右パネルに読み込まれます。</li>
+<li>末尾の追加カードから新しいカットを挿入できます (現在のカットを複製して <code>index+1</code> 位置に挿入)。</li>
+<li>ruler (時間軸) クリックで再生ヘッドが移動し、その位置のカットが自動で右パネルに読み込まれます。</li>
+<li>ズームボタンで横スケールを変更可能。<code>#timelineSpacer</code> + sticky canvas で長尺でも寸法上限に当たりません。</li>
+<li>BGM トラックは波形入りで表示され、選択中のトラック / 口パク用トラック (<code>useForLipSync</code>) を強調表示。</li>
+</ul>
+<h3 id="_20">磁力スナップ<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h3>
+<p>タイムライン上のテロップ / 効果音 / 動画レイヤーをドラッグして移動・端をリサイズするとき、近くの境界に <strong>自動で吸い付く</strong> ようになっています。優先度が高い方が勝つので、複数候補が重なっていても自然に揃います。</p>
+<table>
+<thead>
+<tr>
+<th>優先度</th>
+<th>スナップ先</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>再生ヘッド (playhead)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>カット境界 (各カットの先頭・末尾フレーム)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>BPM 拍 (シーン設定で BPM 指定時)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>他のテロップ / 効果音 / 動画レイヤーの先頭・末尾 (自身および同時ドラッグ中のグループ全員は除外)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>フレームグリッド (1/24 秒)</td>
+</tr>
+</tbody>
+</table>
+<p>ドラッグ中、スナップが効いた瞬間に <strong>アクセントカラーの薄い破線</strong> が縦に立って「ここに揃いました」を可視化します。</p>
+<ul>
+<li>スナップを一時的に切るには <strong><code>Shift</code> を押しながらドラッグ</strong></li>
+<li>微調整は <strong>右パネルの数値入力（タイムコード）</strong> または <strong><code>←</code> / <code>→</code>（1 frame）</strong> / <strong><code>Alt</code>+<code>←</code>/<code>→</code>（1 秒）</strong> ショートカット</li>
+<li>カット境界を含む全アイテム間で吸い付くため、場面転換テロップとカット先頭の位置合わせも狙いやすくなっています。</li>
+</ul>
+<h3 id="bgm">シーン設定ダイアログの BGM タブ<a class="headerlink" href="#bgm" title="Permanent link">&para;</a></h3>
+<p>シーンの <strong>BGM</strong> タブから「BGM を追加」で複数の音源トラックを並べられます。各トラックでは以下を編集できます。</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ソース</td>
+<td>音源アセット (アセット管理の「音声」カテゴリから選択)</td>
+</tr>
+<tr>
+<td>音量 (0〜2)</td>
+<td>出力ボリューム</td>
+</tr>
+<tr>
+<td>トリム開始</td>
+<td>素材内のどの位置から鳴らし始めるか (秒)</td>
+</tr>
+<tr>
+<td>フェードイン / フェードアウト</td>
+<td>秒数。シーン頭・終端での音量カーブ</td>
+</tr>
+<tr>
+<td>このトラックをループする</td>
+<td>ON のとき、シーン終端まで素材を繰り返し再生する。<strong>排他ではない</strong> ので、複数のトラックを同時にループに設定できる。プレビュー / 書き出し どちらも同じように繰り返される</td>
+</tr>
+<tr>
+<td>このトラックを口パク入力に使う</td>
+<td>シーン内 1 トラックのみ ON 可能 (ラジオ式)。<code>useForLipSync = true</code> のトラックは出力ミックスから外され、口パクメーター・口パク振幅判定の入力源として使われる</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_21">カットカードの表示<a class="headerlink" href="#_21" title="Permanent link">&para;</a></h3>
+<p>カットリスト (timeline 上部の横スクロール) のカードは:</p>
+<ul>
+<li><strong>タイトル行</strong>: そのカットのセリフ本文</li>
+<li><strong>メタ行</strong>: 話者キャラ名 / 音声ファイル名（タイムコードはホバー tooltip）</li>
+</ul>
+<p>カード幅はセリフの長さによらず固定です（タイトルは長文だと末尾が <code>…</code> で省略表示されます）。</p>
+<p>active なカットのアクセントカラーには、話者キャラに設定された <strong>キャラクターカラー</strong> が使われます（タイムライン下部のカットバーも同じ色、<code>Shift+クリック</code> などの範囲選択中カードも同じ色で薄く光ります）。話者なし or キャラクターカラー未指定なら従来どおり既定のアクセントカラー。色はキャラ管理ダイアログで設定します。</p>
+<h3 id="_22">カット一覧のスクロールと自動追従<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h3>
+<p>カットリスト (timeline 上部) は次の挙動になります。</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>マウスホイール (縦)</td>
+<td>カットリスト上にカーソルがあるときは、縦ホイールが横スクロールに変換されます。ease-out で減衰する慣性付きで、ぎこちなく飛ばない程度の速さに調整しています</td>
+</tr>
+<tr>
+<td><code>Shift</code> + ホイール / トラックパッド 2 本指水平スワイプ / スクロールバー直ドラッグ</td>
+<td>従来どおりブラウザ純正の横スクロール（こちらが効いているときは縦ホイール変換は無効化）</td>
+</tr>
+<tr>
+<td>再生中</td>
+<td>再生ヘッドが乗っているカードが視界外に出ると、なめらかにスクロールして引き込みます（タイムラインの自動追従と同じタイミング）</td>
+</tr>
+<tr>
+<td>シーク (先頭へ / 終端へ、<code>Home</code> / <code>End</code>、ruler クリック、フレーム移動ショートカット 等)</td>
+<td>再生ヘッドの移動先カードが視界外なら、同じくスクロールで引き込みます</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_23">カットカードのクリック動作<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>シングルクリック</td>
+<td>カードを選択して右パネルに読み込む（従来通り）</td>
+</tr>
+<tr>
+<td>ダブルクリック</td>
+<td>再生ヘッドをそのカットの先頭フレームへ移動する。シングルクリックの選択動作も同時に走るが、副作用は薄い</td>
+</tr>
+<tr>
+<td><code>Shift</code> + クリック</td>
+<td>アンカー（直前の単一選択）から連続範囲を選択</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_24">タイムライン上部のクイックボタン<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h3>
+<p>シーン設定の右隣にカット操作ボタンが並びます。</p>
+<table>
+<thead>
+<tr>
+<th>ボタン</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>カットへリンク / リンク解除</strong> (トグル)</td>
+<td>選択中のテロップ / 効果音 / 動画レイヤーを、cut-list で active 表示中のカット（無ければ再生ヘッドを含むカット）へ紐付ける / 紐付け解除する。選択 0 件のときは無効。選択中に未リンクが 1 件でもあれば「カットへリンク」表示で全件リンク、すべてリンク済みなら「リンク解除」表示で一括解除（=トグル）。詳細は <a href="#カットへのリンク">カットへのリンク</a> を参照</td>
+</tr>
+<tr>
+<td>選択カットを複製 / 選択テロップを複製 / 選択効果音を複製</td>
+<td>選択中の種別 (カット / テロップ / 効果音) に応じてラベルが切り替わり、<code>Shift+D</code> と同じ動作になる</td>
+</tr>
+<tr>
+<td>選択カットを削除 / 選択テロップを削除 / 選択効果音を削除</td>
+<td>同上で <code>Backspace</code> と同じ動作。Undo で復帰可</td>
+</tr>
+<tr>
+<td>再生位置で分割 (ハサミ)</td>
+<td>再生位置を含むカットを 2 つに分割。前半は元のセリフ・音声を保持、後半は視覚状態 (キャラ配置・背景・効果) を引き継いだうえで音声とセリフ本文をクリアする。境界線上 (frame=0 / 終端) では何もしない</td>
+</tr>
+<tr>
+<td>再生位置にカット終端 (ものさし)</td>
+<td>再生位置を含むカットの終端 (<code>durationFrame</code>) を再生位置まで縮める / 延ばす</td>
+</tr>
+<tr>
+<td>カットを一括追加</td>
+<td>音声ファイル群から複数カットをまとめて作成</td>
+</tr>
+<tr>
+<td>テロップを追加 / テロップ一括追加</td>
+<td>テロップ単発追加 / 複数まとめて追加</td>
+</tr>
+<tr>
+<td>効果音を追加</td>
+<td>再生ヘッド位置に効果音 1 件を追加。アセット選択は右パネル側で行う</td>
+</tr>
+<tr>
+<td>アイテムを追加 → タイトル</td>
+<td>別ページの <a href="../title-editor/">タイトル組版エディタ</a> を開く。本編とは独立した PNG (透過可) を作って前景アセットとして取り込める。遷移前に現在のシナリオは自動保存される</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_25">カットの選択・並び替え・複製・削除<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h3>
+<p>複数カットを選んでまとめて操作できます。</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>クリック</td>
+<td>単一選択</td>
+</tr>
+<tr>
+<td><code>Shift</code> + クリック</td>
+<td>アンカー（直前の単一選択カット）から連続範囲を選択</td>
+</tr>
+<tr>
+<td><code>Shift</code> + <code>←</code> / <code>→</code></td>
+<td>単一選択を左右に広げて連続範囲選択</td>
+</tr>
+<tr>
+<td><code>Alt</code> (Win) / <code>Option</code> (Mac) + <code>←</code> / <code>→</code></td>
+<td>選択中のカット群を前後に入れ替え</td>
+</tr>
+<tr>
+<td>マウスドラッグ</td>
+<td>選択中のカット群を任意位置にドロップして並び替え</td>
+</tr>
+<tr>
+<td><code>Shift+D</code></td>
+<td>選択中のカット（または選択中のテロップ）を複製</td>
+</tr>
+<tr>
+<td><code>Backspace</code></td>
+<td>選択中のカット（または選択中のテロップ）を削除（Undo で復帰可）</td>
+</tr>
+</tbody>
+</table>
+<p>カードのドロップ位置は左/右半分のホバーで決まり、青いラインがガイドとして表示されます。</p>
+<h3 id="_26">タイムラインアイテムの選択<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h3>
+<p>タイムライン canvas 上のテロップ・効果音・動画レイヤーを選ぶときの操作です。</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>クリック</td>
+<td>単一選択（種別は editorTarget に切替、右パネルが該当種別の編集 UI に）</td>
+</tr>
+<tr>
+<td><code>Shift</code> + クリック</td>
+<td>同種別の中で連続範囲を選択</td>
+</tr>
+<tr>
+<td><strong><code>Cmd</code> (Mac) / <code>Ctrl</code> (Win) + クリック</strong></td>
+<td><strong>種別をまたいで</strong> 追加 / 解除（テロップ + 効果音 + 動画レイヤーをまとめて選んで「カットへリンク」したいときに使う）</td>
+</tr>
+<tr>
+<td>空き領域からドラッグ</td>
+<td>マーキー（矩形範囲）選択</td>
+</tr>
+<tr>
+<td><code>Shift+D</code></td>
+<td>選択中のアイテムを複製（種別ごとに専用ロジック）</td>
+</tr>
+<tr>
+<td><code>Backspace</code></td>
+<td>選択中のアイテムを削除（Undo で復帰可）</td>
+</tr>
+</tbody>
+</table>
+<p>cross-type 選択中は <strong>3 種別すべてのバーが同時にハイライト</strong> 表示になります（通常は editorTarget の種別のみハイライト）。右パネルは最後にクリックした種別を表示しますが、<code>カットへリンク</code> ボタンなどクロスタイプ操作はすべての選択を対象にします。</p>
+<h3 id="_27">カットへのリンク<a class="headerlink" href="#_27" title="Permanent link">&para;</a></h3>
+<p>「カットへリンク」を使うと、<strong>テロップ / 効果音 / 動画レイヤー</strong> をカットに紐付けて、カット操作と連動させられます。場面転換テロップ + シーン切替効果音 + ブリッジ動画みたいなセットを「1 カットの付属物」として扱いたい場面で使います。</p>
+<table>
+<thead>
+<tr>
+<th>カット操作</th>
+<th>リンク済みアイテムの挙動</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>カット並び替え (<code>Alt+←/→</code>、ドラッグ)</td>
+<td>リンク先カットの新 startFrame に合わせて平行移動。後続カットに紐付くアイテムも、後続カットの新位置に合わせて自動シフト</td>
+</tr>
+<tr>
+<td>カット複製 (<code>Shift+D</code> / 複製ボタン)</td>
+<td>リンク済みアイテムも複製され、新カット側に同じオフセットで紐付く（元カット側のアイテムはそのまま残る）</td>
+</tr>
+<tr>
+<td>カット削除 (<code>Backspace</code> / 削除ボタン)</td>
+<td>件数を出した確認ダイアログ → 一緒に削除（Undo で 1 ステップで戻る）</td>
+</tr>
+<tr>
+<td>カット duration 変更</td>
+<td>リンク先カット内のアイテムはオフセットを保ったまま（手動で動かさない限り維持）。後続カット紐付きアイテムは Δdur 分シフト</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_28">リンクの貼り方 / 解除<a class="headerlink" href="#_28" title="Permanent link">&para;</a></h4>
+<ol>
+<li>リンクしたいアイテムを選ぶ（<code>Cmd/Ctrl</code> クリックで複数種別の同時選択も可）。</li>
+<li>cut-list 上で対象カットを選ぶ（カードがアクセント色で光っている状態。再生ヘッドの位置にあるカットでも OK）。</li>
+<li>ツールバーの <strong>「カットへリンク」</strong> ボタンを押す。トースト「N 件をカット『…』へリンクしました」が出ます。</li>
+<li>ボタンが <strong>「リンク解除」</strong> 表示に切り替わる → もう一度押すと現在の選択のリンクを一括解除。</li>
+</ol>
+<p>混在状態（一部リンク済み + 一部未リンク）のときは「カットへリンク」が表示され、押すと全部リンクされて揃います。続けてもう一度押せば全解除に揃います。</p>
+<h4 id="_29">可視化<a class="headerlink" href="#_29" title="Permanent link">&para;</a></h4>
+<p>リンク済みのテロップ / 効果音 / 動画レイヤーは、タイムライン上のバー <strong>右上に鎖アイコン</strong> が出ます。アイコン背景はリンク先カットのキャラクターカラー（speaker color）と同じなので、どのカットに紐付いているかは色で判別できます。</p>
+<h4 id="_30">注意点<a class="headerlink" href="#_30" title="Permanent link">&para;</a></h4>
+<ul>
+<li>リンク対象アイテムを手動でドラッグして「リンク先カットの範囲外」に動かしても、<strong>リンクは維持</strong> されます（オフセットが更新されるだけ）。明示的に「リンク解除」ボタンを押さない限り紐付きは切れません。</li>
+<li>存在しないカット ID を指すリンクは、シナリオ読み込み時のサーバ正規化で自動的に <code>null</code> に倒されます（dangling reference の保護）。</li>
+</ul>
+<h3 id="_31">ショートカットキー<a class="headerlink" href="#_31" title="Permanent link">&para;</a></h3>
+<p>ショートカットは「全般」「カット編集」「テロップ編集」「効果音編集」「再生・タイムライン」の 5 カテゴリに分かれています。同じ物理キー（例: <code>←</code> / <code>↑</code>）を複数のカテゴリで再利用でき、フォーカス位置（タイムライン canvas / それ以外）と現在の選択状態（編集対象がカット / テロップ / 効果音のいずれか）に応じて適切なアクションが発火します。下表は <strong>既定値</strong> です。すべて全体設定 → ショートカット タブで個別に変更 / 「なし」に設定できます。</p>
+<h4 id="_32">全般<a class="headerlink" href="#_32" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>既定キー</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Space</code></td>
+<td>再生 / 停止</td>
+</tr>
+<tr>
+<td><code>R</code></td>
+<td>ループ再生を切替 (なし → カット → シーン → なし)</td>
+</tr>
+<tr>
+<td><code>Shift+D</code></td>
+<td>選択を複製（カット / テロップ / 効果音いずれかを選択中の対象で動作）</td>
+</tr>
+<tr>
+<td><code>Backspace</code></td>
+<td>選択を削除（同上。Undo で復帰可）</td>
+</tr>
+<tr>
+<td><code>N</code></td>
+<td>現在のカットの末尾に新規カットを挿入</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_33">カット編集<a class="headerlink" href="#_33" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>既定キー</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>←</code> / <code>→</code></td>
+<td>前 / 次のカットへ移動</td>
+</tr>
+<tr>
+<td><code>Shift+←</code> / <code>Shift+→</code></td>
+<td>選択を左 / 右へ広げる（複数カット選択）</td>
+</tr>
+<tr>
+<td><code>Alt+←</code> / <code>Alt+→</code></td>
+<td>選択カットを前 / 後ろへ移動（並び替え）</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_34">テロップ編集<a class="headerlink" href="#_34" title="Permanent link">&para;</a></h4>
+<p>タイムライン canvas にフォーカス (canvas クリックまたは Tab) した状態、または右パネルがテロップ編集モードのとき有効です。</p>
+<table>
+<thead>
+<tr>
+<th>既定キー</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>↑</code> / <code>↓</code></td>
+<td>前 / 次のテロップを選択（重なりの有無は問わない）</td>
+</tr>
+<tr>
+<td><code>←</code> / <code>→</code></td>
+<td>テロップ選択中は ±1 frame 平行移動</td>
+</tr>
+<tr>
+<td><code>S</code></td>
+<td>テロップ群の先頭、または直近のテロップ先頭を再生ヘッドに合わせる</td>
+</tr>
+<tr>
+<td><code>E</code></td>
+<td>直近のテロップの終端を再生ヘッドに合わせる (1 frame snap あり)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_35">効果音編集<a class="headerlink" href="#_35" title="Permanent link">&para;</a></h4>
+<p>右パネルが効果音編集モード (タイムラインの効果音帯から効果音を選択した状態) のとき有効です。<code>↑</code> / <code>↓</code> の既定キーはテロップ編集と同じですが、編集対象が効果音のときだけ発火します。</p>
+<table>
+<thead>
+<tr>
+<th>既定キー</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>↑</code> / <code>↓</code></td>
+<td>前 / 次の効果音を選択 (startFrame 昇順)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_36">再生・タイムライン<a class="headerlink" href="#_36" title="Permanent link">&para;</a></h4>
+<p>タイムライン canvas にフォーカスした状態で有効です。</p>
+<table>
+<thead>
+<tr>
+<th>既定キー</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Shift+←</code> / <code>Shift+→</code></td>
+<td>再生ヘッドを ±1 frame 移動</td>
+</tr>
+<tr>
+<td><code>Shift+Alt+←</code> / <code>Shift+Alt+→</code></td>
+<td>再生ヘッドを ±1 秒移動</td>
+</tr>
+<tr>
+<td><code>Home</code> / <code>End</code></td>
+<td>再生ヘッドを先頭 / 末尾へ</td>
+</tr>
+<tr>
+<td><code>←</code> / <code>→</code></td>
+<td>テロップ未選択時: 前 / 次のテロップ先頭へジャンプ</td>
+</tr>
+</tbody>
+</table>
+<h4 id="os">OS 標準（変更不可）<a class="headerlink" href="#os" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>キー</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Cmd/Ctrl+Z</code></td>
+<td>Undo</td>
+</tr>
+<tr>
+<td><code>Cmd/Ctrl+Shift+Z</code> / <code>Cmd/Ctrl+Y</code></td>
+<td>Redo</td>
+</tr>
+<tr>
+<td><code>Cmd/Ctrl+A</code></td>
+<td>タイムライン canvas にフォーカス時、全テロップ選択</td>
+</tr>
+</tbody>
+</table>
+<p>ダイアログを開いている間や <code>&lt;input&gt;</code> / <code>&lt;textarea&gt;</code> にフォーカスがあるときは、上記ショートカットは OS の編集操作を優先します。</p>
+<h4 id="_37">ショートカットの変更<a class="headerlink" href="#_37" title="Permanent link">&para;</a></h4>
+<p><code>全体設定 → ショートカット</code> で各アクションのキーをクリックし、割当てたいキーを押してください。「クリア」で「なし」（無効化）、「初期値」で出荷時設定に戻せます。同じキーをカテゴリ別に重ねることもでき、フォーカスと選択状態で適切な側が発火します（例: <code>←</code> をカット編集ではそのまま、テロップ編集では「なし」に設定すれば、テロップ選択中の ±1 frame 平行移動だけ無効化できる）。</p>
+<h2 id="_38">ダッシュボード<a class="headerlink" href="#_38" title="Permanent link">&para;</a></h2>
+<p>ダッシュボードはプロジェクト一覧 + 補助操作の集約画面です。</p>
+<ul>
+<li>プロジェクト一覧 (検索・並び替え・新規・複製・名称変更・削除)</li>
+<li>取り込み待ちの PSD と取り込み履歴</li>
+<li>ヘルプ (<code>/help/</code> でビルド済みドキュメント)</li>
+<li>全体設定への入口</li>
+</ul>
+<h2 id="_39">全体設定<a class="headerlink" href="#_39" title="Permanent link">&para;</a></h2>
+<p>ヘッダーの <code>全体設定</code> で開きます。左側に <code>動画書き出し</code> / <code>編集</code> / <code>環境</code> / <code>音声読み上げ</code> / <code>ショートカット</code> / <code>バックアップ</code> / <code>キャッシュ</code> のタブがあります。</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>タブ</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>動画プリセット</td>
+<td>動画書き出し</td>
+<td>内蔵プリセット + ユーザープリセット (<code>customPresets</code>)</td>
+</tr>
+<tr>
+<td>既定の書き出しプリセット</td>
+<td>動画書き出し</td>
+<td>動画書き出しダイアログで初期選択するプリセット</td>
+</tr>
+<tr>
+<td>モノラル → ステレオ</td>
+<td>動画書き出し</td>
+<td>mono の音声を stereo にミックスダウンするか</td>
+</tr>
+<tr>
+<td>書き出しダイアログを毎回出す</td>
+<td>動画書き出し</td>
+<td>「動画出力」ボタンで毎回プリセット / fps を選ぶか</td>
+</tr>
+<tr>
+<td>Undo 履歴サイズ</td>
+<td>編集</td>
+<td>1〜500</td>
+</tr>
+<tr>
+<td>ffmpeg のパス</td>
+<td>環境</td>
+<td>起動時に自動検出されるが、明示指定で固定可</td>
+</tr>
+<tr>
+<td>プロジェクトフォルダ</td>
+<td>環境</td>
+<td><code>projects/</code> の代替先を絶対パスで指定</td>
+</tr>
+<tr>
+<td>静音モード (quietMode)</td>
+<td>環境</td>
+<td>uvicorn のアクセスログを WARNING に抑制</td>
+</tr>
+<tr>
+<td>JS ライブラリのインストール</td>
+<td>環境</td>
+<td>three.js / mp4box.js を <code>static/vendor/</code> に取得</td>
+</tr>
+<tr>
+<td>CDN を使う</td>
+<td>環境</td>
+<td>ローカル vendor を無視して CDN を強制利用 (デバッグ用)</td>
+</tr>
+<tr>
+<td>Noto Sans JP をインストール</td>
+<td>環境</td>
+<td><code>notofonts/noto-cjk</code> の static OTF を 7 weight (Thin / Light / DemiLight / Regular / Medium / Bold / Black) <code>assets/fonts/NotoSansJP/</code> に取得</td>
+</tr>
+<tr>
+<td>フォント自動認識</td>
+<td>環境</td>
+<td><code>assets/fonts/</code> の各ファイルから OS/2.usWeightClass + name テーブルを読み、weight と表示名を自動判定。誤判定はファイル単位でドロップダウン上書き可</td>
+</tr>
+<tr>
+<td>VOICEVOX アプリのパス / URL</td>
+<td>音声読み上げ</td>
+<td>検出された VOICEVOX を使う場合は空欄でも可。別パスにインストール済みなら絶対パスを指定</td>
+</tr>
+<tr>
+<td>VOICEPEAK バイナリのパス</td>
+<td>音声読み上げ</td>
+<td>VOICEPEAK の CLI バイナリのパス (mac は <code>.app</code> 配下、Windows は <code>voicepeak.exe</code>)</td>
+</tr>
+<tr>
+<td>ボイスを登録</td>
+<td>音声読み上げ</td>
+<td>VOICEVOX の <code>/speakers</code> と VOICEPEAK の <code>--list-narrator</code> から話者・感情を取得して <code>app_state/voice_catalog.json</code> へ保存。VOICEVOX が起動していなければ自動で起動を試みる (最大 20 秒)</td>
+</tr>
+<tr>
+<td>ショートカット一覧</td>
+<td>ショートカット</td>
+<td>カテゴリ別 (全般 / カット / テロップ / 再生・タイムライン) に各アクションのキーを編集。クリアで「なし」、初期値で出荷時設定に戻る。<code>global_config.json</code> の <code>shortcuts</code> に保存</td>
+</tr>
+<tr>
+<td>自動バックアップ間隔 / 保存件数</td>
+<td>バックアップ</td>
+<td><code>scenarios/main.json</code> の auto スナップショット (周期 + 切替時)。詳細は<a href=".././project-settings/">プロジェクト設定 → バックアップ</a></td>
+</tr>
+<tr>
+<td>起動時に古いキャッシュを自動削除</td>
+<td>キャッシュ</td>
+<td><code>cache/preview/</code> / <code>cache/lipsync/</code> / <code>cache/clean_pcm/</code> のうち mtime が指定日数より古いものを起動時に削除 (既定: ON / 30 日)。手動削除は <a href=".././assets/#キャッシュタブ">素材管理 → キャッシュタブ</a> から</td>
+</tr>
+</tbody>
+</table>
+<p>設定は <code>~/.config</code> などではなく、リポジトリ直下の <code>app_state/global_config.json</code> に保存されます。</p>
+<p>音声読み上げタブの詳しい使い方は <a href="../../tutorials/voice-synthesis/">音声合成 (VOICEVOX / VOICEPEAK) を使う</a> を参照してください。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="フッター" >
+        
+          
+          <a href="../../tutorials/export-video/" class="md-footer__link md-footer__link--prev" aria-label="前: PNG &#x2f; 動画を書き出す">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                前
+              </span>
+              <div class="md-ellipsis">
+                PNG / 動画を書き出す
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../title-editor/" class="md-footer__link md-footer__link--next" aria-label="次: タイトル組版エディタ">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                次
+              </span>
+              <div class="md-ellipsis">
+                タイトル組版エディタ
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.footer","navigation.indexes","navigation.sections","navigation.path","navigation.tracking","search.highlight","toc.follow"],"search":"../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"コピーしました","clipboard.copy":"クリップボードへコピー","search.result.more.one":"このページ内にもう1件見つかりました","search.result.more.other":"このページ内にあと#件見つかりました","search.result.none":"何も見つかりませんでした","search.result.one":"1件見つかりました","search.result.other":"#件見つかりました","search.result.placeholder":"検索キーワードを入力してください","search.result.term.missing":"検索に含まれない","select.version":"バージョン切り替え"},"version":null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.63456bd9.min.js"></script>
+      
+    
+  </body>
+</html>

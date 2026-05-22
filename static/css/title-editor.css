@@ -1,0 +1,356 @@
+/* =============================================================================
+   title-editor.css
+   Phase 7 — /title-editor 専用スタイル。base.css / tokens.css の変数を流用。
+   ============================================================================= */
+
+body.title-editor-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "LINE Seed JP", "Noto Sans JP", system-ui, sans-serif;
+}
+
+.title-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px;
+  background: var(--surface-1, var(--bg));
+  border-bottom: 1px solid var(--border);
+  flex-wrap: nowrap;
+}
+
+.title-editor-home-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+  background: transparent;
+}
+.title-editor-home-link:hover {
+  background: var(--surface-2);
+}
+
+.title-editor-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.title-editor-meta {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.title-editor-meta-divider {
+  display: inline-block;
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+.title-editor-meta-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+  /* base.css の `label { margin-top: 12px }` を打ち消す
+     (= 単一行ツールバーで他要素と縦位置を合わせる) */
+  margin-top: 0;
+}
+.title-editor-meta-row > span {
+  white-space: nowrap;
+}
+.title-editor-meta-row input[type="text"] {
+  min-width: 200px;
+  height: 32px;
+}
+.title-editor-meta-row select {
+  height: 32px;
+}
+.title-editor-meta .ghost-button,
+.title-editor-meta .primary-button {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.title-editor-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 560px;
+  gap: 16px;
+  padding: 14px 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---- 左: キャンバスエリア ---- */
+.title-editor-canvas-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  align-items: stretch;
+}
+.title-editor-canvas-frame {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* プレビューを上限まで拡大しすぎないように max-width で抑える (= フル HD で下が窮屈にならない) */
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
+  /* 16:9 を維持しつつ親の幅いっぱいまで広がる */
+  aspect-ratio: 16 / 9;
+  /* チェッカー柄 (= 透過モードで「下が透明」と分かるように) */
+  background-image:
+    linear-gradient(45deg, var(--surface-3, #d8d8d8) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--surface-3, #d8d8d8) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--surface-3, #d8d8d8) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--surface-3, #d8d8d8) 75%);
+  background-size: 24px 24px;
+  background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+}
+.title-editor-canvas-frame canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: crosshair;
+}
+.title-editor-canvas-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-muted, var(--text));
+  flex-wrap: wrap;
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
+}
+.title-editor-bg-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.title-editor-bg-control .bg-label {
+  white-space: nowrap;
+}
+.title-editor-canvas-info {
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+/* ---- 右: サイドペイン ---- */
+.title-editor-side {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 12px;
+  min-height: 0;
+}
+
+.title-editor-param-pane {
+  background: var(--surface-1, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+.title-editor-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted, var(--text));
+  opacity: 0.7;
+}
+
+.title-editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.title-editor-field-label {
+  font-size: 12px;
+  color: var(--text-muted, var(--text));
+  opacity: 0.85;
+}
+.title-editor-field input,
+.title-editor-field select,
+.title-editor-field textarea {
+  font-family: inherit;
+  font-size: 13px;
+}
+.title-editor-field textarea {
+  resize: vertical;
+  min-height: 48px;
+}
+
+.title-editor-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.title-editor-field-row-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.title-editor-multi-banner {
+  margin: 0 0 4px;
+  padding: 6px 8px;
+  background: var(--accent-soft, var(--surface-2));
+  border-left: 3px solid var(--accent);
+  font-size: 12px;
+  border-radius: 4px;
+  color: var(--text);
+}
+
+.title-editor-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+/* ---- レイヤー一覧 ---- */
+.title-editor-layer-list-pane {
+  background: var(--surface-1, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+}
+.title-editor-layer-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.title-editor-layer-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.title-editor-layer-list-actions .ghost-button {
+  padding: 4px 6px;
+}
+.title-editor-layer-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  flex: 1;
+}
+.layer-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.layer-item:hover {
+  background: var(--surface-3, var(--surface-2));
+}
+.layer-item.selected {
+  border-color: var(--accent);
+}
+.layer-item.active {
+  border-color: var(--accent);
+  background: var(--accent-soft, var(--surface-2));
+}
+.layer-item-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 整列ツールバー (Phase 7-G) */
+.title-editor-align-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  background: var(--surface-1, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.title-editor-align-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 6px;
+  border-right: 1px solid var(--border);
+}
+.title-editor-align-group:last-of-type {
+  border-right: none;
+  padding-right: 0;
+}
+.title-editor-align-toolbar .ghost-button {
+  padding: 4px 6px;
+}
+.title-editor-align-toolbar button:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.title-editor-align-hint {
+  font-size: 12px;
+  color: var(--text-muted, var(--text));
+  opacity: 0.7;
+  margin-left: auto;
+}
+
+
+/* 位置プリセット 3×3 グリッド */
+.title-editor-pos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  max-width: 220px;
+}
+.title-editor-pos-cell {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 0;
+  font-size: 18px;
+  cursor: pointer;
+  text-align: center;
+}
+.title-editor-pos-cell:hover {
+  background: var(--surface-3, var(--accent-soft, var(--surface-2)));
+  border-color: var(--accent);
+}

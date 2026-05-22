@@ -1,0 +1,10 @@
+/*
+ * このファイルは static/css/ 配下へ分割移行済み:
+ *   tokens.css     — カラー・タイポ・形状の CSS 変数（ライト/ダーク）
+ *   base.css       — リセット・基本タイポ・フォーム要素
+ *   components.css — ボタン・入力・ダイアログ・トースト・Material Symbols
+ *   layout.css     — アプリシェル・コントロールパネル・タイムライン・ダッシュボード
+ *
+ * 旧 <link href="/static/styles.css"> へのキャッシュ参照対策のため
+ * 空のスタイルシートとして残しています。
+ */

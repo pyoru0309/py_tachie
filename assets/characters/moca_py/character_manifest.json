@@ -1,0 +1,151 @@
+{
+  "version": 4,
+  "id": "moca_py",
+  "name": "モカ",
+  "backHairs": [],
+  "bases": [
+    {
+      "id": "base_モカ_ボディ",
+      "name": "モカ_ボディ",
+      "path": "assets/characters/moca_py/base/モカ_ボディ.avif",
+      "sourceCombination": "モカ/ボディ"
+    }
+  ],
+  "cheeks": [],
+  "eyes": [
+    {
+      "id": "eye_モカ_目_目閉じ",
+      "name": "モカ_目_目閉じ",
+      "path": "assets/characters/moca_py/eye/モカ_目_目閉じ.avif",
+      "sourceCombination": "モカ/目/目閉じ",
+      "flags": {
+        "blinkClosed": true
+      }
+    },
+    {
+      "id": "eye_モカ_目_半目開き",
+      "name": "モカ_目_半目開き",
+      "path": "assets/characters/moca_py/eye/モカ_目_半目開き.avif",
+      "sourceCombination": "モカ/目/半目開き",
+      "flags": {
+        "blinkHalf": true
+      }
+    },
+    {
+      "id": "eye_モカ_目_光る眼鏡1",
+      "name": "モカ_目_光る眼鏡1",
+      "path": "assets/characters/moca_py/eye/モカ_目_光る眼鏡1.avif",
+      "sourceCombination": "モカ/目/光る眼鏡1"
+    },
+    {
+      "id": "eye_モカ_目_光る眼鏡2",
+      "name": "モカ_目_光る眼鏡2",
+      "path": "assets/characters/moca_py/eye/モカ_目_光る眼鏡2.avif",
+      "sourceCombination": "モカ/目/光る眼鏡2"
+    },
+    {
+      "id": "eye_モカ_目_自信",
+      "name": "モカ_目_自信",
+      "path": "assets/characters/moca_py/eye/モカ_目_自信.avif",
+      "sourceCombination": "モカ/目/自信"
+    },
+    {
+      "id": "eye_モカ_目_開き",
+      "name": "モカ_目_開き",
+      "path": "assets/characters/moca_py/eye/モカ_目_開き.avif",
+      "sourceCombination": "モカ/目/開き",
+      "flags": {
+        "blinkOpen": true
+      }
+    },
+    {
+      "id": "eye_モカ_目_じと目",
+      "name": "モカ_目_じと目",
+      "path": "assets/characters/moca_py/eye/モカ_目_じと目.avif",
+      "sourceCombination": "モカ/目/じと目"
+    }
+  ],
+  "mouths": [
+    {
+      "id": "mouth_モカ_口_笑い",
+      "name": "モカ_口_笑い",
+      "path": "assets/characters/moca_py/mouth/モカ_口_笑い.avif",
+      "sourceCombination": "モカ/口/笑い",
+      "flags": {
+        "lipOpen": true
+      }
+    },
+    {
+      "id": "mouth_モカ_口_開き",
+      "name": "モカ_口_開き",
+      "path": "assets/characters/moca_py/mouth/モカ_口_開き.avif",
+      "sourceCombination": "モカ/口/開き",
+      "flags": {
+        "lipMid": true
+      }
+    },
+    {
+      "id": "mouth_モカ_口_へ",
+      "name": "モカ_口_へ",
+      "path": "assets/characters/moca_py/mouth/モカ_口_へ.avif",
+      "sourceCombination": "モカ/口/へ"
+    },
+    {
+      "id": "mouth_モカ_口_閉じ口",
+      "name": "モカ_口_閉じ口",
+      "path": "assets/characters/moca_py/mouth/モカ_口_閉じ口.avif",
+      "sourceCombination": "モカ/口/閉じ口",
+      "flags": {
+        "lipClosed": true
+      }
+    }
+  ],
+  "bangs": [],
+  "fronts": [
+    {
+      "id": "front_モカ_髪飾り_2",
+      "name": "モカ_髪飾り_2",
+      "path": "assets/characters/moca_py/front/モカ_髪飾り_2.avif",
+      "sourceCombination": "モカ/髪飾り 2"
+    },
+    {
+      "id": "front_モカ_黒眼鏡反射",
+      "name": "モカ_黒眼鏡反射",
+      "path": "assets/characters/moca_py/front/モカ_黒眼鏡反射.avif",
+      "sourceCombination": "モカ/黒眼鏡反射"
+    },
+    {
+      "id": "front_モカ_赤眼鏡反射",
+      "name": "モカ_赤眼鏡反射",
+      "path": "assets/characters/moca_py/front/モカ_赤眼鏡反射.avif",
+      "sourceCombination": "モカ/赤眼鏡反射"
+    },
+    {
+      "id": "front_モカ_黒眼鏡",
+      "name": "モカ_黒眼鏡",
+      "path": "assets/characters/moca_py/front/モカ_黒眼鏡.avif",
+      "sourceCombination": "モカ/黒眼鏡"
+    },
+    {
+      "id": "front_モカ_赤眼鏡",
+      "name": "モカ_赤眼鏡",
+      "path": "assets/characters/moca_py/front/モカ_赤眼鏡.avif",
+      "sourceCombination": "モカ/赤眼鏡"
+    }
+  ],
+  "defaults": {
+    "character": {
+      "x": 240,
+      "y": -250,
+      "scale": 1.0
+    },
+    "removeWhite": false,
+    "baseId": "base_モカ_ボディ"
+  },
+  "importYaml": "import_manifest.yml",
+  "voice": {
+    "id": "voicepeak:Miyamai Moca",
+    "emotion": ""
+  },
+  "color": "#00bfff"
+}

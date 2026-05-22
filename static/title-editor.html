@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>タイトル組版エディタ</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=LINE+Seed+JP:wght@400;700;800&family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/tokens.css?v=20260518b" />
+    <link rel="stylesheet" href="/static/css/base.css?v=20260518b" />
+    <link rel="stylesheet" href="/static/css/components.css?v=20260518b" />
+    <link rel="stylesheet" href="/static/css/title-editor.css?v=20260518b" />
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("splite_anime_theme");
+          var dark = stored
+            ? stored === "dark"
+            : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+        } catch (_) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
+  </head>
+  <body class="title-editor-body">
+    <header class="title-editor-header">
+      <a href="/" class="title-editor-home-link" title="メインに戻る">
+        <span class="msym" aria-hidden="true">arrow_back</span>
+      </a>
+      <h1 class="title-editor-title">タイトル組版エディタ</h1>
+      <div class="title-editor-meta">
+        <label class="title-editor-meta-row">
+          <span>タイトル名</span>
+          <input id="compositionNameInput" type="text" placeholder="未命名タイトル" />
+        </label>
+        <label class="title-editor-meta-row">
+          <span>既存を開く</span>
+          <select id="compositionPicker" title="既存のタイトル組版を開く"></select>
+        </label>
+        <button id="newCompositionButton" type="button" class="ghost-button" title="新規">
+          <span class="msym button-icon" aria-hidden="true">add</span>
+          <span>新規</span>
+        </button>
+        <button id="saveCompositionButton" type="button" class="ghost-button" title="この組版を保存">
+          <span class="msym button-icon" aria-hidden="true">save</span>
+        </button>
+        <button id="deleteCompositionButton" type="button" class="ghost-button" title="この組版を削除">
+          <span class="msym button-icon" aria-hidden="true">delete</span>
+        </button>
+        <span class="title-editor-meta-divider" aria-hidden="true"></span>
+        <label class="title-editor-meta-row">
+          <span>PNG 保存先</span>
+          <select id="exportTargetSelect" title="PNG の保存先">
+            <option value="local">ローカル (.png をダウンロード)</option>
+            <option value="shared">アセット共通 (assets/foregrounds/)</option>
+            <option value="project">現行プロジェクト (前景)</option>
+          </select>
+        </label>
+        <button id="exportPngButton" type="button" class="primary-button">
+          <span class="msym button-icon" aria-hidden="true">download</span>
+          <span>PNG 保存</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="title-editor-main">
+      <section class="title-editor-canvas-area">
+        <div class="title-editor-canvas-frame" id="canvasFrame">
+          <canvas id="titleCanvas" width="1920" height="1080"></canvas>
+        </div>
+        <div class="title-editor-canvas-footer">
+          <label class="title-editor-bg-control">
+            <span class="bg-label">背景色</span>
+            <span id="backgroundColorSwatchHost"></span>
+          </label>
+          <label class="title-editor-bg-control">
+            <input id="backgroundTransparentInput" type="checkbox" />
+            <span>背景透明 (PNG 書き出しで透過)</span>
+          </label>
+          <span class="title-editor-canvas-info" id="canvasInfo">1920 × 1080</span>
+        </div>
+      </section>
+
+      <aside class="title-editor-side">
+        <div class="title-editor-align-toolbar" id="alignToolbar" aria-label="整列ツール">
+          <span class="title-editor-align-group">
+            <button type="button" class="ghost-button" data-align="hLeft"   title="左揃え"><span class="msym button-icon">align_horizontal_left</span></button>
+            <button type="button" class="ghost-button" data-align="hCenter" title="水平中央揃え"><span class="msym button-icon">align_horizontal_center</span></button>
+            <button type="button" class="ghost-button" data-align="hRight"  title="右揃え"><span class="msym button-icon">align_horizontal_right</span></button>
+          </span>
+          <span class="title-editor-align-group">
+            <button type="button" class="ghost-button" data-align="vTop"    title="上揃え"><span class="msym button-icon">align_vertical_top</span></button>
+            <button type="button" class="ghost-button" data-align="vMiddle" title="垂直中央揃え"><span class="msym button-icon">align_vertical_center</span></button>
+            <button type="button" class="ghost-button" data-align="vBottom" title="下揃え"><span class="msym button-icon">align_vertical_bottom</span></button>
+          </span>
+          <span class="title-editor-align-group">
+            <button type="button" class="ghost-button" data-align="distH"   title="水平等間隔 (3つ以上)"><span class="msym button-icon">horizontal_distribute</span></button>
+            <button type="button" class="ghost-button" data-align="distV"   title="垂直等間隔 (3つ以上)"><span class="msym button-icon">vertical_distribute</span></button>
+          </span>
+          <span class="title-editor-align-hint" id="alignToolbarHint">2 つ以上選択で有効</span>
+        </div>
+        <div class="title-editor-param-pane" id="layerParamPane">
+          <p class="title-editor-empty" id="layerParamEmpty">レイヤーを選択するとここに編集項目が表示されます。</p>
+        </div>
+        <div class="title-editor-layer-list-pane">
+          <div class="title-editor-layer-list-header">
+            <strong>レイヤー</strong>
+            <div class="title-editor-layer-list-actions">
+              <button id="addLayerButton" type="button" class="ghost-button" title="新規レイヤーを追加">
+                <span class="msym button-icon" aria-hidden="true">add</span>
+              </button>
+              <button id="duplicateLayerButton" type="button" class="ghost-button" title="このレイヤーを複写 (Shift+D)">
+                <span class="msym button-icon" aria-hidden="true">content_copy</span>
+              </button>
+              <button id="moveLayerUpButton" type="button" class="ghost-button" title="前面へ">
+                <span class="msym button-icon" aria-hidden="true">keyboard_arrow_up</span>
+              </button>
+              <button id="moveLayerDownButton" type="button" class="ghost-button" title="背面へ">
+                <span class="msym button-icon" aria-hidden="true">keyboard_arrow_down</span>
+              </button>
+              <button id="deleteLayerButton" type="button" class="ghost-button" title="このレイヤーを削除">
+                <span class="msym button-icon" aria-hidden="true">delete</span>
+              </button>
+            </div>
+          </div>
+          <ul class="title-editor-layer-list" id="layerList"></ul>
+        </div>
+      </aside>
+    </main>
+
+    <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+
+    <script type="module" src="/static/js/title-editor/main.js?v=20260518b"></script>
+  </body>
+</html>

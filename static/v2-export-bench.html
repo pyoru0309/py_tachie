@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>v2 export PoC bench</title>
+    <link rel="stylesheet" href="/static/css/tokens.css" />
+    <link rel="stylesheet" href="/static/css/base.css" />
+    <link rel="stylesheet" href="/static/css/components.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("splite_anime_theme");
+          var dark = stored ? stored === "dark"
+            : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+        } catch (_) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
+    <style>
+      /* base.css の body は本体 UI のアプリシェル用に
+         `height:100%; overflow:hidden` を強制しているので、bench ページでは
+         html/body をスクロール可能に戻す。 */
+      html, body { height: auto; min-height: 100%; overflow: auto; }
+      body { padding: 24px 24px 64px; max-width: 1100px; margin: 0 auto; }
+      h1 { font-size: 1.4rem; margin: 0 0 4px; }
+      .lede { color: var(--text-muted); margin: 0 0 18px; font-size: 0.9rem; line-height: 1.5; }
+      fieldset { border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; margin: 0 0 14px; }
+      legend { padding: 0 6px; font-weight: 600; font-size: 0.85rem; color: var(--text-muted); }
+      .grid { display: grid; grid-template-columns: 160px 1fr; gap: 8px 14px; align-items: center; }
+      .grid label { font-size: 0.9rem; }
+      .grid select, .grid input { width: 100%; }
+      .actions { display: flex; gap: 10px; align-items: center; margin: 14px 0; }
+      .preview-wrap { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+      .preview-wrap canvas { display: block; max-width: 100%; height: auto; background: #000; }
+      .stats { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; }
+      .stats pre { margin: 0; white-space: pre-wrap; font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; }
+      .log { max-height: 200px; overflow: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; }
+      .log .line { padding: 1px 0; }
+      .log .err { color: var(--danger, #c33); }
+      .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); font-size: 0.75rem; margin-left: 6px; }
+      .pill.run { background: #0a7c30; color: #fff; border-color: #0a7c30; }
+      .pill.done { background: #295dd6; color: #fff; border-color: #295dd6; }
+      .pill.err { background: #c33; color: #fff; border-color: #c33; }
+    </style>
+  </head>
+  <body>
+    <h1>v2 export PoC bench <span id="status" class="pill">idle</span></h1>
+    <p class="lede">
+      WebGL → readPixels → WebSocket → ffmpeg stdin の搬送限界を測定します。
+      まず <strong>discard</strong> で WS/ASGI 経路だけの throughput を見て、その上で
+      <strong>-f null -</strong> → 実エンコーダ (libx264 / videotoolbox / nvenc) と段階を上げます。
+      <br>
+      backpressure 閾値を 0 にすると WS キューに無制限に積めます（= 旧挙動。enqueue fps が出るだけ）。
+      非 0 にすると <code>bufferedAmount</code> がそれを超えている間 <code>ws.send</code> を await して
+      実 throughput を測ります。
+      <br>
+      WS 圧縮が有効だと raw RGBA を毎フレーム deflate しようとして CPU が負けます。
+      uvicorn は既定で <code>permessage-deflate</code> を有効にする実装があるので、ベンチ用には
+      <code>--ws-per-message-deflate=false</code> を付けて起動するのを推奨。
+      handshake で交渉された extensions は集計欄に出します。
+    </p>
+
+    <fieldset>
+      <legend>シーン</legend>
+      <div class="grid">
+        <label for="projectSelect">プロジェクト</label>
+        <select id="projectSelect"></select>
+        <label for="cutSelect">カット</label>
+        <select id="cutSelect"></select>
+        <label for="totalFramesInput">フレーム数</label>
+        <input id="totalFramesInput" type="number" min="1" max="9999" value="240" />
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>レンダ条件</legend>
+      <div class="grid">
+        <label for="resolutionSelect">解像度</label>
+        <select id="resolutionSelect">
+          <option value="1280x720">720p (1280x720)</option>
+          <option value="1920x1080" selected>1080p (1920x1080)</option>
+          <option value="3840x2160">4K (3840x2160)</option>
+        </select>
+        <label for="readbackSelect">readback モード</label>
+        <select id="readbackSelect">
+          <option value="sync" selected>sync (gl.readPixels 即時)</option>
+          <option value="pbo2">pbo2 (PBO×2 + fenceSync, 1-frame-late)</option>
+          <option value="pbo3">pbo3 (PBO×3 + fenceSync, 2-frame-late)</option>
+        </select>
+        <label for="vflipSelect">Y 反転</label>
+        <select id="vflipSelect">
+          <option value="ffmpeg" selected>ffmpeg -vf vflip</option>
+          <option value="gpu" disabled>GPU 内 FBO 反転（未実装）</option>
+          <option value="cpu">CPU row reverse (比較用)</option>
+          <option value="none">反転無し (上下逆のまま)</option>
+        </select>
+        <label for="encoderSelect">出力</label>
+        <select id="encoderSelect">
+          <option value="discard" selected>discard (WS だけ。ffmpeg を経由しない)</option>
+          <option value="null">ffmpeg -f null - (encode 無しでパイプを消費)</option>
+          <option value="libx264_ultrafast">libx264 ultrafast</option>
+          <option value="h264_videotoolbox">h264_videotoolbox (Apple HW)</option>
+          <option value="h264_nvenc">h264_nvenc (NVIDIA HW)</option>
+        </select>
+        <label for="vizModeSelect">visualizer</label>
+        <select id="vizModeSelect">
+          <option value="normal" selected>normal (現行 / 12fps PNG 連番を idx 進行で差替え)</option>
+          <option value="off">off (visualizer レイヤーを scene に追加しない)</option>
+          <option value="frozen">frozen (idx=0 固定 / texture 差替えゼロ)</option>
+          <option value="preloaded">preloaded (build 前に全 frame を並列 fetch+decode)</option>
+        </select>
+        <label for="bpThresholdInput">backpressure 閾値 (MB)</label>
+        <input id="bpThresholdInput" type="number" min="0" max="2048" step="1" value="16" />
+      </div>
+    </fieldset>
+
+    <div class="actions">
+      <button id="startBtn" class="primary">開始</button>
+      <button id="stopBtn" disabled>停止</button>
+      <span id="progress"></span>
+    </div>
+
+    <div class="preview-wrap">
+      <canvas id="renderCanvas" width="1920" height="1080"></canvas>
+    </div>
+
+    <h2 style="font-size: 1rem; margin: 16px 0 6px;">集計</h2>
+    <div class="stats">
+      <pre id="statsOut">（測定後にここに表示）</pre>
+    </div>
+
+    <h2 style="font-size: 1rem; margin: 16px 0 6px;">ログ</h2>
+    <div id="logOut" class="log"></div>
+
+    <script type="module" src="/static/js/v2-export-bench.js"></script>
+  </body>
+</html>

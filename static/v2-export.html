@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>v2 export (Step 0)</title>
+    <link rel="stylesheet" href="/static/css/tokens.css" />
+    <link rel="stylesheet" href="/static/css/base.css" />
+    <link rel="stylesheet" href="/static/css/components.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/",
+          "mp4box": "https://cdn.jsdelivr.net/npm/mp4box@0.5.2/+esm"
+        }
+      }
+    </script>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("splite_anime_theme");
+          var dark = stored ? stored === "dark"
+            : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+        } catch (_) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
+    <style>
+      html, body { height: auto; min-height: 100%; overflow: auto; }
+      body { padding: 24px 24px 64px; max-width: 1100px; margin: 0 auto; }
+      h1 { font-size: 1.4rem; margin: 0 0 4px; }
+      .lede { color: var(--text-muted); margin: 0 0 18px; font-size: 0.9rem; line-height: 1.5; }
+      fieldset { border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; margin: 0 0 14px; }
+      legend { padding: 0 6px; font-weight: 600; font-size: 0.85rem; color: var(--text-muted); }
+      .grid { display: grid; grid-template-columns: 160px 1fr; gap: 8px 14px; align-items: center; }
+      .grid label { font-size: 0.9rem; }
+      .grid select, .grid input { width: 100%; }
+      .actions { display: flex; gap: 10px; align-items: center; margin: 14px 0; }
+      .preview-wrap { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+      .preview-wrap canvas { display: block; max-width: 100%; height: auto; background: #000; }
+      .stats { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; }
+      .stats pre { margin: 0; white-space: pre-wrap; font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; }
+      .log { max-height: 240px; overflow: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; }
+      .log .line { padding: 1px 0; }
+      .log .err { color: var(--danger, #c33); }
+      .log .warn { color: var(--warning, #b85000); }
+      .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); font-size: 0.75rem; margin-left: 6px; }
+      .pill.run { background: #0a7c30; color: #fff; border-color: #0a7c30; }
+      .pill.done { background: #295dd6; color: #fff; border-color: #295dd6; }
+      .pill.err { background: #c33; color: #fff; border-color: #c33; }
+      details { margin: 0 0 14px; }
+      details > summary { cursor: pointer; font-size: 0.85rem; color: var(--text-muted); user-select: none; }
+    </style>
+  </head>
+  <body>
+    <h1>v2 export (Step 0) <span id="status" class="pill">idle</span></h1>
+    <p class="lede">
+      WebGL → PBO readback → WebSocket → ffmpeg の本実装。
+      Step 0 は <strong>1 cut / visualizer なし / videoTrack なし</strong> で
+      最小経路を通す段階。telop / dialogue は scene 内 plane に取り込み済みなので
+      そのまま出る。<code>document.fonts.ready</code> を export 開始前に await して
+      最初の 1 frame だけ fallback font になる事故を回避する。
+      <br>
+      <strong>uvicorn は <code>--ws-per-message-deflate=false</code> で起動してください。</strong>
+      圧縮あり = 100fps→6fps の事故あり。
+    </p>
+
+    <fieldset>
+      <legend>対象</legend>
+      <div class="grid">
+        <label for="projectSelect">プロジェクト</label>
+        <select id="projectSelect"></select>
+        <label>書き出し範囲</label>
+        <div>
+          <label class="checkbox-row" style="font-size: 0.9rem; margin-right: 14px;">
+            <input type="radio" name="exportTarget" value="cut" checked />
+            このカット
+          </label>
+          <label class="checkbox-row" style="font-size: 0.9rem;">
+            <input type="radio" name="exportTarget" value="project" />
+            シナリオ全体
+          </label>
+        </div>
+        <label for="cutSelect">カット</label>
+        <select id="cutSelect"></select>
+        <label for="totalFramesInput">フレーム数</label>
+        <input id="totalFramesInput" type="number" min="1" max="999999" value="240" />
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>出力</legend>
+      <div class="grid">
+        <label for="encoderSelect">encoder</label>
+        <select id="encoderSelect">
+          <!-- 起動時に /api/v2/export/capabilities で実機検出した encoder で
+               option を入れ替える (preferred を selected にする)。fallback として
+               全候補を出しておく。 -->
+          <option value="h264_videotoolbox">h264_videotoolbox (Apple HW)</option>
+          <option value="h264_nvenc">h264_nvenc (NVIDIA HW)</option>
+          <option value="libx264_fast">libx264 veryfast (CPU fallback)</option>
+          <option value="null">-f null - (パイプ消費だけ。ファイル無し)</option>
+        </select>
+        <label for="outputPathInput">出力先</label>
+        <input id="outputPathInput" type="text" placeholder="(空欄で projects/{id}/exports/v2_*.mp4 自動命名)" />
+        <label for="resolutionSelect">解像度</label>
+        <select id="resolutionSelect">
+          <option value="1280x720">720p</option>
+          <option value="1920x1080" selected>1080p</option>
+          <option value="3840x2160">4K</option>
+        </select>
+        <label for="fpsSelect">fps</label>
+        <select id="fpsSelect">
+          <option value="24" selected>24</option>
+          <option value="30">30</option>
+        </select>
+        <label for="leadInInput">先頭プリロール</label>
+        <input id="leadInInput" type="number" min="0" max="10" step="0.1" value="0" />
+        <label for="visualizerToggle">visualizer</label>
+        <div>
+          <label class="checkbox-row" style="font-size: 0.85rem;">
+            <input id="visualizerToggle" type="checkbox" checked />
+            含める (precomputed stream で deterministic)
+          </label>
+        </div>
+        <label for="videoTrackToggle">背景動画</label>
+        <div>
+          <label class="checkbox-row" style="font-size: 0.85rem;">
+            <input id="videoTrackToggle" type="checkbox" checked />
+            含める (WebCodecs で deterministic decode)
+          </label>
+        </div>
+        <label for="audioMuxToggle">音声</label>
+        <div>
+          <label class="checkbox-row" style="font-size: 0.85rem; margin-right: 14px;">
+            <input id="audioMuxToggle" type="checkbox" checked />
+            含める (映像書き出し後に -c:v copy で mux)
+          </label>
+          <label class="checkbox-row" style="font-size: 0.85rem;">
+            <input id="monoToStereoToggle" type="checkbox" checked />
+            モノラル→ステレオ
+          </label>
+        </div>
+      </div>
+    </fieldset>
+
+    <details>
+      <summary>診断パラメータ (内部用)</summary>
+      <fieldset style="margin-top: 8px;">
+        <legend>readback / 転送</legend>
+        <div class="grid">
+          <label for="readbackSelect">readback</label>
+          <select id="readbackSelect">
+            <option value="pbo2" selected>pbo2 (推奨)</option>
+            <option value="pbo3">pbo3</option>
+            <option value="sync">sync (WebGL2 不要)</option>
+          </select>
+          <label for="vflipSelect">Y 反転</label>
+          <select id="vflipSelect">
+            <option value="ffmpeg" selected>ffmpeg -vf vflip</option>
+            <option value="cpu">CPU row reverse</option>
+            <option value="none">なし (上下逆のまま)</option>
+          </select>
+          <label for="bpThresholdInput">backpressure (MB)</label>
+          <input id="bpThresholdInput" type="number" min="0" max="2048" step="1" value="16" />
+        </div>
+      </fieldset>
+    </details>
+
+    <div class="actions">
+      <button id="startBtn" class="primary">書き出し開始</button>
+      <button id="stopBtn" disabled>停止</button>
+      <span id="progress"></span>
+    </div>
+
+    <div class="preview-wrap">
+      <canvas id="renderCanvas" width="1920" height="1080"></canvas>
+    </div>
+
+    <h2 style="font-size: 1rem; margin: 16px 0 6px;">結果</h2>
+    <div class="stats">
+      <pre id="statsOut">（書き出し後にここに表示）</pre>
+    </div>
+
+    <h2 style="font-size: 1rem; margin: 16px 0 6px;">ログ</h2>
+    <div id="logOut" class="log"></div>
+
+    <script type="module" src="/static/js/v2-export.js"></script>
+  </body>
+</html>
