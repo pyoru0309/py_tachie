@@ -2236,6 +2236,34 @@ export async function playLiveCutV2(cut, _options = {}) {
   if (activeToken && layerData.token && activeToken === layerData.token) {
     sceneInstance = v2.getActiveScene ? v2.getActiveScene() : null;
   }
+
+  // ★ 音声を buildScene より前に発火させる (= カット切替時の「音が一瞬飛ぶ」対策)。
+  //   旧実装は buildScene を await した後に audio.play() していたため、buildScene が
+  //   重いカット (Windows ANGLE で 300ms+ になることがある) では「カット切替直後に
+  //   構造的な無音区間」が生まれていた。
+  //   - 取り出し / analyser attach / play() は全部 buildScene の前で済ませる
+  //   - setupSpeakerLipSyncAnalyser は play() より前に createMediaElementSource する
+  //     必要があるので、ここでの順序 (analyser → play) は維持する
+  //   - 副作用: 画面切替が build 完了まで遅れて見える (= 音声先行) が、人間の知覚は
+  //     音声基準で同期するため違和感は最小限。
+  let audio = null;
+  if (cut.audio) {
+    const source = audioSourceForCut(cut);
+    // 既に prefetch されていれば decoded buffer を持つ HTMLAudioElement を再利用。
+    // ヒットしなければ通常通り new Audio (ブラウザの HTTP キャッシュには載っている
+    // ことが多いので、ここでも体感差はそれなりに小さい)。
+    audio = takePrefetchedAudio(source) || new Audio(source);
+    state.playbackAudio = audio;
+    // useForLipSync な BGM が無ければ、話者音声から口パクを駆動する
+    // フォールバック。createMediaElementSource は audio.play() より前で呼ぶ。
+    setupSpeakerLipSyncAnalyser(audio);
+    const initialOffset = Math.max(0, (performance.now() - cutStartWallclockMs) / 1000);
+    if (initialOffset > 0) {
+      try { audio.currentTime = initialOffset; } catch (_) { /* ignore */ }
+    }
+    audio.play().catch((error) => console.warn("Audio preview failed", error));
+  }
+
   if (!sceneInstance) {
     try {
       sceneInstance = await v2.buildSceneFromLayerData(
@@ -2263,24 +2291,6 @@ export async function playLiveCutV2(cut, _options = {}) {
   const blinkStartsByChar = layerData.blinkEnabled !== false
     ? generateBlinkStartsByChar(duration, blinkCharIds)
     : {};
-
-  let audio = null;
-  if (cut.audio) {
-    const source = audioSourceForCut(cut);
-    // 既に prefetch されていれば decoded buffer を持つ HTMLAudioElement を再利用。
-    // ヒットしなければ通常通り new Audio (ブラウザの HTTP キャッシュには載っている
-    // ことが多いので、ここでも体感差はそれなりに小さい)。
-    audio = takePrefetchedAudio(source) || new Audio(source);
-    state.playbackAudio = audio;
-    // useForLipSync な BGM が無ければ、話者音声から口パクを駆動する
-    // フォールバック。createMediaElementSource は audio.play() より前で呼ぶ。
-    setupSpeakerLipSyncAnalyser(audio);
-    const initialOffset = Math.max(0, (performance.now() - cutStartWallclockMs) / 1000);
-    if (initialOffset > 0) {
-      try { audio.currentTime = initialOffset; } catch (_) { /* ignore */ }
-    }
-    audio.play().catch((error) => console.warn("Audio preview failed", error));
-  }
 
   const animationFps = clampCharacterAnimationFps(state.manifest?.config?.characterAnimationFps);
   const speakerId = layerData.speakerId || null;
