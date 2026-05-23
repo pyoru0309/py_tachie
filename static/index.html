@@ -2094,6 +2094,24 @@
                 </button>
               </div>
               <div id="globalFontScanList" class="font-scan-list"></div>
+              <h3>アップデート</h3>
+              <p class="asset-hint">
+                最新版が公開されているか確認し、ボタン 1 つで取得できます。
+                あなたが作ったプロジェクトやアップロード済み素材は、アップデートで消えません。
+                既定では <code>app_state/backups/</code> にバックアップを取ってから更新します。
+              </p>
+              <div id="globalUpdateStatus" class="asset-hint" aria-live="polite">未確認</div>
+              <div class="preset-list-actions">
+                <button type="button" id="checkForUpdatesButton" class="link-button">
+                  <span class="msym button-icon" aria-hidden="true">cloud_download</span>
+                  <span>アップデートを確認</span>
+                </button>
+                <button type="button" id="applyUpdateButton" class="link-button hidden">
+                  <span class="msym button-icon" aria-hidden="true">system_update</span>
+                  <span>アップデートを実行</span>
+                </button>
+              </div>
+              <div id="globalUpdateDetails" class="update-details hidden"></div>
             </section>
             <section class="settings-group hidden" data-global-tab-panel="tts">
               <h3>VOICEVOX</h3>

@@ -656,6 +656,132 @@ async function installNotoSansJp() {
   }
 }
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;",
+  }[c]));
+}
+
+function renderUpdateStatus(data) {
+  const status = elements.globalUpdateStatus;
+  const applyBtn = elements.applyUpdateButton;
+  const details = elements.globalUpdateDetails;
+  if (!status || !applyBtn || !details) return;
+  const current = data.currentTag || data.currentSha || "?";
+  const latest = data.latestTag || data.latestSha || "?";
+  if (data.behind === 0) {
+    status.textContent = `最新版です (${current})`;
+    applyBtn.classList.add("hidden");
+    details.classList.add("hidden");
+    details.innerHTML = "";
+    return;
+  }
+  status.textContent = `${current} → ${latest} （${data.behind} 個の更新があります）`;
+  applyBtn.classList.remove("hidden");
+  details.classList.remove("hidden");
+
+  const lines = ['<div class="update-options">'];
+  lines.push(
+    '<label class="checkbox-row"><input type="checkbox" id="updateIncludeAssets" /> ' +
+      "共通アセット (背景・音声等) も更新する" +
+      "</label>"
+  );
+  lines.push(
+    '<label class="checkbox-row"><input type="checkbox" id="updateMakeBackup" checked /> ' +
+      "アップデート前にバックアップを取る (app_state/backups/)" +
+      "</label>"
+  );
+  if (Array.isArray(data.dirtyModified) && data.dirtyModified.length > 0) {
+    lines.push(
+      '<label class="checkbox-row"><input type="checkbox" id="updateDiscardLocal" /> ' +
+        "ローカルで変更されているファイルを破棄して進める" +
+        "</label>"
+    );
+    lines.push('<details class="update-dirty-files">');
+    lines.push(`<summary>変更があるファイル (${data.dirtyModified.length})</summary><ul>`);
+    for (const f of data.dirtyModified.slice(0, 30)) {
+      lines.push(`<li><code>${escapeHtml(f)}</code></li>`);
+    }
+    if (data.dirtyModified.length > 30) {
+      lines.push(`<li>… 他 ${data.dirtyModified.length - 30} 件</li>`);
+    }
+    lines.push("</ul></details>");
+  }
+  lines.push("</div>");
+  details.innerHTML = lines.join("");
+}
+
+async function checkForUpdates() {
+  const button = elements.checkForUpdatesButton;
+  if (button) button.disabled = true;
+  if (elements.globalUpdateStatus) {
+    elements.globalUpdateStatus.textContent = "確認中…";
+  }
+  try {
+    const res = await fetch("/api/update/check");
+    const data = await res.json().catch(() => ({}));
+    if (!data.ok) {
+      const msg = data.message || "確認に失敗しました";
+      if (elements.globalUpdateStatus) elements.globalUpdateStatus.textContent = msg;
+      elements.applyUpdateButton?.classList.add("hidden");
+      elements.globalUpdateDetails?.classList.add("hidden");
+      return;
+    }
+    state.updateInfo = data;
+    renderUpdateStatus(data);
+  } catch (error) {
+    console.error(error);
+    if (elements.globalUpdateStatus) {
+      elements.globalUpdateStatus.textContent = "確認に失敗しました";
+    }
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function applyUpdate() {
+  if (!confirm("アップデートを実行します。完了後はアプリの再起動が必要です。続行しますか?")) {
+    return;
+  }
+  const button = elements.applyUpdateButton;
+  if (button) button.disabled = true;
+  if (elements.globalUpdateStatus) {
+    elements.globalUpdateStatus.textContent = "更新中…";
+  }
+  try {
+    const includeAssets = document.getElementById("updateIncludeAssets")?.checked || false;
+    const backup = document.getElementById("updateMakeBackup")?.checked !== false;
+    const discardLocal = document.getElementById("updateDiscardLocal")?.checked || false;
+    const res = await fetch("/api/update/apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ includeAssets, backup, discardLocalChanges: discardLocal }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      const msg = data.message || data.detail || "アップデートに失敗しました";
+      showToast(msg, "error");
+      if (elements.globalUpdateStatus) elements.globalUpdateStatus.textContent = msg;
+      return;
+    }
+    showToast(data.message || "アップデートが完了しました。再起動してください。", "success");
+    if (elements.globalUpdateStatus) {
+      elements.globalUpdateStatus.textContent = data.message;
+    }
+    elements.applyUpdateButton?.classList.add("hidden");
+    elements.globalUpdateDetails?.classList.add("hidden");
+  } catch (error) {
+    console.error(error);
+    showToast("アップデートに失敗しました", "error");
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 export async function openGlobalSettings() {
   try {
     state.globalConfig = await fetchGlobalConfig();
@@ -851,6 +977,12 @@ export function bindGlobalSettings(injectedDeps) {
   });
   elements.refreshFontScanButton?.addEventListener("click", () => {
     refreshFontScan();
+  });
+  elements.checkForUpdatesButton?.addEventListener("click", () => {
+    checkForUpdates();
+  });
+  elements.applyUpdateButton?.addEventListener("click", () => {
+    applyUpdate();
   });
   elements.resetShortcutsButton?.addEventListener("click", () => {
     if (state.globalConfig?.config) {

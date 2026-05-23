@@ -248,6 +248,9 @@ app.include_router(_dev_tools_router)
 # JS ライブラリ (three / mp4box) の vendor 管理。詳細は app/vendor.py。
 from . import vendor as vendor_mod  # noqa: E402
 
+# アプリ内アップデータ (git pull ラッパ)。詳細は app/update.py。
+from . import update as update_mod  # noqa: E402
+
 # デフォルトフォント (Noto Sans JP) のインストール。詳細は app/fonts.py。
 from . import fonts as fonts_mod  # noqa: E402
 
@@ -4269,6 +4272,39 @@ def fonts_scan_detail_endpoint() -> dict[str, Any]:
         "weightChoices": weight_choices,
         "overrides": overrides,
     }
+
+
+# ============================================================================
+# アプリ内アップデータ (git pull ラッパ)
+# ============================================================================
+
+@app.get("/api/update/check")
+def update_check_endpoint() -> dict[str, Any]:
+    """origin/main を fetch して HEAD との差分を返す。UI の「アップデートを確認」用。"""
+    return update_mod.check_for_updates()
+
+
+@app.post("/api/update/apply")
+def update_apply_endpoint(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """git pull を実行してアップデートを適用する。
+
+    Payload (全て optional):
+      - includeAssets: bool (default False) — assets/ も最新版に上書きするか
+      - backup:        bool (default True)  — 適用前にバックアップを取るか
+      - discardLocalChanges: bool (default False) — modified file を破棄して進めるか
+    """
+    payload = payload or {}
+    include_assets = bool(payload.get("includeAssets", False))
+    backup = bool(payload.get("backup", True))
+    discard = bool(payload.get("discardLocalChanges", False))
+    try:
+        return update_mod.apply_update(
+            include_assets=include_assets,
+            backup=backup,
+            discard_local_changes=discard,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"アップデートの実行に失敗しました: {exc}") from exc
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
