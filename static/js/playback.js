@@ -5,6 +5,7 @@ import { drawTimeline, autoScrollTimelineToCursor, autoScrollCutListToActive } f
 import { PROJECT_FPS, clampCharacterAnimationFps } from "./timecode.js";
 import { cutStartFrame, cutDurationFrame, cutStartSec, cutDurationSec } from "./scenario.js";
 import { captureAndUploadThumbnail } from "./thumbnail.js";
+import { getFontsEpoch } from "./font.js";
 
 // =============================================================================
 // v2 (WebGL + three.js) renderer
@@ -1784,7 +1785,11 @@ async function renderPreviewV2(cut, requestId) {
   //   まま新フレームへ滑らかに切り替わる。
   let sceneInstance = null;
   const activeToken = v2.getActiveSceneToken?.();
-  if (activeToken && layerData.token && activeToken === layerData.token) {
+  // scene-builder は token に `#fe${fontsEpoch}` suffix を付与する
+  // (= フォントロード後に再 build を強制する仕組み)。比較側でも同じ suffix を
+  // 付けないと cut 切替で毎回再 build になってしまうので、ここで suffix を揃える。
+  const expectedToken = layerData.token ? `${layerData.token}#fe${getFontsEpoch()}` : null;
+  if (activeToken && expectedToken && activeToken === expectedToken) {
     sceneInstance = v2.getActiveScene?.();
   }
   if (!sceneInstance) {
@@ -2233,7 +2238,10 @@ export async function playLiveCutV2(cut, _options = {}) {
   // 旧 scene が見え続けるので、透明フラッシュが消える方向)。
   let sceneInstance = null;
   const activeToken = v2.getActiveSceneToken ? v2.getActiveSceneToken() : null;
-  if (activeToken && layerData.token && activeToken === layerData.token) {
+  // ★ scene-builder の token suffix (`#fe<fontsEpoch>`) と一致比較する
+  //   (フォントロード後の再 build 強制ロジック、playLiveCutV2 と同じ趣旨)。
+  const expectedToken = layerData.token ? `${layerData.token}#fe${getFontsEpoch()}` : null;
+  if (activeToken && expectedToken && activeToken === expectedToken) {
     sceneInstance = v2.getActiveScene ? v2.getActiveScene() : null;
   }
   if (!sceneInstance) {
