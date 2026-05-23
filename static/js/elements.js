@@ -468,7 +468,7 @@ export const elements = {
   globalBackupIntervalInput: document.querySelector("#globalBackupIntervalInput"),
   globalBackupRetentionInput: document.querySelector("#globalBackupRetentionInput"),
   globalCacheAutoPruneInput: document.querySelector("#globalCacheAutoPruneInput"),
-  globalCacheAutoPruneDaysInput: document.querySelector("#globalCacheAutoPruneDaysInput"),
+  globalCacheAutoPruneHoursInput: document.querySelector("#globalCacheAutoPruneHoursInput"),
   globalFfmpegPathInput: document.querySelector("#globalFfmpegPathInput"),
   globalFfmpegResolved: document.querySelector("#globalFfmpegResolved"),
   globalProjectsPathInput: document.querySelector("#globalProjectsPathInput"),

@@ -1963,6 +1963,10 @@
               <span class="msym button-icon" aria-hidden="true">memory</span>
               <span>キャッシュ</span>
             </button>
+            <button class="settings-tab" data-global-tab="update" type="button">
+              <span class="msym button-icon" aria-hidden="true">system_update</span>
+              <span>アップデート</span>
+            </button>
           </div>
           <div class="settings-content">
             <section class="settings-group" data-global-tab-panel="video">
@@ -2094,24 +2098,6 @@
                 </button>
               </div>
               <div id="globalFontScanList" class="font-scan-list"></div>
-              <h3>アップデート</h3>
-              <p class="asset-hint">
-                最新版が公開されているか確認し、ボタン 1 つで取得できます。
-                あなたが作ったプロジェクトやアップロード済み素材は、アップデートで消えません。
-                既定では <code>app_state/backups/</code> にバックアップを取ってから更新します。
-              </p>
-              <div id="globalUpdateStatus" class="asset-hint" aria-live="polite">未確認</div>
-              <div class="preset-list-actions">
-                <button type="button" id="checkForUpdatesButton" class="link-button">
-                  <span class="msym button-icon" aria-hidden="true">cloud_download</span>
-                  <span>アップデートを確認</span>
-                </button>
-                <button type="button" id="applyUpdateButton" class="link-button hidden">
-                  <span class="msym button-icon" aria-hidden="true">system_update</span>
-                  <span>アップデートを実行</span>
-                </button>
-              </div>
-              <div id="globalUpdateDetails" class="update-details hidden"></div>
             </section>
             <section class="settings-group hidden" data-global-tab-panel="tts">
               <h3>VOICEVOX</h3>
@@ -2202,13 +2188,34 @@
                   起動時に古いキャッシュを自動削除する
                 </label>
                 <label>
-                  保持期間 (日)
-                  <input id="globalCacheAutoPruneDaysInput" type="number" min="1" max="365" step="1" />
+                  保持期間 (時間)
+                  <input id="globalCacheAutoPruneHoursInput" type="number" min="1" max="8760" step="1" />
                 </label>
               </div>
               <p class="asset-hint">
-                例: 30 日 = mtime が 30 日より古いファイルだけ削除。現在使用中のキャッシュは触れません。
+                例: 6 時間 = mtime が 6 時間より古いファイルだけ削除。現在使用中のキャッシュは触れません。
+                既定 6 時間。長時間の連続編集でキャッシュが数 GB 規模に膨らむため、短めに設定しても再生成コストは体感差ありません。
               </p>
+            </section>
+            <section class="settings-group hidden" data-global-tab-panel="update">
+              <h3>アップデート</h3>
+              <p class="asset-hint">
+                最新版が公開されているか確認し、ボタン 1 つで取得できます。
+                あなたが作ったプロジェクトやアップロード済み素材は、アップデートで消えません。
+                既定では <code>app_state/backups/</code> にバックアップを取ってから更新します。
+              </p>
+              <div id="globalUpdateStatus" class="asset-hint" aria-live="polite">未確認</div>
+              <div class="preset-list-actions">
+                <button type="button" id="checkForUpdatesButton" class="link-button">
+                  <span class="msym button-icon" aria-hidden="true">cloud_download</span>
+                  <span>アップデートを確認</span>
+                </button>
+                <button type="button" id="applyUpdateButton" class="link-button hidden">
+                  <span class="msym button-icon" aria-hidden="true">system_update</span>
+                  <span>アップデートを実行</span>
+                </button>
+              </div>
+              <div id="globalUpdateDetails" class="update-details hidden"></div>
             </section>
           </div>
         </div>

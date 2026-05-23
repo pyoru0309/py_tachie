@@ -250,12 +250,14 @@ def default_global_config() -> dict[str, Any]:
         },
         # キャッシュ自動破棄 (アプリ起動時に preview/lipsync/clean_pcm から古いものを間引く)。
         # autoPruneOnStartup: True で起動時に prune_old_cache_files を実行。
-        # autoPruneOlderThanDays: mtime がこれより古いキャッシュファイルを削除。
-        #   既定 30 日は「素材編集を一段落させた後、別プロジェクトを触ってもひと月は
-        #   戻ってこない」想定の保守的な値。1〜365 にクランプ。
+        # autoPruneOlderThanHours: mtime がこれより古いキャッシュファイルを削除。
+        #   既定 6 時間は「半日の連続編集中に数 GB 蓄積する」現実値からの逆算。
+        #   キャッシュ生成コストはユーザー体感で気付かない (= 数 ms) のでデフォルトを
+        #   短く倒して、ディスク使用量を低く保つ。1〜8760 (= 1 年) にクランプ。
+        #   旧 autoPruneOlderThanDays (= 日単位) は load 時に Hours に migration する。
         "cache": {
             "autoPruneOnStartup": True,
-            "autoPruneOlderThanDays": 30,
+            "autoPruneOlderThanHours": 6,
         },
     }
 
@@ -361,12 +363,21 @@ def load_global_config() -> dict[str, Any]:
     cache_in = data.get("cache") if isinstance(data.get("cache"), dict) else {}
     if "autoPruneOnStartup" in cache_in:
         config["cache"]["autoPruneOnStartup"] = bool(cache_in["autoPruneOnStartup"])
-    if "autoPruneOlderThanDays" in cache_in:
+    # 旧キー autoPruneOlderThanDays (日単位) → autoPruneOlderThanHours (時間単位) に migration。
+    # 新キーが書かれていればそれを優先、無ければ旧キーを 24 倍して取り込む。
+    if "autoPruneOlderThanHours" in cache_in:
+        try:
+            hours = int(cache_in["autoPruneOlderThanHours"])
+        except (TypeError, ValueError):
+            hours = config["cache"]["autoPruneOlderThanHours"]
+        config["cache"]["autoPruneOlderThanHours"] = max(1, min(8760, hours))
+    elif "autoPruneOlderThanDays" in cache_in:
         try:
             days = int(cache_in["autoPruneOlderThanDays"])
+            hours = days * 24
         except (TypeError, ValueError):
-            days = config["cache"]["autoPruneOlderThanDays"]
-        config["cache"]["autoPruneOlderThanDays"] = max(1, min(365, days))
+            hours = config["cache"]["autoPruneOlderThanHours"]
+        config["cache"]["autoPruneOlderThanHours"] = max(1, min(8760, hours))
     return config
 
 
@@ -495,16 +506,25 @@ def save_global_config(payload: dict[str, Any]) -> dict[str, Any]:
         cache_in = payload.get("cache") if isinstance(payload.get("cache"), dict) else None
         if cache_in is not None:
             cache_out = config.setdefault(
-                "cache", {"autoPruneOnStartup": True, "autoPruneOlderThanDays": 30}
+                "cache", {"autoPruneOnStartup": True, "autoPruneOlderThanHours": 6}
             )
             if "autoPruneOnStartup" in cache_in:
                 cache_out["autoPruneOnStartup"] = bool(cache_in["autoPruneOnStartup"])
-            if "autoPruneOlderThanDays" in cache_in:
+            if "autoPruneOlderThanHours" in cache_in:
+                try:
+                    hours = int(cache_in["autoPruneOlderThanHours"])
+                except (TypeError, ValueError):
+                    raise ValueError("autoPruneOlderThanHours must be an integer")
+                cache_out["autoPruneOlderThanHours"] = max(1, min(8760, hours))
+            elif "autoPruneOlderThanDays" in cache_in:
+                # 旧クライアントから日単位で送られてきた場合の互換取り込み
                 try:
                     days = int(cache_in["autoPruneOlderThanDays"])
                 except (TypeError, ValueError):
                     raise ValueError("autoPruneOlderThanDays must be an integer")
-                cache_out["autoPruneOlderThanDays"] = max(1, min(365, days))
+                cache_out["autoPruneOlderThanHours"] = max(1, min(8760, days * 24))
+            # 旧フィールドはディスクに残さない (新クライアントに混乱を与えるため)
+            cache_out.pop("autoPruneOlderThanDays", None)
     GLOBAL_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     GLOBAL_CONFIG_PATH.write_text(
         json.dumps(config, ensure_ascii=False, indent=2),

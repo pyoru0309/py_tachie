@@ -400,25 +400,26 @@ def startup() -> None:
         ensure_config(ctx)
     # キャッシュ自動間引き (mtime 古いものを削除)。長期に触っていない
     # `cache/preview/` / `cache/lipsync/` / `cache/clean_pcm/` を間引く。
-    # 既定 30 日。今 active project の token は最近 touch されているので
+    # 既定 6 時間。今 active project の token は最近 touch されているので
     # 削除されない (= 起動直後 hit の速攻性は維持)。
+    # 旧キー autoPruneOlderThanDays は global_config 側で Hours に migration 済み。
     cache_cfg = global_config.get("cache") or {}
     if cache_cfg.get("autoPruneOnStartup", True):
         try:
-            days = int(cache_cfg.get("autoPruneOlderThanDays") or 30)
+            hours = int(cache_cfg.get("autoPruneOlderThanHours") or 6)
         except (TypeError, ValueError):
-            days = 30
-        days = max(1, min(365, days))
+            hours = 6
+        hours = max(1, min(8760, hours))
         try:
-            counts = prune_old_cache_files(days)
+            counts = prune_old_cache_files(hours)
         except Exception as exc:  # noqa: BLE001
             app_logger("startup").warning("cache auto-prune failed: %s", exc)
         else:
             total = sum(counts.values())
             if total > 0:
                 app_logger("startup").info(
-                    "cache auto-prune (mtime > %d 日): preview=%d lipsync=%d cleanPcm=%d",
-                    days, counts["preview"], counts["lipsync"], counts["cleanPcm"],
+                    "cache auto-prune (mtime > %d 時間): preview=%d lipsync=%d cleanPcm=%d",
+                    hours, counts["preview"], counts["lipsync"], counts["cleanPcm"],
                 )
 
 
@@ -3376,8 +3377,8 @@ def empty_shared_cache(*, include_clean_pcm: bool = True) -> dict[str, int]:
     return {"cleanPcm": clean_pcm_removed}
 
 
-def prune_old_cache_files(older_than_days: int) -> dict[str, int]:
-    """mtime が ``older_than_days`` より古いキャッシュファイルを削除。
+def prune_old_cache_files(older_than_hours: int) -> dict[str, int]:
+    """mtime が ``older_than_hours`` より古いキャッシュファイルを削除。
 
     対象:
       - `projects/<id>/cache/preview/` 配下のファイル
@@ -3387,10 +3388,10 @@ def prune_old_cache_files(older_than_days: int) -> dict[str, int]:
     `thumbnail.png` / `psd-importer/` は対象外 (= 別仕組みで管理されているため)。
     返り値は削除件数 (項目別)。
     """
-    if older_than_days <= 0:
+    if older_than_hours <= 0:
         return {"preview": 0, "lipsync": 0, "cleanPcm": 0}
     import time as _time
-    cutoff = _time.time() - older_than_days * 86400
+    cutoff = _time.time() - older_than_hours * 3600
 
     def _prune(path: Path) -> int:
         if not path.exists():

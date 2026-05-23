@@ -139,8 +139,13 @@ function renderGlobalSettings() {
   if (elements.globalCacheAutoPruneInput) {
     elements.globalCacheAutoPruneInput.checked = cacheCfg.autoPruneOnStartup !== false;
   }
-  if (elements.globalCacheAutoPruneDaysInput) {
-    elements.globalCacheAutoPruneDaysInput.value = cacheCfg.autoPruneOlderThanDays ?? 30;
+  if (elements.globalCacheAutoPruneHoursInput) {
+    // 旧 autoPruneOlderThanDays が残っていれば 24 倍して読む (= migration はサーバ側で
+    // やっているので普通は autoPruneOlderThanHours が入っている)。
+    const fallbackHours = cacheCfg.autoPruneOlderThanDays != null
+      ? Number(cacheCfg.autoPruneOlderThanDays) * 24
+      : 6;
+    elements.globalCacheAutoPruneHoursInput.value = cacheCfg.autoPruneOlderThanHours ?? fallbackHours;
   }
   if (elements.globalFfmpegPathInput) {
     elements.globalFfmpegPathInput.value = data.config.ffmpegPath || "";
@@ -874,9 +879,9 @@ async function saveGlobalSettings() {
     },
     cache: {
       autoPruneOnStartup: !!(elements.globalCacheAutoPruneInput?.checked),
-      autoPruneOlderThanDays: Math.max(
+      autoPruneOlderThanHours: Math.max(
         1,
-        Math.min(365, Number(elements.globalCacheAutoPruneDaysInput?.value) || cfg.cache?.autoPruneOlderThanDays || 30)
+        Math.min(8760, Number(elements.globalCacheAutoPruneHoursInput?.value) || cfg.cache?.autoPruneOlderThanHours || 6)
       ),
     },
     // renderer.version は v2 固定 (UI / バックエンドとも撤去済み)。payload には乗せない。
