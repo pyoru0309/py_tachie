@@ -24,7 +24,6 @@
 import { drawCaptionClip, releaseTextScratch } from "./text-core.js";
 import { getEffectPreset, resolveRuntimeFlags } from "./text-effects.js";
 import { PROJECT_FPS } from "../timecode.js";
-import { getFontsEpoch } from "../font.js";
 // 副作用登録: プリセットを全部読み込む。
 import "./text-effects/index.js";
 
@@ -297,11 +296,6 @@ function _staticClipFingerprint(clip) {
     clip.effectPreset || "",
     JSON.stringify(clip.effectParams || {}),
     JSON.stringify(clip.animation || {}),
-    // fontsEpoch を含めることで、フォントロード後に fingerprint が変わり
-    // offscreen キャッシュが invalidate される。これがないと「未ロード状態で
-    // 焼かれた古い canvas2D texture」がフォントロード後も使われ続け、
-    // preview と PNG 出力でフォントが食い違う事象が起きる。
-    `fe${getFontsEpoch()}`,
   ].join("|");
 }
 

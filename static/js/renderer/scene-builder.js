@@ -29,7 +29,6 @@ import { createBlurPass } from "./effects/gaussian-blur.js";
 import { createCoverPass } from "./effects/cover.js";
 import { createTintPlane, setTint } from "./effects/tint.js";
 import { createCharacterMaterial } from "./effects/character-material.js";
-import { preloadSceneFonts } from "../font.js";
 import {
   createDialogueCanvasTexture,
   drawDialogueOnCanvas,
@@ -394,12 +393,9 @@ async function buildTelops(scene, layerData) {
   const telops = Array.isArray(layerData?.telops) ? layerData.telops : null;
   if (!telops || telops.length === 0) return null;
   // FontFace のロードが終わるのを待ってから 1 度初期化描画する。dialogue 経路と同じ。
-  // document.fonts.ready だけでは特定 (family, weight) の解決が保証されないため、
-  // 各 telop の fontSpec を preloadSceneFonts で明示的に load する。
   if (document.fonts?.ready) {
     try { await document.fonts.ready; } catch {}
   }
-  try { await preloadSceneFonts(layerData); } catch {}
   // ★ Phase 3: renderLayer ごとに plane を分ける。
   //   各 clip の renderLayer (overlay / above_bg / above_chars / above_fg) を見て
   //   グループ化、そのキーごとに 1 plane を作成。該当 clip がないキーは plane を
@@ -500,14 +496,9 @@ async function buildDialogue(scene, layerData, urls, options = {}) {
   if (!dialogue || !dialogue.raw) return null;
   // FontFace のロードを待つ。未ロード状態で描くとシステムフォントへ
   // フォールバックされて期待と違う絵になる。
-  // document.fonts.ready は「現在登録されている全 face 完了」だけを保証するが、
-  // 特定 (family, weight) の解決は別問題 (= ctx.font 設定時にブラウザが
-  // サイレント fallback する)。preloadSceneFonts で具体 fontSpec を
-  // document.fonts.load() で明示 await して取り違えを防ぐ。
   if (document.fonts?.ready) {
     try { await document.fonts.ready; } catch {}
   }
-  try { await preloadSceneFonts(layerData); } catch {}
   const raw = dialogue.raw;
   // セリフ枠の背景 / ボーダーは独自 blend (screen / multiply) を使うため別 plane へ。
   // boxOpacity (0..255) を 0..1 正規化して shader uOpacity に渡す。0 で完全に no-op。
@@ -1238,12 +1229,7 @@ export async function buildScene(
   // token は scene-bundle が返した payload SHA1 (state hash)。playLiveCutV2 が
   // 「同じ token = 同じ state」のときに dispose+build を skip して既存 scene を
   // 流用するために露出しておく。
-  // ★ fontsEpoch を suffix として混ぜることで、フォントロード前に build した
-  //   scene が、フォントロード後に「同じ token だから再利用」されて古い canvas2D
-  //   texture (= Noto Sans フォールバックで焼かれた dialogue/telop) を使い続ける
-  //   現象を防ぐ。fontsEpoch が変われば token も変わり、再 build される。
-  const baseToken = layerData?.token || null;
-  const token = baseToken ? `${baseToken}#fe${getFontsEpoch()}` : null;
+  const token = layerData?.token || null;
 
   // meshes は本番フローでは外から触らないが、PoC ベンチが visualizer 内部状態へ
   // 介入できるようにここで露出する (v2-export-bench: preloadVisualizerImages)。
