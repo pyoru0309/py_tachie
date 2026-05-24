@@ -534,6 +534,7 @@ function endCutTransition() {
 export function clearPreviewLayerCache() {
   clearSceneBundlePrefetchCache();
   clearAudioPrefetchCache();
+  clearPrefetchedSceneInstances();
 }
 
 function generateBlinkStarts(duration) {
@@ -1982,6 +1983,96 @@ function clearSceneBundlePrefetchCache() {
   sceneBundlePrefetchCache.clear();
 }
 
+// =============================================================================
+// scene instance prefetch (Phase 3, 2026-05-24): 次カットの SceneInstance を裏で
+// pre-build しておき、切替時に setActiveScene するだけで使えるようにする。
+//
+// 動機: Windows ANGLE で buildScene が偶発的に 200-450ms 跳ねる (= shader compile /
+// texture upload の初回コスト)。事前 build により cut N 再生中に GPU が遊ぶ時間で
+// この処理を片付け、cut N+1 切替時の buildScene 時間を ≒0 に近づける。
+//
+// 制約:
+//   - 動画レイヤー (= scene.videoLayers[]) を含むカットは対象外。
+//     videoLayerProvidersById は playLiveCutV2 内で毎カット作り直されるため、
+//     事前 build 時点で provider が確定しない (lifecycle 干渉のリスク)。
+//   - renderer はシングルトンなので、build を直列化する (= serial queue)。
+//     同時に 2 つの buildScene が走ると cover RT 等の state が混ざる可能性。
+//
+// lifecycle:
+//   - prefetch: cache に Promise<SceneInstance> を入れる
+//   - take: 取り出し (= cache から削除、所有権移譲)。setActiveScene で active 化
+//   - clear: stop / project 切替 / config change で全 dispose
+//     (active scene にすでに昇格していたものは disposeActiveScene 側で扱う)
+// =============================================================================
+const sceneInstancePrefetchCache = new Map();
+let _sceneInstanceBuildQueue = Promise.resolve();
+
+function _hasVideoLayers(layerData) {
+  const v = layerData?.videoLayers;
+  return Array.isArray(v) && v.length > 0;
+}
+
+// 直列化された buildSceneFromLayerData。前の build が終わるまで次は待つ。
+function _serialBuildScene(layerData, videoLayerProvidersById, videoLayerDurations) {
+  const next = _sceneInstanceBuildQueue.then(async () => {
+    const { buildSceneFromLayerData } = await import("/static/js/renderer/index.js");
+    return buildSceneFromLayerData(
+      layerData, null,
+      videoLayerProvidersById, videoLayerDurations,
+    );
+  });
+  _sceneInstanceBuildQueue = next.catch(() => {});
+  return next;
+}
+
+function prefetchSceneInstance(cut) {
+  if (!cut?.id) return;
+  if (sceneInstancePrefetchCache.has(cut.id)) return;
+  // scene-bundle の prefetch が無ければ並行で発火させる (= bundle Promise を取る)
+  prefetchSceneBundleV2(cut);
+  const bundlePromise = sceneBundlePrefetchCache.get(cut.id);
+  if (!bundlePromise) return;
+  const promise = bundlePromise.then(async (layerData) => {
+    if (!layerData) return null;
+    // 動画レイヤーありカットは事前 build 対象外 (provider lifecycle 制約)。
+    // playLiveCutV2 で従来通り同期 build される。
+    if (_hasVideoLayers(layerData)) return null;
+    // hasVideoTrack (= scene.videoTrack) も同様に provider 経由なので除外
+    if (layerData.hasVideoTrack) return null;
+    try {
+      return await _serialBuildScene(layerData, null, state.videoLayerDurations);
+    } catch (err) {
+      console.warn("[scene-instance] prefetch build failed", err);
+      return null;
+    }
+  });
+  sceneInstancePrefetchCache.set(cut.id, promise);
+  promise.then((inst) => {
+    if (!inst) sceneInstancePrefetchCache.delete(cut.id);
+  });
+}
+
+function takePrefetchedSceneInstance(cut) {
+  if (!cut?.id) return null;
+  const promise = sceneInstancePrefetchCache.get(cut.id);
+  if (!promise) return null;
+  sceneInstancePrefetchCache.delete(cut.id);
+  return promise; // Promise<SceneInstance | null>
+}
+
+function clearPrefetchedSceneInstances() {
+  const promises = Array.from(sceneInstancePrefetchCache.values());
+  sceneInstancePrefetchCache.clear();
+  // dispose は非同期 (= 各 Promise が resolve したら inst.dispose)
+  for (const p of promises) {
+    p.then((inst) => {
+      if (inst) {
+        try { inst.dispose?.(); } catch (_) { /* ignore */ }
+      }
+    }).catch(() => {});
+  }
+}
+
 // 全体設定の textDefaults / telopDefaults などプロジェクト config レベルの値が
 // 変わったときに呼ぶ。scene-bundle 自体の token はカット payload しか覆っていない
 // ので、設定変更だけだと token が同じまま active scene が再利用されてしまい、
@@ -1990,6 +2081,7 @@ function clearSceneBundlePrefetchCache() {
 // canvas を焼き直すため、prefetch / active scene の双方を捨てる。
 export async function invalidateRendererCachesForConfigChange() {
   clearSceneBundlePrefetchCache();
+  clearPrefetchedSceneInstances();
   try {
     const { disposeActiveScene } = await import("/static/js/renderer/index.js");
     disposeActiveScene?.();
@@ -2114,6 +2206,13 @@ function ensureLookahead(cuts, currentIndex, lookahead) {
     if (sceneBundlePrefetchCache.has(cut.id)) continue;
     prefetchSceneBundleV2(cut);
     prefetchAudioForCut(cut);
+  }
+  // Phase 3: 直後のカット (= lookahead=1 相当) は SceneInstance も裏で build。
+  // serial queue 経由なので、現カットの build が終わってから順次走る。
+  // video layer ありカットは prefetchSceneInstance 内で skip される。
+  const nextCut = cuts[currentIndex + 1];
+  if (nextCut?.id && !sceneInstancePrefetchCache.has(nextCut.id)) {
+    prefetchSceneInstance(nextCut);
   }
 }
 
@@ -2262,6 +2361,22 @@ export async function playLiveCutV2(cut, _options = {}) {
       try { audio.currentTime = initialOffset; } catch (_) { /* ignore */ }
     }
     audio.play().catch((error) => console.warn("Audio preview failed", error));
+  }
+
+  // Phase 3: 事前 build された SceneInstance があれば取り出して使う。
+  // video layer / videoTrack ありカットは prefetchSceneInstance 内で skip されるので、
+  // hit するのは「動画なしカット」のみ (= 大多数)。
+  if (!sceneInstance) {
+    const prefetched = takePrefetchedSceneInstance(cut);
+    if (prefetched) {
+      try {
+        const inst = await prefetched;
+        if (inst) {
+          sceneInstance = inst;
+          v2.setActiveScene(sceneInstance);
+        }
+      } catch (_err) { /* ignore: 失敗時は下の build にフォールバック */ }
+    }
   }
 
   if (!sceneInstance) {
