@@ -2007,9 +2007,35 @@ function clearSceneBundlePrefetchCache() {
 const sceneInstancePrefetchCache = new Map();
 let _sceneInstanceBuildQueue = Promise.resolve();
 
-function _hasVideoLayers(layerData) {
+// scene-level の videoLayers から、cut の時間範囲に重なる layer が 1 つでもあるか判定。
+// 重なる = preview で「この cut の間に動画が流れる」状態 → provider 経路が必要。
+// 重ならない = この cut の間は動画なし → prefetch 対象にできる。
+//
+// layer の終了 frame は trimEnd - trimStart を fps 倍した値。speed は無視 (= 1.0
+// 既定、速度変更ありなら厳密には short になるが安全側に倒すため 1.0 で計算)。
+function _videoLayerOverlapsCut(layer, cutStartFrame, cutDurationFrame) {
+  const layerStart = Math.max(0, Number(layer?.startFrame) || 0);
+  const trimStart = Math.max(0, Number(layer?.trimStartSec) || 0);
+  const trimEndRaw = layer?.trimEndSec;
+  const trimEnd = trimEndRaw == null ? null : Math.max(trimStart, Number(trimEndRaw) || trimStart);
+  if (trimEnd == null) {
+    // 終端未指定 = 「素材末尾まで」。長さ不明なので「重なる可能性あり」を安全側で返す。
+    return true;
+  }
+  const layerLenFrames = Math.max(1, Math.round((trimEnd - trimStart) * PROJECT_FPS));
+  const layerEnd = layerStart + layerLenFrames;
+  const cutEnd = cutStartFrame + cutDurationFrame;
+  // 半開区間 [start, end) の重なり判定
+  return layerStart < cutEnd && layerEnd > cutStartFrame;
+}
+
+function _anyActiveVideoLayer(layerData, cutStartFrame, cutDurationFrame) {
   const v = layerData?.videoLayers;
-  return Array.isArray(v) && v.length > 0;
+  if (!Array.isArray(v) || v.length === 0) return false;
+  for (const layer of v) {
+    if (_videoLayerOverlapsCut(layer, cutStartFrame, cutDurationFrame)) return true;
+  }
+  return false;
 }
 
 // 直列化された buildSceneFromLayerData。前の build が終わるまで次は待つ。
@@ -2040,6 +2066,10 @@ function prefetchSceneInstance(cut) {
     if (window.__spliteCutPerf) console.log(`[scene-prefetch] skip (already cached) ${cut.id}`);
     return;
   }
+  // cut の時間範囲を計算 (= active な videoLayer 判定のため)
+  const cutStartFrameVal = cutStartFrame(cut);
+  const cutDurationFrameVal = cutDurationFrame(cut);
+
   // scene-bundle の prefetch が無ければ並行で発火させる (= bundle Promise を取る)
   prefetchSceneBundleV2(cut);
   const bundlePromise = sceneBundlePrefetchCache.get(cut.id);
@@ -2053,17 +2083,18 @@ function prefetchSceneInstance(cut) {
       if (window.__spliteCutPerf) console.log(`[scene-prefetch] no layerData ${cut.id}`);
       return null;
     }
-    // 動画レイヤーありカットは事前 build 対象外 (provider lifecycle 制約)。
-    // playLiveCutV2 で従来通り同期 build される。
-    if (_hasVideoLayers(layerData)) {
-      if (window.__spliteCutPerf) console.log(`[scene-prefetch] skip videoLayers ${cut.id}`);
-      return null;
-    }
-    // videoTrack (= scene 全体の背景動画) も同様に provider 経由なので除外。
+    // videoTrack (= scene 全体の背景動画) は provider 経由なので除外。
     // ★ playLiveCutV2 内で書き加えられる layerData.hasVideoTrack はここでは未定義。
     //   scene-bundle response の videoTrack.src を直接見る必要がある。
     if (layerData.videoTrack?.src) {
       if (window.__spliteCutPerf) console.log(`[scene-prefetch] skip videoTrack ${cut.id}`);
+      return null;
+    }
+    // 動画レイヤーは scene-level の配列で、それぞれ時間範囲を持つ。cut の時間範囲に
+    // 重なる layer が 1 つもなければ、この cut の間は動画レイヤーが描画されないので
+    // provider 不要 → prefetch 対象にできる。
+    if (_anyActiveVideoLayer(layerData, cutStartFrameVal, cutDurationFrameVal)) {
+      if (window.__spliteCutPerf) console.log(`[scene-prefetch] skip active videoLayer ${cut.id}`);
       return null;
     }
     try {
