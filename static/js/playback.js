@@ -19,6 +19,20 @@ async function loadRendererV2() {
   return _v2ModulePromise;
 }
 
+// preview canvas の CSS 表示サイズ × DPR を GL 出力 framebuffer サイズに反映する。
+// scene 内座標は scene-builder の CANVAS_WIDTH/HEIGHT (= 1920×1080) を維持するので、
+// shader / mesh / texture には影響しない。rasterize / blend のコストだけ軽くなる
+// (動画ソフトのプロクシ相当)。PNG 出力 / 動画書き出し時は呼び出し側で
+// CANVAS_WIDTH×CANVAS_HEIGHT に戻す (captureSceneSnapshot / v2-export 経路)。
+function applyPreviewRendererSize(v2, canvas) {
+  if (!v2?.setRendererOutputSize || !canvas) return;
+  const cssW = canvas.clientWidth || 0;
+  const cssH = canvas.clientHeight || 0;
+  if (cssW <= 0 || cssH <= 0) return;
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  v2.setRendererOutputSize(Math.round(cssW * dpr), Math.round(cssH * dpr));
+}
+
 let deps = {
   loadCut: async () => {},
   payload: () => ({}),
@@ -1724,6 +1738,7 @@ async function renderPreviewV2(cut, requestId) {
   if (!canvas) throw new Error("livePreviewWebglCanvas not found");
   const v2 = await loadRendererV2();
   v2.initRenderer(canvas);
+  applyPreviewRendererSize(v2, canvas);
 
   const sceneVideo = state.scenario?.scenes?.[0]?.videoTrack || null;
   const hasVideoTrack = !!(sceneVideo && sceneVideo.src);
@@ -2166,6 +2181,7 @@ export async function playLiveCutV2(cut, _options = {}) {
   try {
     v2 = await loadRendererV2();
     v2.initRenderer(canvas);
+    applyPreviewRendererSize(v2, canvas);
   } catch (error) {
     abortV2Playback("three.js / WebGL の初期化に失敗", error);
     return;
