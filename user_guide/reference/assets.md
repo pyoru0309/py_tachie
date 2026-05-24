@@ -45,7 +45,7 @@ projects/<project_id>/
 
 音声は `audio/` に置きます。対応拡張子は `.wav` / `.mp3` / `.m4a` / `.aac` / `.ogg` です。
 カットに音声を設定すると、口パク解析と動画書き出しの両方で利用されます。
-シーンの BGM (`bgmTracks`) も同じ拡張子をサポートし、`volume` / `fadeInSec` / `fadeOutSec` / `useForLipSync` で挙動を調整します。
+シーンの BGM (`bgmTracks`) も同じ拡張子をサポートし、`volume` / `trimStartSec` / `fadeInSec` / `fadeOutSec` / `useForLipSync` / `loop` で挙動を調整します。
 
 ## 効果音
 

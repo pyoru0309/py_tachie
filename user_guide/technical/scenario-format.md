@@ -84,16 +84,16 @@
 | `title` | UI に表示するシーン名 |
 | `background` | 静止画背景パス (videoTrack を使う場合は空でも可) |
 | `videoTrack` | 動画背景。`fit` (cover/contain/fit)、`muted`、`loop`、`trim`、`speed` を持つ |
-| `bgmTracks` | BGM 配列。`volume` / `fadeInSec` / `fadeOutSec` / `useForLipSync` を持つ |
-| `soundEffects` | 効果音配列。`{ id, src, startFrame, volume }` のみを持つ最小スキーマ。長さはアセットの長さがそのまま使われる |
+| `bgmTracks` | BGM 配列。`volume` / `trimStartSec` / `fadeInSec` / `fadeOutSec` / `useForLipSync` / `loop` を持つ |
+| `soundEffects` | 効果音配列。`{ id, src, startFrame, durationFrame, loop, fadeInSec, fadeOutSec, audioOffsetSec, volume, linkedCutId }` を持つ。詳細は下記 |
 | `videoLayers` | 動画レイヤー配列。短いクリップ (タイトル / トランジション / 解説動画) を任意区間に置く。下記参照 |
 | `bpm` | 任意。テロップやモーションの拍合わせに使用 |
 | `cuts` | カット配列 |
 | `telops` | テロップ配列 (カットと独立) |
 
-`bgmTracks[].useForLipSync` は 1 シーンにつき 1 トラックだけ ON にできます (ラジオ式)。ON のトラックが口パク解析の入力になります (歌唱+伴奏を分けて納品する場合などに使用)。
+`bgmTracks[].useForLipSync` は 1 シーンにつき 1 トラックだけ ON にできます (ラジオ式)。ON のトラックが口パク解析の入力になります (歌唱+伴奏を分けて納品する場合などに使用)。`loop` を ON にするとシーン終端まで素材を繰り返し再生します (複数 BGM が ON でも排他ではなく、それぞれ独立にループ)。
 
-`soundEffects[]` はテロップと同様の点配置で、`startFrame` (シーン頭からのフレーム) に到達した瞬間に発音し、アセット末尾で自然終了します。同じ時刻に複数の効果音を重ねることができます。フェードはサポートしていません。書き出しでは `adelay` + `volume` で `amix` に合流します。
+`soundEffects[]` はシーン中の任意位置に置ける効果音で、`startFrame` から `durationFrame` フレームだけ再生されます。`durationFrame=0` はアセット末尾までの自然終了。`loop=true` で素材長 < 区間長のとき素材を繰り返し、`audioOffsetSec` で素材内の頭出し位置 (= 素材の途中から鳴らす) を指定できます。`fadeInSec` / `fadeOutSec` は区間全体の先頭と末尾にだけ掛かります (= ループ反復の境目には掛けない)。同じ時刻に複数の効果音を重ねることもできます。書き出しでは `adelay` + `volume` + `atrim` で `amix` に合流します。
 
 ### videoLayers
 

@@ -238,7 +238,7 @@ git pull
   - 再生ヘッド位置はプロジェクトに保存され、再起動後にカット位置から復元
 - **動画書き出し (v2 GL → ffmpeg)**
   - GL canvas を WebGL2 PBO で読み出し → WebSocket で uvicorn → ffmpeg にパイプ
-  - 内蔵プリセット: H.264 標準 / H.264 高画質 / H.265 高効率 / ProRes 422 Proxy/HQ/4444 / QuickTime PNG / FFV1
+  - 内蔵プリセット: H.264 標準 / H.264 高画質 / H.265 高効率 / ProRes 422 Proxy/HQ/4444 / QuickTime PNG
   - alpha 対応プリセット (ProRes 4444 / QtPNG) は背景なしで透過動画として書き出し
   - HW エンコーダは `ffmpeg -encoders` を解析して自動検出。利用可能なものだけ UI に並ぶ
   - 書き出し中はバックグラウンドスレッドで実行し、フレーム単位の進捗をストリーム表示
@@ -265,7 +265,6 @@ git pull
 | ProRes 422 HQ | mov | 視覚ロスレスの編集中間 |
 | ProRes 4444 (alpha) | mov | アルファ付き透過素材 (合成素材納品向け) |
 | QuickTime PNG (alpha) | mov | 完全可逆 + アルファ。容量大 |
-| FFV1 (mkv) | mkv | 完全可逆。長期保管 |
 
 `writeup` 時に `ffmpeg` の能力を検出して、未搭載のエンコーダはダイアログ上で disabled になります。NVENC を使う場合は GPL ビルド版 ffmpeg を全体設定の `ffmpeg のパス` に指定してください。
 

@@ -1431,11 +1431,11 @@
 </tr>
 <tr>
 <td><code>bgmTracks</code></td>
-<td>BGM 配列。<code>volume</code> / <code>fadeInSec</code> / <code>fadeOutSec</code> / <code>useForLipSync</code> を持つ</td>
+<td>BGM 配列。<code>volume</code> / <code>trimStartSec</code> / <code>fadeInSec</code> / <code>fadeOutSec</code> / <code>useForLipSync</code> / <code>loop</code> を持つ</td>
 </tr>
 <tr>
 <td><code>soundEffects</code></td>
-<td>効果音配列。<code>{ id, src, startFrame, volume }</code> のみを持つ最小スキーマ。長さはアセットの長さがそのまま使われる</td>
+<td>効果音配列。<code>{ id, src, startFrame, durationFrame, loop, fadeInSec, fadeOutSec, audioOffsetSec, volume, linkedCutId }</code> を持つ。詳細は下記</td>
 </tr>
 <tr>
 <td><code>videoLayers</code></td>
@@ -1455,8 +1455,8 @@
 </tr>
 </tbody>
 </table>
-<p><code>bgmTracks[].useForLipSync</code> は 1 シーンにつき 1 トラックだけ ON にできます (ラジオ式)。ON のトラックが口パク解析の入力になります (歌唱+伴奏を分けて納品する場合などに使用)。</p>
-<p><code>soundEffects[]</code> はテロップと同様の点配置で、<code>startFrame</code> (シーン頭からのフレーム) に到達した瞬間に発音し、アセット末尾で自然終了します。同じ時刻に複数の効果音を重ねることができます。フェードはサポートしていません。書き出しでは <code>adelay</code> + <code>volume</code> で <code>amix</code> に合流します。</p>
+<p><code>bgmTracks[].useForLipSync</code> は 1 シーンにつき 1 トラックだけ ON にできます (ラジオ式)。ON のトラックが口パク解析の入力になります (歌唱+伴奏を分けて納品する場合などに使用)。<code>loop</code> を ON にするとシーン終端まで素材を繰り返し再生します (複数 BGM が ON でも排他ではなく、それぞれ独立にループ)。</p>
+<p><code>soundEffects[]</code> はシーン中の任意位置に置ける効果音で、<code>startFrame</code> から <code>durationFrame</code> フレームだけ再生されます。<code>durationFrame=0</code> はアセット末尾までの自然終了。<code>loop=true</code> で素材長 &lt; 区間長のとき素材を繰り返し、<code>audioOffsetSec</code> で素材内の頭出し位置 (= 素材の途中から鳴らす) を指定できます。<code>fadeInSec</code> / <code>fadeOutSec</code> は区間全体の先頭と末尾にだけ掛かります (= ループ反復の境目には掛けない)。同じ時刻に複数の効果音を重ねることもできます。書き出しでは <code>adelay</code> + <code>volume</code> + <code>atrim</code> で <code>amix</code> に合流します。</p>
 <h3 id="videolayers">videoLayers<a class="headerlink" href="#videolayers" title="Permanent link">&para;</a></h3>
 <p><code>scene.videoLayers[]</code> は <code>scene.videoTrack</code> (背景動画) と違い、シーン中の任意区間に置ける短いクリップを表します。フェード / 配置 / 拡縮 / z 位置 (キャラの前 or 後ろ) を指定でき、書き出しでは GL plane として焼き、音声は ffmpeg amix に合流します。</p>
 <table>

@@ -59,7 +59,7 @@
 1. ブラウザ側の three.js が 1 フレームずつ GL シーンを描画。
 2. WebGL2 PBO (Pixel Buffer Object) を 2〜3 段リングに分けて `clientWaitSync` で完了を待つ非同期 readback を行う。
 3. RGBA バッファを `/api/v2/export/ws` 経由で uvicorn に流す (圧縮 OFF: `--ws-per-message-deflate false` 必須)。
-4. uvicorn 側は ffmpeg を別プロセスで起動し、rawvideo パイプ → エンコーダ → mp4/mov/mkv へエンコード。
+4. uvicorn 側は ffmpeg を別プロセスで起動し、rawvideo パイプ → エンコーダ → mp4/mov へエンコード。
 5. `videoTrack` / テロップ / `bgmTracks` / セリフ音声は GL シーン側で焼き込み済みのため、ffmpeg では基本的に映像 + 音声 mux だけ。
 6. シーン間の `startFrame` のギャップはエンコーダ側でカット境界として処理。
 
