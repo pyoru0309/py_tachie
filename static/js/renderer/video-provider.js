@@ -415,6 +415,16 @@ export class WebCodecsVideoProvider {
     const mp4boxMod = await import("mp4box");
     const MP4Box = mp4boxMod.default || mp4boxMod;
     if (!MP4Box?.createFile) throw new Error("mp4box: createFile not found in module");
+    // mov コンテナ (= 画面録画素材で多い) に含まれる未知 atom や padding を
+    // mp4box が `[BoxParser] Box of type '...' has a size N greater than ...`
+    // と error level で大量に console.error する問題の抑制。setLogLevel(5) は
+    // mp4box 0.5.2 の「全 log silent」レベル (内部閾値 5 > error=4)。
+    // 致命的な demux 失敗は file.onError コールバックが reject で別途補足するので、
+    // ここで silent にしても問題は検出できる。grobal singleton のため初回 1 度で良い。
+    const Log = mp4boxMod.Log || MP4Box?.Log;
+    if (Log && typeof Log.setLogLevel === "function") {
+      Log.setLogLevel(5);
+    }
     const file = MP4Box.createFile();
 
     const trackInfo = await new Promise((resolve, reject) => {
