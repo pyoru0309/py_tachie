@@ -26,7 +26,7 @@ PSD レイヤー付きキャラクター・PNG/WebP 立ち絵・動画背景・B
 
 本ツールで実際に作った紹介動画をニコニコ動画で公開しています。立ち絵・セリフ・テロップ・効果音・BGM の組み合わせで、どんな仕上がりになるかご覧いただけます。
 
-[![立ち絵システム 紹介動画](https://nicovideo.cdn.nimg.jp/thumbnails/46350304/46350304.L)](https://www.nicovideo.jp/watch/sm46350304)
+[![立ち絵システム 紹介動画](promo/intro_thumb.png)](https://www.nicovideo.jp/watch/sm46350304)
 
 ▶ 視聴ページ: <https://www.nicovideo.jp/watch/sm46350304>
 
