@@ -2017,12 +2017,18 @@ function _hasVideoLayers(layerData) {
 // prefetch build が並列に走ると state が混ざって結果が壊れる。playLiveCutV2 の
 // 同期 build 経路もこの queue を通すことで、prefetch との競合を排除する。
 function _serialBuildScene(layerData, videoProvider, videoLayerProvidersById, videoLayerDurations) {
+  const tag = layerData?.token ? `[serial-build] ${layerData.token.slice(0, 8)}` : "[serial-build]";
+  const queuedAt = performance.now();
   const next = _sceneInstanceBuildQueue.then(async () => {
+    if (window.__spliteCutPerf) console.log(`${tag} start (waited ${(performance.now() - queuedAt).toFixed(1)}ms in queue)`);
+    const startedAt = performance.now();
     const { buildSceneFromLayerData } = await import("/static/js/renderer/index.js");
-    return buildSceneFromLayerData(
+    const inst = await buildSceneFromLayerData(
       layerData, videoProvider,
       videoLayerProvidersById, videoLayerDurations,
     );
+    if (window.__spliteCutPerf) console.log(`${tag} done in ${(performance.now() - startedAt).toFixed(1)}ms`);
+    return inst;
   });
   _sceneInstanceBuildQueue = next.catch(() => {});
   return next;
@@ -2030,24 +2036,42 @@ function _serialBuildScene(layerData, videoProvider, videoLayerProvidersById, vi
 
 function prefetchSceneInstance(cut) {
   if (!cut?.id) return;
-  if (sceneInstancePrefetchCache.has(cut.id)) return;
+  if (sceneInstancePrefetchCache.has(cut.id)) {
+    if (window.__spliteCutPerf) console.log(`[scene-prefetch] skip (already cached) ${cut.id}`);
+    return;
+  }
   // scene-bundle の prefetch が無ければ並行で発火させる (= bundle Promise を取る)
   prefetchSceneBundleV2(cut);
   const bundlePromise = sceneBundlePrefetchCache.get(cut.id);
-  if (!bundlePromise) return;
+  if (!bundlePromise) {
+    if (window.__spliteCutPerf) console.log(`[scene-prefetch] no bundle promise ${cut.id}`);
+    return;
+  }
+  if (window.__spliteCutPerf) console.log(`[scene-prefetch] start ${cut.id}`);
   const promise = bundlePromise.then(async (layerData) => {
-    if (!layerData) return null;
+    if (!layerData) {
+      if (window.__spliteCutPerf) console.log(`[scene-prefetch] no layerData ${cut.id}`);
+      return null;
+    }
     // 動画レイヤーありカットは事前 build 対象外 (provider lifecycle 制約)。
     // playLiveCutV2 で従来通り同期 build される。
-    if (_hasVideoLayers(layerData)) return null;
+    if (_hasVideoLayers(layerData)) {
+      if (window.__spliteCutPerf) console.log(`[scene-prefetch] skip videoLayers ${cut.id}`);
+      return null;
+    }
     // videoTrack (= scene 全体の背景動画) も同様に provider 経由なので除外。
     // ★ playLiveCutV2 内で書き加えられる layerData.hasVideoTrack はここでは未定義。
     //   scene-bundle response の videoTrack.src を直接見る必要がある。
-    if (layerData.videoTrack?.src) return null;
+    if (layerData.videoTrack?.src) {
+      if (window.__spliteCutPerf) console.log(`[scene-prefetch] skip videoTrack ${cut.id}`);
+      return null;
+    }
     try {
-      return await _serialBuildScene(layerData, null, null, state.videoLayerDurations);
+      const inst = await _serialBuildScene(layerData, null, null, state.videoLayerDurations);
+      if (window.__spliteCutPerf) console.log(`[scene-prefetch] built ${cut.id}`);
+      return inst;
     } catch (err) {
-      console.warn("[scene-instance] prefetch build failed", err);
+      console.warn("[scene-prefetch] build failed", err);
       return null;
     }
   });
@@ -2060,8 +2084,12 @@ function prefetchSceneInstance(cut) {
 function takePrefetchedSceneInstance(cut) {
   if (!cut?.id) return null;
   const promise = sceneInstancePrefetchCache.get(cut.id);
-  if (!promise) return null;
+  if (!promise) {
+    if (window.__spliteCutPerf) console.log(`[scene-prefetch] MISS ${cut.id}`);
+    return null;
+  }
   sceneInstancePrefetchCache.delete(cut.id);
+  if (window.__spliteCutPerf) console.log(`[scene-prefetch] HIT ${cut.id}`);
   return promise; // Promise<SceneInstance | null>
 }
 
