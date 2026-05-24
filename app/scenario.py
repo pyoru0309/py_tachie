@@ -1705,7 +1705,7 @@ def _normalize_scene_visualizer(raw: Any) -> dict[str, Any]:
     plugin_key = str(raw.get("pluginKey") or "").strip()
     audio_track_id = str(raw.get("audioTrackId") or "").strip()
     layer = str(raw.get("layer") or "above_bg").strip().lower()
-    if layer not in ("above_bg", "above_chars", "above_fg"):
+    if layer not in ("below_bg", "above_bg", "above_chars", "above_fg"):
         layer = "above_bg"
     params_raw = raw.get("params")
     params: dict[str, Any] = {}

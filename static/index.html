@@ -987,7 +987,7 @@
           </section>
 
           <section class="form-tab-panel hidden" data-scene-tab-panel="visualizer">
-            <p class="asset-hint">背景の上、キャラクターの下に重なります。プラグインは plugins/visualizers/*.py に追加できます</p>
+            <p class="asset-hint">音声と連動した装飾をシーンに重ねます。プラグインは plugins/visualizers/*.py に追加できます。動画レイヤーは常にビジュアライザーより上 (= 背景の一種として) 重なります</p>
             <label class="checkbox-row">
               <input id="sceneVisualizerEnabledInput" type="checkbox" />
               ビジュアライザを表示
@@ -1006,7 +1006,8 @@
               <label>
                 重なり位置
                 <select id="sceneVisualizerLayerSelect">
-                  <option value="above_bg">背景の上 (キャラの下)</option>
+                  <option value="below_bg">背景の下 (背景色の上、背景画像の下)</option>
+                  <option value="above_bg">背景の上 (動画レイヤー・キャラの下)</option>
                   <option value="above_chars">キャラの上 (前景の下)</option>
                   <option value="above_fg">前景の上 (セリフの下)</option>
                 </select>

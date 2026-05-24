@@ -367,7 +367,7 @@ export function applySceneFieldsFromDialog() {
   scene.visualizer.pluginKey = String(elements.sceneVisualizerPlugin?.value || "");
   scene.visualizer.audioTrackId = String(elements.sceneVisualizerAudio?.value || "");
   const layerVal = String(elements.sceneVisualizerLayer?.value || "above_bg");
-  scene.visualizer.layer = ["above_bg", "above_chars", "above_fg"].includes(layerVal) ? layerVal : "above_bg";
+  scene.visualizer.layer = ["below_bg", "above_bg", "above_chars", "above_fg"].includes(layerVal) ? layerVal : "above_bg";
   scene.visualizer.params = readVisualizerParamsFromControls();
 }
 

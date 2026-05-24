@@ -3,8 +3,10 @@
 //
 // /api/v2/scene-bundle のレスポンス (layerData) から THREE.Scene を組み立てる。
 // レイヤー構成:
-//   bg → visualizer(above_bg) → characters (under / eye / mouth / over) →
-//   visualizer(above_chars) → fg → visualizer(above_fg) → dialogue → telop
+//   bg_color → visualizer(below_bg) → bg_image → visualizer(above_bg) →
+//   video_layer(above_bg) → characters (under / eye / mouth / over) →
+//   visualizer(above_chars) → fg → video_layer(above_fg) → visualizer(above_fg) →
+//   dialogue → telop
 //
 // テロップ・セリフ・ビジュアライザはすべて scene 内 plane に取り込まれて
 // いるので、preview / 一時停止 / サムネ / export はすべて WebGL canvas 1 枚に
@@ -59,9 +61,20 @@ function computeEffectPadding(...blurPxList) {
 
 // renderOrder は数値が小さい方が先に描画 (=奥)。深度テストは無効化して
 // renderOrder だけで重ね順を決める (透明 plane の z-fighting 回避)。
-const ORDER_BG = 0;
-const ORDER_VIDEO_LAYER_ABOVE_BG = 25; // 背景面の直上、visualizer (above_bg) の下
-const ORDER_VIZ_ABOVE_BG = 50;     // 背景の直上、キャラの下
+//
+// 背景レイヤーの 5 段重ね (新設計 2026-05-24):
+//   -10 ORDER_BG_COLOR        単色塗りつぶし (常に最下層、画像と共存可)
+//   -5  ORDER_VIZ_BELOW_BG    ビジュアライザー (背景画像の下)、新規モード
+//    0  ORDER_BG_IMAGE        背景画像 / videoTrack
+//   25  ORDER_VIZ_ABOVE_BG    ビジュアライザー (背景の上)
+//   50  ORDER_VIDEO_LAYER_ABOVE_BG  動画レイヤー (= 背景の一種として扱える)
+// 旧定数 ORDER_BG (=0) は ORDER_BG_IMAGE に統一。
+const ORDER_BG_COLOR = -10;
+const ORDER_VIZ_BELOW_BG = -5;
+const ORDER_BG_IMAGE = 0;
+const ORDER_BG = ORDER_BG_IMAGE; // 互換 alias (旧コードが参照する間だけ残す)
+const ORDER_VIZ_ABOVE_BG = 25;     // 背景画像の上、動画レイヤーの下
+const ORDER_VIDEO_LAYER_ABOVE_BG = 50; // 動画レイヤーは「背景の一種」として最上層に置く
 const ORDER_CHAR_BASE = 100;       // キャラ間の差は (count-1-index) で +10 (前にあるキャラほど手前)
 const ORDER_CHAR_UNDER_OFFSET = 0;
 const ORDER_CHAR_EYE_OFFSET = 1;
@@ -175,48 +188,54 @@ function makeCharPlaneShader(width, height, texture, renderOrder, colorFilter) {
 }
 
 async function buildBackground(scene, layerData, urls, renderer, videoProvider) {
-  // ★ videoTrack を WebGL の bg plane として取り込む経路。
-  //   これまでは「透過 bg + DOM video 背景」で済ませていたが、
-  //   - WebGL canvas が透明になりブラウザ合成段で半透明エフェクトが暗くなる
-  //   - readPixels に動画が含まれずデバッグが破綻する
-  //   - DOM 透明 canvas + DOM video の合成は環境依存が強い
-  //   など問題があった。VideoTexture (or WebCodecs 経由のテクスチャ) を使えば
-  //   canvas alpha が一様 1 になり、glow / shadow / fg / dialogue がすべて
-  //   WebGL 内で合成される。
+  // 背景は最下層に「単色塗りつぶし」(ORDER_BG_COLOR=-10) を常に敷き、
+  // その上に「画像 / videoTrack」(ORDER_BG_IMAGE=0) を必要に応じて重ねる。
+  // 透過 PNG 等の背景画像でも下の色が透ける + ビジュアライザー (below_bg) を
+  // 両者の間に挟める。
   //
-  // 2026-05-05: video frame の "取り出し方" を VideoProvider に抽象化。
-  //   - preview: VideoTextureProvider (HTMLVideoElement + THREE.VideoTexture)
-  //   - export:  WebCodecsVideoProvider (frame-accurate decode)
-  // どちらも getTexture() で THREE.Texture を返すので、ここでは provider に
-  // 関与せず Texture を貼るだけ。
+  // 戻り値: { colorMesh?, mesh?, bgBlur?, bgCover?, videoProvider? }
+  //   - colorMesh: 色 plane (opacity>0 のときのみ)
+  //   - mesh:      画像 / video plane (画像 or videoTrack があるときのみ)
+  const result = { mesh: null, colorMesh: null, bgBlur: null, bgCover: null };
+
+  // 1) 単色塗りつぶし (常に最下層、画像と共存)
+  const colorOpacity = Math.max(0, Math.min(1, Number(layerData.background?.colorOpacity) || 0));
+  if (colorOpacity > 0) {
+    const color = String(layerData.background?.color || "#000000");
+    const colorMesh = makeColorPlane(
+      CANVAS_WIDTH, CANVAS_HEIGHT, color, colorOpacity, ORDER_BG_COLOR, 0, 0,
+    );
+    scene.add(colorMesh);
+    result.colorMesh = colorMesh;
+  }
+
+  // 2) videoTrack を WebGL bg plane として取り込む経路 (背景画像と排他)。
+  //   2026-05-05: video frame の "取り出し方" を VideoProvider に抽象化。
+  //     - preview: VideoTextureProvider (HTMLVideoElement + THREE.VideoTexture)
+  //     - export:  WebCodecsVideoProvider (frame-accurate decode)
+  //   どちらも getTexture() で THREE.Texture を返すので、ここでは provider に
+  //   関与せず Texture を貼るだけ。dispose 時の texture 解放は provider 側。
   if (videoProvider && layerData?.hasVideoTrack) {
     const videoTex = videoProvider.getTexture();
-    const mesh = makePlane(CANVAS_WIDTH, CANVAS_HEIGHT, videoTex, ORDER_BG, 0, 0);
+    const mesh = makePlane(CANVAS_WIDTH, CANVAS_HEIGHT, videoTex, ORDER_BG_IMAGE, 0, 0);
     scene.add(mesh);
-    // dispose 時の解放は provider に委ねる (texture 自体の dispose は provider 側)。
-    return { mesh, videoProvider };
+    result.mesh = mesh;
+    result.videoProvider = videoProvider;
+    return result;
   }
-  // scene-bundle が assetUrl で元素材を直接 texture 化、cover を専用 RT に焼く。
+
+  // 3) 背景画像 (scene-bundle が assetUrl で元素材を直接 texture 化、cover を専用 RT に焼く)
   const url = layerData.background?.assetUrl || null;
   if (!url) {
-    // 背景画像/動画が無いケース: 「演出」タブで指定された単色塗りつぶしがあれば描画。
-    // opacity=0 (既定) のときは plane を作らず canvas を完全透過のままにする。
-    const colorOpacity = Math.max(0, Math.min(1, Number(layerData.background?.colorOpacity) || 0));
-    if (colorOpacity > 0) {
-      const color = String(layerData.background?.color || "#000000");
-      const mesh = makeColorPlane(CANVAS_WIDTH, CANVAS_HEIGHT, color, colorOpacity, ORDER_BG, 0, 0);
-      scene.add(mesh);
-      return { mesh, colorPlane: true };
-    }
-    return null;
+    // 画像が無い場合は色 plane だけで終わり。色も無いなら null を返さず result を返す
+    // (= 透過のまま) ── visualizer (below_bg) が単独で描かれるケースもあるため。
+    return result.colorMesh ? result : null;
   }
   urls.push(url);
   const texture = await loadTexture(url);
-  if (!texture) return null;
+  if (!texture) return result.colorMesh ? result : null;
   const blurPx = Math.max(0, Number(layerData.background?.blurPx) || 0);
   let displayTexture = texture;
-  let bgBlur = null;
-  let bgCover = null;
   // Pillow ImageFilter.GaussianBlur(radius=R) は σ ≒ R で広がるが、
   // gaussian-blur.js の apply は σ = blurPx / 2 にしている (glow / dropShadow
   // の見た目を CSS filter:blur と揃えるための既定値)。bg だけ Pillow と
@@ -233,18 +252,19 @@ async function buildBackground(scene, layerData, urls, renderer, videoProvider) 
   const srcW = (img && (img.naturalWidth || img.videoWidth || img.width)) || 0;
   const srcH = (img && (img.naturalHeight || img.videoHeight || img.height)) || 0;
   if (renderer && srcW > 0 && srcH > 0) {
-    bgCover = createCoverPass(CANVAS_WIDTH, CANVAS_HEIGHT);
-    const coveredTex = bgCover.apply(renderer, texture, srcW, srcH);
+    result.bgCover = createCoverPass(CANVAS_WIDTH, CANVAS_HEIGHT);
+    const coveredTex = result.bgCover.apply(renderer, texture, srcW, srcH);
     if (blurPx > 0) {
-      bgBlur = createBlurPass(CANVAS_WIDTH, CANVAS_HEIGHT);
-      displayTexture = bgBlur.pass.apply(renderer, coveredTex, bgBlurArg);
+      result.bgBlur = createBlurPass(CANVAS_WIDTH, CANVAS_HEIGHT);
+      displayTexture = result.bgBlur.pass.apply(renderer, coveredTex, bgBlurArg);
     } else {
       displayTexture = coveredTex;
     }
   }
-  const mesh = makePlane(CANVAS_WIDTH, CANVAS_HEIGHT, displayTexture, ORDER_BG, 0, 0);
+  const mesh = makePlane(CANVAS_WIDTH, CANVAS_HEIGHT, displayTexture, ORDER_BG_IMAGE, 0, 0);
   scene.add(mesh);
-  return { mesh, bgBlur, bgCover };
+  result.mesh = mesh;
+  return result;
 }
 
 async function buildForeground(scene, layerData, urls) {
@@ -592,7 +612,8 @@ async function buildVisualizer(scene, layerData, urls, renderer, backgroundInfo 
   if (!viz) return null;
   const layerKey = String(viz.layer || "above_bg");
   let renderOrder = ORDER_VIZ_ABOVE_BG;
-  if (layerKey === "above_chars") renderOrder = ORDER_VIZ_ABOVE_CHARS;
+  if (layerKey === "below_bg") renderOrder = ORDER_VIZ_BELOW_BG;
+  else if (layerKey === "above_chars") renderOrder = ORDER_VIZ_ABOVE_CHARS;
   else if (layerKey === "above_fg") renderOrder = ORDER_VIZ_ABOVE_FG;
 
   // GL plugin 経路のみ (PNG 連番 fallback は撤去済)。
@@ -879,8 +900,10 @@ export async function buildScene(
   // dialogue のセリフ枠 blend は「実際に背景 plane が作られたか」を必要とする。
   // assetUrl があっても loadTexture が失敗 (404 等) して plane が作られないケースは
   // 透明背景と同じ挙動になるので、bg 結果を待ってから dialogue を構築する。
+  // ★ 新仕様: 背景色 plane (colorMesh) も背景の一部としてカウントする
+  //   (= 色だけでも通常 blend を維持。旧コードと互換の挙動)。
   const dialoguePromise = bgPromise.then((bg) => {
-    const hasBgPlane = !!(bg && bg.mesh);
+    const hasBgPlane = !!(bg && (bg.mesh || bg.colorMesh));
     return buildDialogue(scene, layerData, urls, {
       transparentBackground: !hasBgPlane,
     });
