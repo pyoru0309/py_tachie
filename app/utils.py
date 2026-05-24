@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shutil
+import threading
 import time
 import unicodedata
 from dataclasses import dataclass
@@ -142,20 +143,45 @@ def current_project() -> ProjectContext:
     return ensure_project(project_id)
 
 
+# project.json 直列化用の per-project Lock。
+# Windows では os.replace 中に並列 open() が PermissionError [Errno 13] になる
+# ことがある (例: 再生中の playhead 連続保存 + scenario auto-save の並列衝突)。
+# プロセス内で「read → write tmp → os.replace」を 1 プロジェクト 1 直列に制約し、
+# 衝突窓そのものを潰す。ロックは ctx.id 単位、テナント間は独立。
+_project_file_locks: dict[str, threading.Lock] = {}
+_project_file_locks_guard = threading.Lock()
+
+
+def _get_project_file_lock(project_id: str) -> threading.Lock:
+    lock = _project_file_locks.get(project_id)
+    if lock is not None:
+        return lock
+    with _project_file_locks_guard:
+        lock = _project_file_locks.get(project_id)
+        if lock is None:
+            lock = threading.Lock()
+            _project_file_locks[project_id] = lock
+    return lock
+
+
 def read_project_file(ctx: ProjectContext) -> dict[str, Any]:
     """``project.json`` を読む。並列書き込み中の "瞬間 0 バイト" を回避する safety net 付き。
 
     write_project_file はアトミック (tmp → os.replace) になっているが、別の場所で
     非アトミック書き込みが残っている可能性、および環境によっては replace 直前の
     fsync flush タイミングを衝突する可能性に備えて、JSONDecodeError を最大 3 回
-    短時間 retry する。"""
+    短時間 retry する。
+
+    PermissionError も retry する: Windows で os.replace と open() が極短時間
+    競合すると Errno 13 を起こす (POSIX は通常踏まないが harmless)。
+    """
     ensure_project(ctx.id)
     last_err: Exception | None = None
     for attempt in range(3):
         try:
             with ctx.project_file.open("r", encoding="utf-8") as handle:
                 return json.load(handle)
-        except (json.JSONDecodeError, ValueError) as exc:
+        except (json.JSONDecodeError, ValueError, PermissionError) as exc:
             last_err = exc
             if attempt < 2:
                 time.sleep(0.01 * (attempt + 1))
@@ -178,23 +204,25 @@ def write_project_file(
     ``read_project_file`` がその瞬間に走ると JSONDecodeError ("Expecting value: line 1
     column 1") を起こした (再生中の playhead 連続保存で顕在化)。本実装は tmp に
     書いてから ``os.replace`` で atomic rename する (POSIX / Windows 共に保証)。
+    さらに per-project Lock で read→write→replace の三段を直列化し、Windows での
+    PermissionError 競合窓も潰す。
     """
-    project = read_project_file(ctx)
-    if updates:
-        project.update(updates)
-    if bump_updated_at:
-        project["updatedAt"] = datetime.now().isoformat(timespec="seconds")
-    target = ctx.project_file
-    # 並列 write 衝突を避けるため tmp 名にユニーク suffix (pid + monotonic ns)。
-    # 複数スレッドが同時に書きに来ても、別々の tmp に書いて別々に rename する
-    # (rename は最終勝者で確定。中間の writer は替わるが、内容はどれも同等の
-    # 「最新の project state」なのでデータは欠けない)。
-    unique = f".{os.getpid()}.{time.monotonic_ns()}.tmp"
-    tmp = target.with_suffix(target.suffix + unique)
-    with tmp.open("w", encoding="utf-8") as handle:
-        json.dump(project, handle, ensure_ascii=False, indent=2)
-    os.replace(tmp, target)
-    return project
+    with _get_project_file_lock(ctx.id):
+        project = read_project_file(ctx)
+        if updates:
+            project.update(updates)
+        if bump_updated_at:
+            project["updatedAt"] = datetime.now().isoformat(timespec="seconds")
+        target = ctx.project_file
+        # tmp 名にユニーク suffix (pid + monotonic ns)。同一プロセス内は Lock で
+        # 直列化されるが、別プロセス (例: dev で複数 uvicorn 起動) からの並列も
+        # ありうるので tmp 衝突自体は防いでおく。
+        unique = f".{os.getpid()}.{time.monotonic_ns()}.tmp"
+        tmp = target.with_suffix(target.suffix + unique)
+        with tmp.open("w", encoding="utf-8") as handle:
+            json.dump(project, handle, ensure_ascii=False, indent=2)
+        os.replace(tmp, target)
+        return project
 
 
 def project_thumbnail_path(ctx: ProjectContext) -> str | None:

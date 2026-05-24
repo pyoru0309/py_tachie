@@ -23,6 +23,7 @@ export async function buildSceneFromLayerData(
   videoProvider = null,
   videoLayerProvidersById = null,
   videoLayerDurations = null,
+  vlWindowKey = "",
 ) {
   // エフェクト (silhouette → blur) は WebGLRenderer 経由で RT に書く必要があるので、
   // 構築時に renderer を渡す (update 時に保持参照を使う)。
@@ -34,13 +35,19 @@ export async function buildSceneFromLayerData(
   // preview では HTMLVideoElement + VideoTextureProvider、export では
   // WebCodecsVideoProvider per-layer instance を渡す。
   // videoLayerDurations は /api/video-duration から解決した Map (fit 計算 / 終端判定用)。
-  return buildScene(
+  // vlWindowKey は VL 時間窓キー (A1)。SceneInstance に持たせて、setActiveScene の
+  // reuse 判定で「同 token でも窓が変われば rebuild」を可能にする。
+  const inst = await buildScene(
     layerData,
     getRenderer(),
     videoProvider,
     videoLayerProvidersById,
     videoLayerDurations,
   );
+  if (inst) {
+    inst.vlWindowKey = vlWindowKey || "";
+  }
+  return inst;
 }
 
 export function setActiveScene(instance) {
@@ -59,6 +66,12 @@ export function getActiveScene() {
 // ための helper。一度も build していないとき / token 未指定のときは null。
 export function getActiveSceneToken() {
   return activeSceneInstance?.token || null;
+}
+
+// 現在 active な SceneInstance の VL window key (A1)。reuse 判定で
+// 「同 token でも窓構成が違うなら rebuild」するのに使う。空文字は「窓 = 空」。
+export function getActiveVlWindowKey() {
+  return activeSceneInstance?.vlWindowKey || "";
 }
 
 export function disposeActiveScene() {

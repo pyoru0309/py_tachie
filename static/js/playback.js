@@ -529,6 +529,59 @@ function endCutTransition() {
   console.log(`${prefix}cut="${p.label}" ${parts} total=${total.toFixed(1)}ms`);
 }
 
+// 動画レイヤー (VL) 系リソース消費の観測。`window.__spliteVLPerf = true` で有効化。
+// 再生開始で setInterval、停止で clearInterval。1 秒間隔で 1 行 console.log する。
+// Map.size と Set(Map.values()).size を両方出すのは、group 共有で同一 element/provider
+// を複数 ID から参照する設計のため、Map.size だけでは実リソース数を過大表示するため。
+// 出力例:
+//   [vl-perf] vlEls=12(uniq=4) vlProv=12(uniq=4) vlAud=4(uniq=4) audioPrefetch=8
+//             sceneBundlePrefetch=3 scenePrefetch=1 vlGroups=4 sceneVlLen=12
+const vlPerf = {
+  intervalId: null,
+};
+
+function isVlPerfEnabled() {
+  return !!window.__spliteVLPerf;
+}
+
+function _logVlPerfSample() {
+  if (!isVlPerfEnabled()) return;
+  const els = state.playbackVideoLayerEls;
+  const provs = state.playbackVideoLayerProviders;
+  const auds = state.playbackVideoLayerAudios;
+  const elsUniq = new Set(els.values()).size;
+  const provsUniq = new Set(provs.values()).size;
+  const audsUniq = new Set(auds.values()).size;
+  const sceneVl = state.scenario?.scenes?.[0]?.videoLayers;
+  const sceneVlLen = Array.isArray(sceneVl) ? sceneVl.length : 0;
+  let groupCount = 0;
+  try {
+    groupCount = _groupSameSrcContiguousVideoLayers(sceneVl || []).length;
+  } catch (_) { /* ignore */ }
+  console.log(
+    `[vl-perf] vlEls=${els.size}(uniq=${elsUniq})`
+    + ` vlProv=${provs.size}(uniq=${provsUniq})`
+    + ` vlAud=${auds.size}(uniq=${audsUniq})`
+    + ` audioPrefetch=${audioPrefetchCache.size}`
+    + ` sceneBundlePrefetch=${sceneBundlePrefetchCache.size}`
+    + ` scenePrefetch=${sceneInstancePrefetchCache.size}`
+    + ` vlGroups=${groupCount}`
+    + ` sceneVlLen=${sceneVlLen}`,
+  );
+}
+
+function startVlPerfTimer() {
+  if (vlPerf.intervalId != null) return;
+  // フラグ後付け有効化を許すため、毎 tick で isVlPerfEnabled を再チェック。
+  vlPerf.intervalId = window.setInterval(_logVlPerfSample, 1000);
+}
+
+function stopVlPerfTimer() {
+  if (vlPerf.intervalId == null) return;
+  window.clearInterval(vlPerf.intervalId);
+  vlPerf.intervalId = null;
+}
+
 // プロジェクト切替時 / 再生開始時に呼ぶ汎用 cleanup。scene-bundle prefetch と
 // 音声 prefetch を一括で破棄する。app-state.js もここを叩く。
 export function clearPreviewLayerCache() {
@@ -1060,10 +1113,18 @@ async function _prepareVideoLayerElForStill(videoEl, targetTime, timeoutMs = 150
   ]);
 }
 
-async function prepareVideoLayersForPreview(scene, sceneSec) {
-  const layers = Array.isArray(scene?.videoLayers) ? scene.videoLayers : [];
+// scene: 元の scene 全体 (videoLayers 全件を持つ可能性あり)。
+// sceneSec: focus 時刻 (= still preview の表示時刻 / 再生開始時刻)。
+// options.windowedLayers: 呼び出し側が事前に時間窓フィルタを掛けた subset (A1)。
+//   渡されたときは scene.videoLayers を使わず、これを正解として扱う。
+//   未指定なら旧挙動 (= scene.videoLayers 全件) にフォールバック。
+async function prepareVideoLayersForPreview(scene, sceneSec, options = {}) {
+  const allLayers = Array.isArray(scene?.videoLayers) ? scene.videoLayers : [];
+  const layers = Array.isArray(options.windowedLayers)
+    ? options.windowedLayers
+    : allLayers;
   if (!layers.length) {
-    // 過去 scene の el / provider を全解放
+    // 過去 scene の el / provider を全解放 (= 窓に入る VL が 0 件なら確実に空にする)
     releaseAllVideoLayerEls();
     return { providersById: new Map() };
   }
@@ -1081,7 +1142,13 @@ async function prepareVideoLayersForPreview(scene, sceneSec) {
       }
     }
   }
-  ensureVideoLayerEls(scene);
+  // A1: ensureVideoLayerEls には窓フィルタ後の videoLayers を持つ scene を渡す。
+  // これにより wantedIds から窓外 VL が抜け、`<video>` / clean PCM `<audio>` も窓外は
+  // _disposeVideoLayerEl で破棄される。
+  const scopedScene = (options.windowedLayers && scene)
+    ? { ...scene, videoLayers: layers }
+    : scene;
+  ensureVideoLayerEls(scopedScene);
   syncVideoLayerEls(layers, sceneSec, 24, state.isPlaying);
 
   // ★ 停止中は active layer の seek を「metadata → seeked → HAVE_CURRENT_DATA → RAF」
@@ -1817,13 +1884,14 @@ async function renderPreviewV2(cut, requestId) {
   const sceneVideo = state.scenario?.scenes?.[0]?.videoTrack || null;
   const hasVideoTrack = !!(sceneVideo && sceneVideo.src);
   layerData.hasVideoTrack = hasVideoTrack;
-  // 動画レイヤーは scene-bundle の payload にも乗っているが、live state を
-  // sceneOverride で渡しているので、ここでは scenario からのほうが新しい。
-  // 念のため上書きしておく (videoTrack と同じ思想)。
-  const liveVideoLayers = state.scenario?.scenes?.[0]?.videoLayers;
-  if (Array.isArray(liveVideoLayers)) {
-    layerData.videoLayers = liveVideoLayers;
-  }
+  // 動画レイヤー: A1 の時間窓フィルタを停止プレビューにも適用。
+  // 停止中は lookahead=0 (= 現カット + 1 つ前のみ)。再生再開時に
+  // playLiveCutV2 が改めて lookahead 付き window で rebuild するので、
+  // 停止中の VL provider は最小限で十分。
+  const liveSceneForLayersStill = state.scenario?.scenes?.[0] || null;
+  const { windowedLayers: windowedVideoLayersStill, windowKey: vlWindowKeyStill } =
+    _computeVideoLayerWindow(liveSceneForLayersStill, cut, 0);
+  layerData.videoLayers = windowedVideoLayersStill;
   const cutStart = cutStartSec(cut);
   const cutDur = cutDurationSec(cut);
   const playhead = Number(state.timeline?.currentSec);
@@ -1858,10 +1926,10 @@ async function renderPreviewV2(cut, requestId) {
     ? new (await import("/static/js/renderer/video-provider.js")).VideoTextureProvider(videoEl)
     : null;
 
-  // 動画レイヤー (videoLayers) も preview 用に per-layer 準備。
-  const liveSceneForLayers = state.scenario?.scenes?.[0] || null;
+  // 動画レイヤー (videoLayers) も preview 用に per-layer 準備。window フィルタ後を渡す。
   const { providersById: videoLayerProvidersById } = await prepareVideoLayersForPreview(
-    liveSceneForLayers, cutStart + previewSec,
+    liveSceneForLayersStill, cutStart + previewSec,
+    { windowedLayers: windowedVideoLayersStill },
   );
 
   // 同じ token の scene が既にあれば reuse、なければ build。
@@ -1873,13 +1941,15 @@ async function renderPreviewV2(cut, requestId) {
   //   まま新フレームへ滑らかに切り替わる。
   let sceneInstance = null;
   const activeToken = v2.getActiveSceneToken?.();
-  if (activeToken && layerData.token && activeToken === layerData.token) {
+  const activeVlWindowKey = v2.getActiveVlWindowKey?.() || "";
+  if (activeToken && layerData.token && activeToken === layerData.token
+      && activeVlWindowKey === vlWindowKeyStill) {
     sceneInstance = v2.getActiveScene?.();
   }
   if (!sceneInstance) {
     sceneInstance = await v2.buildSceneFromLayerData(
       layerData, videoProvider,
-      videoLayerProvidersById, state.videoLayerDurations,
+      videoLayerProvidersById, state.videoLayerDurations, vlWindowKeyStill,
     );
     if (state.previewRequestId !== requestId) {
       // race: 後続の loadCut が走り、こちらは捨てる対象になった。
@@ -2126,16 +2196,61 @@ function _anyActiveVideoLayer(layerData, cutStartFrame, cutDurationFrame) {
   return false;
 }
 
+// VL 時間窓フィルタ (A1, 2026-05-25):
+// scene 全体の videoLayers から、focusCut ± lookahead カット範囲に重なるものだけ
+// 抜き出す。これで「scene 全 VL に対して常時 <video preload=auto> + clean PCM <audio>
+// preload=auto を保持する」現状を、現在見えている / 直近で active になる範囲だけに
+// 絞り、ブラウザのバッファ消費を有界化する。
+//
+// 窓の決め方:
+//   - focusCut の index を基準に、後ろ 1 cut、前 lookaheadCuts cut を含める
+//   - 後ろ 1 cut は seek 後の巻き戻りで「直前 cut に戻ったとき」即 attach できるよう
+//   - lookaheadCuts は再生中の prefetch lookahead (= 全体設定 preview.prefetchLookahead)
+//
+// 戻り値:
+//   { windowedLayers: VL[], windowKey: string }
+//   windowKey は VL ID のソート済み join。SceneInstance reuse 判定で「window が
+//   変わったら同 token でも rebuild」を可能にするためのキー。
+function _computeVideoLayerWindow(scene, focusCut, lookaheadCuts = 0) {
+  const layers = Array.isArray(scene?.videoLayers) ? scene.videoLayers : [];
+  if (!layers.length) {
+    return { windowedLayers: [], windowKey: "" };
+  }
+  if (!focusCut) {
+    // focus 不明なら旧挙動 (フィルタなし) にフォールバック。
+    const all = layers.slice();
+    const key = all.map((l) => l?.id).filter(Boolean).sort().join("|");
+    return { windowedLayers: all, windowKey: key };
+  }
+  const cuts = state.scenario?.cuts || [];
+  const idx = cuts.findIndex((c) => c?.id === focusCut.id);
+  if (idx < 0) {
+    const all = layers.slice();
+    const key = all.map((l) => l?.id).filter(Boolean).sort().join("|");
+    return { windowedLayers: all, windowKey: key };
+  }
+  const fromIdx = Math.max(0, idx - 1);
+  const toIdx = Math.min(cuts.length - 1, idx + Math.max(0, lookaheadCuts));
+  const windowStartFrame = cutStartFrame(cuts[fromIdx]);
+  const windowEndFrame = cutStartFrame(cuts[toIdx]) + cutDurationFrame(cuts[toIdx]);
+  const windowDurationFrame = Math.max(1, windowEndFrame - windowStartFrame);
+  const windowed = layers.filter((layer) =>
+    _videoLayerOverlapsCut(layer, windowStartFrame, windowDurationFrame),
+  );
+  const windowKey = windowed.map((l) => l?.id).filter(Boolean).sort().join("|");
+  return { windowedLayers: windowed, windowKey };
+}
+
 // 直列化された buildSceneFromLayerData。前の build が終わるまで次は待つ。
 // renderer (= シングルトン) が cover RT / blur RT を共有しているため、同期 build と
 // prefetch build が並列に走ると state が混ざって結果が壊れる。playLiveCutV2 の
 // 同期 build 経路もこの queue を通すことで、prefetch との競合を排除する。
-function _serialBuildScene(layerData, videoProvider, videoLayerProvidersById, videoLayerDurations) {
+function _serialBuildScene(layerData, videoProvider, videoLayerProvidersById, videoLayerDurations, vlWindowKey = "") {
   const next = _sceneInstanceBuildQueue.then(async () => {
     const { buildSceneFromLayerData } = await import("/static/js/renderer/index.js");
     return buildSceneFromLayerData(
       layerData, videoProvider,
-      videoLayerProvidersById, videoLayerDurations,
+      videoLayerProvidersById, videoLayerDurations, vlWindowKey,
     );
   });
   _sceneInstanceBuildQueue = next.catch(() => {});
@@ -2410,11 +2525,16 @@ export async function playLiveCutV2(cut, _options = {}) {
   const sceneVideo = state.scenario?.scenes?.[0]?.videoTrack || null;
   const hasVideoTrack = !!(sceneVideo && sceneVideo.src);
   layerData.hasVideoTrack = hasVideoTrack;
-  // 動画レイヤー: live state を最新として注入 (videoTrack と同じ思想)。
-  const liveVideoLayers = state.scenario?.scenes?.[0]?.videoLayers;
-  if (Array.isArray(liveVideoLayers)) {
-    layerData.videoLayers = liveVideoLayers;
-  }
+  // 動画レイヤー: live state を最新として注入 + A1 の時間窓フィルタ。
+  // window は「現カット ± lookahead カット」内に時間範囲が重なる VL のみ。
+  // これで scene 全 VL に対する `<video preload=auto>` + clean PCM `<audio>` の
+  // 常時保持を停止し、ブラウザバッファ消費を有界化する。
+  const liveSceneForLayersTop = state.scenario?.scenes?.[0] || null;
+  const { windowedLayers: windowedVideoLayers, windowKey: vlWindowKey } =
+    _computeVideoLayerWindow(liveSceneForLayersTop, cut, getPrefetchLookahead());
+  // layerData.videoLayers も窓フィルタ後で固定する。これに合わせて
+  // scene-builder は window 内 VL の plane だけ作る。
+  layerData.videoLayers = windowedVideoLayers;
 
   const timelineOffsetSec = cutStartSec(cut);
   const cutStartWallclockMs = (state.playbackStartWallclockMs ?? performance.now())
@@ -2434,9 +2554,9 @@ export async function playLiveCutV2(cut, _options = {}) {
     : null;
 
   // 動画レイヤー: per-layer の HTMLVideoElement + VideoTextureProvider を準備。
-  const liveSceneForLayers = state.scenario?.scenes?.[0] || null;
+  // window フィルタ後の VL のみ ensure する (A1)。
   const { providersById: videoLayerProvidersById } = await prepareVideoLayersForPreview(
-    liveSceneForLayers, livePreviewSceneSec,
+    liveSceneForLayersTop, livePreviewSceneSec, { windowedLayers: windowedVideoLayers },
   );
 
   // scene-bundle が返す token は state の SHA1。直前のカットと完全に同じ state
@@ -2444,6 +2564,10 @@ export async function playLiveCutV2(cut, _options = {}) {
   // ループを丸ごと省略して、現 active scene をそのまま再利用する。
   // これでカット切替時でも、内容が変わらない限り「重い build やり直し / 同じ
   // viz_*.png の再フェッチ」が発生しなくなる。
+  //
+  // ★ A1: token に加えて VL window key も一致するときだけ reuse。
+  //   同 token でも window が変わった (= 新たに窓入りした VL がある / 窓から抜けた VL
+  //   がある) なら、active scene の videoLayers plane 集合は古いので rebuild が必要。
   // 異なる token のときは新 scene を先に build し、setActiveScene で旧 scene を
   // 自動 dispose する (= dispose-after-build の順序)。理由:
   //   - texture-cache.js は refCount 付きキャッシュ。同じ URL の THREE.Texture
@@ -2460,7 +2584,9 @@ export async function playLiveCutV2(cut, _options = {}) {
   // 旧 scene が見え続けるので、透明フラッシュが消える方向)。
   let sceneInstance = null;
   const activeToken = v2.getActiveSceneToken ? v2.getActiveSceneToken() : null;
-  if (activeToken && layerData.token && activeToken === layerData.token) {
+  const activeVlWindowKey = v2.getActiveVlWindowKey ? v2.getActiveVlWindowKey() : "";
+  if (activeToken && layerData.token && activeToken === layerData.token
+      && activeVlWindowKey === vlWindowKey) {
     sceneInstance = v2.getActiveScene ? v2.getActiveScene() : null;
   }
 
@@ -2494,14 +2620,21 @@ export async function playLiveCutV2(cut, _options = {}) {
   // Phase 3: 事前 build された SceneInstance があれば取り出して使う。
   // video layer / videoTrack ありカットは prefetchSceneInstance 内で skip されるので、
   // hit するのは「動画なしカット」のみ (= 大多数)。
+  // ★ A1: prefetched scene は VL なし状態で build されている (prefetchSceneInstance で
+  //   _anyActiveVideoLayer skip 済み)。現カットの vlWindowKey が空でないなら、窓に
+  //   入る VL の plane が欠けるので dispose して fresh build にフォールバック。
   if (!sceneInstance) {
     const prefetched = takePrefetchedSceneInstance(cut);
     if (prefetched) {
       try {
         const inst = await prefetched;
         if (inst) {
-          sceneInstance = inst;
-          v2.setActiveScene(sceneInstance);
+          if ((inst.vlWindowKey || "") === vlWindowKey) {
+            sceneInstance = inst;
+            v2.setActiveScene(sceneInstance);
+          } else {
+            try { inst.dispose?.(); } catch (_) { /* ignore */ }
+          }
         }
       } catch (_err) { /* ignore: 失敗時は下の build にフォールバック */ }
     }
@@ -2513,7 +2646,7 @@ export async function playLiveCutV2(cut, _options = {}) {
       // 直前の prefetch build がまだ走っていれば、それを await してから自分の build に入る。
       sceneInstance = await _serialBuildScene(
         layerData, videoProvider,
-        videoLayerProvidersById, state.videoLayerDurations,
+        videoLayerProvidersById, state.videoLayerDurations, vlWindowKey,
       );
     } catch (error) {
       abortV2Playback("シーン構築に失敗", error);
@@ -2693,8 +2826,12 @@ export function stopPreviewPlayback(options = {}) {
   const skipPreviewRefresh = hard || options.skipPreviewRefresh === true;
   const wasPlaying = state.isPlaying;
   state.isPlaying = false;
+  stopVlPerfTimer();
   clearSceneBundlePrefetchCache();
   clearAudioPrefetchCache();
+  // A3: 停止時にも pre-built SceneInstance を捨てる。停止 → 編集 → 再生で
+  // 古い prefetch が残ったまま消えない構造を防ぐ。
+  clearPrefetchedSceneInstances();
   if (state.playbackTimer) {
     window.clearTimeout(state.playbackTimer);
     state.playbackTimer = null;
@@ -2755,6 +2892,7 @@ export async function playPreviewPlayback() {
   if (!state.activeProjectId) return;
   state.isPlaying = true;
   setTogglePlayUi(true);
+  startVlPerfTimer();
 
   // 再生開始時に prefetch を一掃。停止 → 編集 → 再生の流れで古いキャッシュ
   // (cut.state を変えても URL/token が同じになるケース) を返さないよう、再生の
