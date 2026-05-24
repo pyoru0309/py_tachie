@@ -3192,6 +3192,136 @@ dialog::backdrop {
   opacity: 0.85;
 }
 
+/* ---- ツールバー overflow (>>) メニュー ---------------------------------- */
+/* ツールバーの幅が足りないときに右端に出る「>>」ボタンとプルダウン。
+   ボタンが押し出されると overflow-menu に縦並びの menu item として収まる。
+   サブメニュー (.dropdown-button) が overflow に入ると、右側に flyout する。 */
+.toolbar-overflow {
+  position: relative;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+.timeline-header > .toolbar-overflow {
+  /* timeline 側は openSceneDialogButton 以降がすでに margin-left:auto で
+     右寄せされているため、追加で margin を入れない (= 隣接末尾に貼り付く)。 */
+  margin-left: 0;
+}
+.overflow-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--fg);
+  cursor: pointer;
+}
+.overflow-button:hover,
+.overflow-button[aria-expanded="true"] {
+  background: var(--surface-2);
+}
+.overflow-button .button-icon {
+  font-size: 18px;
+}
+.overflow-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 220px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.overflow-menu[hidden] {
+  display: none;
+}
+/* overflow に入った各要素は「ボタン形」から「menu item 形」に切り替える。 */
+.overflow-menu > button,
+.overflow-menu > .dropdown-button > button {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 8px 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  color: inherit;
+  min-height: 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.overflow-menu > button:hover,
+.overflow-menu > .dropdown-button:hover > button {
+  background: var(--accent-soft, var(--surface-3, var(--surface-2)));
+}
+.overflow-menu > button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* overflow 内では primary-button の派手な背景は抑える (menu の一貫性を保つ)。 */
+.overflow-menu > button.primary-button {
+  background: transparent;
+  color: var(--fg);
+  border: 0;
+}
+.overflow-menu > button.primary-button:hover {
+  background: var(--accent-soft, var(--surface-3, var(--surface-2)));
+}
+/* divider が overflow に入っても見せない (区切り役は不要)。 */
+.overflow-menu .top-actions-divider {
+  display: none;
+}
+/* select 要素 (例: project-select) は menu 内では幅 100% に展開。 */
+.overflow-menu > select {
+  width: 100%;
+  margin: 4px 0;
+}
+/* サブメニュー持ち (.dropdown-button) は flyout を右に出す。 */
+.overflow-menu > .dropdown-button {
+  position: relative;
+  display: block;
+}
+.overflow-menu > .dropdown-button > button {
+  padding-right: 28px;
+}
+.overflow-menu > .dropdown-button > button .dropdown-caret {
+  margin-left: auto;
+  /* >>形にして「サブメニューあり」を示唆 */
+  font-size: 18px;
+  transform: rotate(-90deg);
+}
+.overflow-menu > .dropdown-button.open > button .dropdown-caret {
+  transform: rotate(-90deg); /* overflow 内では回転アニメは抑止 */
+}
+.overflow-menu > .dropdown-button > .dropdown-menu {
+  top: 0;
+  left: 100%;
+  right: auto;
+  margin-top: 0;
+  margin-left: 4px;
+}
+/* 画面右端にぶつかる場合は左反転 (JS が flip-left class を付ける)。 */
+.overflow-menu > .dropdown-button.flip-left > .dropdown-menu {
+  left: auto;
+  right: 100%;
+  margin-left: 0;
+  margin-right: 4px;
+}
+
 /* テロップ編集パネル側の「テンプレ生成由来」表示 */
 .text-motion-section.poster-template-info {
   border-left: 3px solid var(--accent);

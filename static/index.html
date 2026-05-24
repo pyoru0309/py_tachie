@@ -164,6 +164,20 @@
             >
               <span class="msym button-icon" aria-hidden="true" data-theme-icon>dark_mode</span>
             </button>
+            <div class="toolbar-overflow" data-toolbar-overflow="top" hidden>
+              <button
+                type="button"
+                class="overflow-button"
+                id="topActionsOverflowButton"
+                aria-label="その他のアクション"
+                aria-haspopup="menu"
+                aria-expanded="false"
+                title="その他"
+              >
+                <span class="msym button-icon" aria-hidden="true">keyboard_double_arrow_right</span>
+              </button>
+              <div class="overflow-menu" id="topActionsOverflowMenu" role="menu" hidden></div>
+            </div>
           </div>
         </div>
         <div class="preview-stage">
@@ -859,6 +873,20 @@
             <span class="msym button-icon" aria-hidden="true">format_list_bulleted</span>
             <span>テロップ一括追加</span>
           </button>
+          <div class="toolbar-overflow" data-toolbar-overflow="timeline" hidden>
+            <button
+              type="button"
+              class="overflow-button"
+              id="timelineToolbarOverflowButton"
+              aria-label="その他のアクション"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              title="その他"
+            >
+              <span class="msym button-icon" aria-hidden="true">keyboard_double_arrow_right</span>
+            </button>
+            <div class="overflow-menu" id="timelineToolbarOverflowMenu" role="menu" hidden></div>
+          </div>
         </div>
         <div id="cutList" class="cut-list"></div>
         <div id="timelineContainer" class="timeline-container" aria-label="シーンタイムライン">

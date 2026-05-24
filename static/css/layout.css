@@ -44,6 +44,22 @@
   border-radius: var(--radius);
   padding: 6px;
   box-shadow: var(--shadow-sm);
+  /* 幅不足時はラップせず、はみ出したボタンは toolbar-overflow.js が
+     右側の overflow メニューへ送る (= 常に 1 段に収める)。
+     overflow は visible のまま (= overflow-menu が absolute で外に出るため、
+     hidden を掛けると menu 自体が clip されて見えなくなる)。 */
+  flex-wrap: nowrap;
+}
+/* ボタンが flex-shrink で押し縮められて中の文字が縦に折れるのを禁止。
+   intrinsic 幅を保ち、合計が parent を超えた時だけ overflow.js が
+   右端から overflow メニューへ送る。 */
+.top-actions > *,
+.top-actions > .dropdown-button > button {
+  flex: 0 0 auto;
+}
+.top-actions > button,
+.top-actions > .dropdown-button > button {
+  white-space: nowrap;
 }
 
 .top-actions button {
@@ -361,9 +377,24 @@
 .timeline-header {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   margin-bottom: 6px;
+  /* はみ出したボタンは toolbar-overflow.js が overflow メニューへ送る。
+     overflow は visible のまま (clip すると overflow-menu まで隠れる)。
+     初回 measurement は同期実行するので、はみ出した状態は実質見えない。 */
+}
+/* timeline-header の直接子 (= 各ボタン / dropdown / overflow / .timeline-toolbar)
+   は intrinsic 幅を保つ。これがないと flex-shrink でボタンが縮み、文字が
+   縦書きに折れる (= overflow 判定が trigger しない)。 */
+.timeline-header > *,
+.timeline-header > .dropdown-button > button,
+.timeline-toolbar > * {
+  flex: 0 0 auto;
+}
+.timeline-header > button,
+.timeline-header > .dropdown-button > button {
+  white-space: nowrap;
 }
 
 .cut-list {

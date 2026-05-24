@@ -23,6 +23,7 @@ import {
 } from "./backup.js";
 import { bindPsdImporter } from "./psd-importer.js";
 import { fetchGlobalConfig, bindGlobalSettings } from "./global-settings.js";
+import { bindAllToolbarOverflow } from "./toolbar-overflow.js";
 import { fetchTtsState } from "./tts.js";
 import {
   bindDialogueVoice,
@@ -1210,6 +1211,8 @@ function bindControls() {
       showToast("表情プリセット削除に失敗しました", "error");
     });
   });
+  // ツールバー overflow (>>) の動的振り分けを起動。
+  bindAllToolbarOverflow();
 }
 
 async function init() {
