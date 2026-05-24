@@ -1094,6 +1094,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="全体設定">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_40" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プレビュー表示の品質 (シャープ / 滑らか)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        アップデート
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -2015,6 +2043,34 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="全体設定">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_40" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プレビュー表示の品質 (シャープ / 滑らか)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        アップデート
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3171,7 +3227,7 @@
 <li>全体設定への入口</li>
 </ul>
 <h2 id="_39">全体設定<a class="headerlink" href="#_39" title="Permanent link">&para;</a></h2>
-<p>ヘッダーの <code>全体設定</code> で開きます。左側に <code>動画書き出し</code> / <code>編集</code> / <code>環境</code> / <code>音声読み上げ</code> / <code>ショートカット</code> / <code>バックアップ</code> / <code>キャッシュ</code> のタブがあります。</p>
+<p>ヘッダーの <code>全体設定</code> で開きます。左側に <code>動画書き出し</code> / <code>編集</code> / <code>環境</code> / <code>音声読み上げ</code> / <code>ショートカット</code> / <code>バックアップ</code> / <code>キャッシュ</code> / <code>アップデート</code> のタブがあります。</p>
 <table>
 <thead>
 <tr>
@@ -3205,6 +3261,16 @@
 <td>Undo 履歴サイズ</td>
 <td>編集</td>
 <td>1〜500</td>
+</tr>
+<tr>
+<td>先読みするカット数</td>
+<td>編集</td>
+<td>再生中、現カットから何カット先までを裏で温めるか (0〜20、既定 3)</td>
+</tr>
+<tr>
+<td>プレビュー表示の品質</td>
+<td>編集</td>
+<td><code>シャープ</code> (既定) / <code>滑らか</code> (= 2D canvas overlay 経由の高品質縮小)。詳細は本ページ末尾</td>
 </tr>
 <tr>
 <td>ffmpeg のパス</td>
@@ -3269,12 +3335,56 @@
 <tr>
 <td>起動時に古いキャッシュを自動削除</td>
 <td>キャッシュ</td>
-<td><code>cache/preview/</code> / <code>cache/lipsync/</code> / <code>cache/clean_pcm/</code> のうち mtime が指定日数より古いものを起動時に削除 (既定: ON / 30 日)。手動削除は <a href=".././assets/#キャッシュタブ">素材管理 → キャッシュタブ</a> から</td>
+<td><code>cache/preview/</code> / <code>cache/lipsync/</code> / <code>cache/clean_pcm/</code> のうち mtime が指定時間より古いものを起動時に削除 (既定: ON / <strong>6 時間</strong>、1〜8760 時間で設定可)。長時間の連続編集でキャッシュが数 GB 規模に膨らむため、短めの既定値にしています。手動削除は <a href=".././assets/#キャッシュタブ">素材管理 → キャッシュタブ</a> から</td>
+</tr>
+<tr>
+<td>アップデートを確認 / 実行</td>
+<td>アップデート</td>
+<td>GitHub の最新版を取得 (= <code>git pull</code> 相当)。あなたが作ったプロジェクトやアップロード済み素材は更新の影響を受けません。詳細は本ページ末尾「アップデート」節</td>
 </tr>
 </tbody>
 </table>
 <p>設定は <code>~/.config</code> などではなく、リポジトリ直下の <code>app_state/global_config.json</code> に保存されます。</p>
 <p>音声読み上げタブの詳しい使い方は <a href="../../tutorials/voice-synthesis/">音声合成 (VOICEVOX / VOICEPEAK) を使う</a> を参照してください。</p>
+<h3 id="_40">プレビュー表示の品質 (シャープ / 滑らか)<a class="headerlink" href="#_40" title="Permanent link">&para;</a></h3>
+<p><code>編集</code> タブの <strong>プレビュー表示の品質</strong> で、画面上のプレビュー表示の見え方を切替できます。書き出し動画 / PNG の品質には影響しません。</p>
+<table>
+<thead>
+<tr>
+<th>値</th>
+<th>内容</th>
+<th>向いている用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>シャープ</code> (既定)</td>
+<td>WebGL canvas をブラウザの CSS スケーリングでそのまま表示。文字は鋭く見えるが、Windows + ANGLE 環境ではポリゴンエッジに僅かなジャギーが出ることがある</td>
+<td>文字の鋭さを優先したい / Mac で通常使用</td>
+</tr>
+<tr>
+<td><code>滑らか</code></td>
+<td>プレビュー領域に 2D canvas overlay を重ね、毎フレーム高品質バイリニア縮小で再描画。アンチエイリアスが効きジャギーが消える代わりに、文字はやや柔らかく見える</td>
+<td>Windows でジャギーが気になる場合</td>
+</tr>
+</tbody>
+</table>
+<p>保存ボタンを押すと即座に切り替わります (アプリ再起動不要)。</p>
+<h3 id="_41">アップデート<a class="headerlink" href="#_41" title="Permanent link">&para;</a></h3>
+<p><code>アップデート</code> タブ → <strong>「アップデートを確認」</strong> で GitHub の最新版があるか取得し、<strong>「アップデートを実行」</strong> で <code>git pull</code> 相当を実行します。コマンドラインは不要です。</p>
+<p>通常のソフトのアップデータと同じく、<strong>あなたのカスタマイズは壊しません</strong>:</p>
+<ul>
+<li>❌ プロジェクトデータ (<code>projects/&lt;id&gt;/</code>) は更新の影響を受けない</li>
+<li>❌ 自分でインストールしたフォント (<code>assets/fonts/</code>) は影響なし</li>
+<li>❌ 自分で追加した効果音 (<code>assets/sound_effects/</code>) は影響なし</li>
+<li>❌ 書き出し済みファイル (<code>outputs/</code>) やキャッシュ (<code>cache/</code>) は影響なし</li>
+<li>✅ 配布素材 (<code>assets/characters/maki_py</code>, <code>assets/backgrounds/</code> 等) は、既定では更新されません。「共通アセット (背景・音声等) も更新する」にチェックを入れた時だけ最新版に差し替えます</li>
+</ul>
+<p>アップデート前に <code>app_state/backups/update_&lt;timestamp&gt;/</code> にバックアップを取るオプションが既定でオンになっています。万一の事故時はこのバックアップから手動で復旧できます。</p>
+<blockquote>
+<p>アップデート完了後はサーバ (<code>python -m app</code>) を一度終了して再起動してください。ブラウザのリロードだけでは反映されません。</p>
+</blockquote>
+<p>詳しくは <a href="https://github.com/pyoru0309/py_tachie/#更新方法-新しいバージョンへのアップグレード">README の「更新方法」</a> を参照してください。</p>
 
 
 

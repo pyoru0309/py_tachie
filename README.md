@@ -5,6 +5,8 @@ PSD レイヤー付きキャラクター・PNG/WebP 立ち絵・動画背景・B
 
 ライセンスは [MIT](LICENSE) です。商用利用・改変・再配布、いずれも自由に行えます。
 
+> **本アプリのコードは [Claude Code](https://claude.com/claude-code) (Anthropic) との対話によって作成されています。** 仕様検討・実装・リファクタ・バグ修正をすべて Claude Code とのペアプログラミングで進めました。設計判断と方向性は pyoru0309 (作者) が行っています。
+
 構造はシーン (scene) を最外として、その中に **カット (cut)** と **テロップ (telop)** が並列に並びます。カットは話者・セリフ・キャラ配置のひとまとまり、テロップはカットと独立してシーン全体に対して任意区間に配置します。
 
 - 永続スキーマは v4 (`scenes[]` + フレームベースのタイムコード)
@@ -18,6 +20,14 @@ PSD レイヤー付きキャラクター・PNG/WebP 立ち絵・動画背景・B
 - ユーザー向け解説: [`user_guide/`](user_guide/index.md) (ビルド済み HTML は [`docs/`](docs/index.html)、GitHub Pages でも公開予定)
   - PSD レイヤー命名規則: [`user_guide/technical/psd-layer-rules.md`](user_guide/technical/psd-layer-rules.md)
   - シナリオデータ仕様: [`user_guide/technical/scenario-format.md`](user_guide/technical/scenario-format.md)
+
+## 紹介動画
+
+本ツールで実際に作った紹介動画をニコニコ動画で公開しています。立ち絵・セリフ・テロップ・効果音・BGM の組み合わせで、どんな仕上がりになるかご覧いただけます。
+
+[![立ち絵システム 紹介動画](https://nicovideo.cdn.nimg.jp/thumbnails/46350304/46350304.L)](https://www.nicovideo.jp/watch/sm46350304)
+
+▶ 視聴ページ: <https://www.nicovideo.jp/watch/sm46350304>
 
 ## 推奨環境
 
@@ -307,13 +317,15 @@ python3 tools/migrate_v3_to_v4.py projects/<id>/scenarios/main.json
 
 ## 同梱素材のクレジット
 
-すべて pyoru0309 (ぴょうる) が制作・所有しており、改変・再配布自由 (MIT に準拠) です。
+いずれも pyoru0309 (ぴょうる) が制作・所有 / 利用権を持つ素材で、改変・再配布自由 (MIT に準拠) です。
 
-- **キャラクター素材** — `assets/characters/maki_py/`, `assets/characters/moca_py/`
-- **背景画像** — `assets/backgrounds/`
-- **前景画像** — `assets/foregrounds/`
-- **装飾画像** — `assets/overlays/`
-- **音声 (BGM 等)** — `assets/audio/`
+- **キャラクター素材** (`assets/characters/maki_py/`, `assets/characters/moca_py/`) — pyoru0309 が自作したイラスト
+- **前景画像** (`assets/foregrounds/`) — pyoru0309 自作
+- **装飾画像** (`assets/overlays/`) — pyoru0309 自作
+- **背景画像** (`assets/backgrounds/`) — pyoru0309 が [ChatGPT Plus](https://openai.com/chatgpt) (画像生成機能) で生成したもの。プロンプト・選定は pyoru0309
+- **BGM・音声** (`assets/audio/`) — pyoru0309 が [Suno v5.5](https://suno.com/) で生成 / 編集したもの。プロンプト・選定は pyoru0309
+
+> 生成 AI 関連の利用規約・著作権の解釈は提供元の規約に従います。本リポジトリへの同梱は MIT ライセンスに基づき自由に再配布できますが、二次利用時は各サービスの規約 (商用利用範囲・帰属表記の要否など) もあわせてご確認ください。
 
 ### 同梱していないもの
 
@@ -329,6 +341,12 @@ python3 tools/migrate_v3_to_v4.py projects/<id>/scenarios/main.json
 - 描画エンジン: WebGL2 + three.js (v2)。Pillow は PSD インポータ / scene-bundle 補助 / 画像検証で利用
 - フォント: Material Symbols Outlined / LINE Seed JP を CDN ロード。日本語本文用には Noto Sans JP を `static/vendor/` 経由でローカル取得可能
 - vendor: `static/vendor/` 配下の three.js / mp4box.js は npm registry / jsdelivr ESM bundle から取得
+
+## 開発の背景
+
+このアプリのコードは [Claude Code](https://claude.com/claude-code) (Anthropic) との対話で作成しています。pyoru0309 は **設計判断・仕様検討・テスト・素材制作** を担当し、Claude Code が **実装・リファクタ・デバッグの大部分** を担当する形式です。
+
+「人間にしか作れないアプリ」ではなく、「AI と人間の協働 で作られた、ローカルで気軽に動かせる紙芝居動画ツール」として位置づけています。同種のツールを自分で作ってみたい方の参考になれば幸いです。
 
 ## コントリビューション
 

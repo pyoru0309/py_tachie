@@ -1587,7 +1587,7 @@
 <p>削除しても<strong>プロジェクトは壊れません</strong>。次回開いたときに必要分だけ自動再生成されます。長尺シナリオを何ヶ月も触っていると <code>cache/preview/</code> だけで数 GB に膨らみがちなので、書き出しが終わって落ち着いたら定期的に削除するのがおすすめです。</p>
 <p><code>thumbnail.png</code> (プロジェクト一覧用のサムネイル) は削除対象外で残ります。</p>
 <h3 id="_13">起動時の自動間引き<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h3>
-<p><code>全体設定 → キャッシュ</code> タブで、mtime が指定日数より古いキャッシュファイルを起動時に自動削除する設定ができます。既定は <strong>ON / 30 日</strong>。</p>
+<p><code>全体設定 → キャッシュ</code> タブで、mtime が指定時間より古いキャッシュファイルを起動時に自動削除する設定ができます。既定は <strong>ON / 6 時間</strong> (長時間の連続編集でキャッシュが数 GB 規模に膨らむため、短めに設定しています。再生成コストは数 ms で体感差ありません)。</p>
 <p>対象は <code>cache/preview/</code> / <code>cache/lipsync/</code> / <code>cache/clean_pcm/</code> の 3 つだけで、<code>thumbnail.png</code> と <code>psd-importer/</code> には触れません。最近編集中の token (= ファイル名 SHA1 ハッシュ) は mtime が更新されているので削除されず、起動直後のヒットレートは維持されます。</p>
 <h3 id="_14">「音声（プロジェクト）」での未使用フィルタと一括削除<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h3>
 <p>プロジェクト固有の <strong>音声</strong> カテゴリでは、ファイル数が増えがちな TTS 生成物 (<code>audio/tts/*.wav</code>) を効率的に整理するための専用ツールバーが表示されます。</p>

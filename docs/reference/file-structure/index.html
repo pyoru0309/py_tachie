@@ -1518,7 +1518,7 @@
 </tr>
 </tbody>
 </table>
-<p><code>cache/</code> は安全にまるごと削除できます。次回再生 / 書き出し時に必要分だけ再生成されます。アプリ内では <strong>アセット管理 → キャッシュ タブ</strong> から個別 / 共有 / 全体を削除できます (詳細は <a href=".././assets/#キャッシュタブ">素材管理 — キャッシュタブ</a>)。起動時の mtime ベース自動間引きも <code>全体設定 → キャッシュ</code> で ON/OFF できます (既定 30 日)。</p>
+<p><code>cache/</code> は安全にまるごと削除できます。次回再生 / 書き出し時に必要分だけ再生成されます。アプリ内では <strong>アセット管理 → キャッシュ タブ</strong> から個別 / 共有 / 全体を削除できます (詳細は <a href=".././assets/#キャッシュタブ">素材管理 — キャッシュタブ</a>)。起動時の mtime ベース自動間引きも <code>全体設定 → キャッシュ</code> で ON/OFF できます (既定 6 時間)。</p>
 <h2 id="app_stateglobal_configjson"><code>app_state/global_config.json</code><a class="headerlink" href="#app_stateglobal_configjson" title="Permanent link">&para;</a></h2>
 <p>全体設定 (動画プリセット / ffmpeg のパス / プロジェクトフォルダ / Undo 履歴サイズ / quietMode / <code>vendor.useCdn</code> / <code>fontWeightOverrides</code> / <code>tts.voicevoxAppPath</code> / <code>tts.voicevoxBaseUrl</code> / <code>tts.voicepeakBinPath</code> / <code>backup.autoIntervalMinutes</code> / <code>backup.autoRetentionCount</code> / <code>cache.autoPruneOnStartup</code> / <code>cache.autoPruneOlderThanDays</code> 等) を保存します。
 複数のリポジトリで使い回したい場合は、このファイルを共有 / バージョン管理から外すなどで運用してください。</p>

@@ -2116,7 +2116,7 @@ contract のまま <code>THREE.Object3D</code> / <code>THREE.InstancedMesh</code
 <li><code>bands</code> / sample width 自体を減らす (見た目に妥協が要る)。</li>
 </ol>
 <h2 id="scene-layer">scene への配置と layer 制御<a class="headerlink" href="#scene-layer" title="Permanent link">&para;</a></h2>
-<p>ビジュアライザは scene の Z 軸方向で 3 段階のいずれかに配置できます (シナリオ側で <code>viz.layer</code> フィールドとして保存)。</p>
+<p>ビジュアライザは scene の Z 軸方向で 4 段階のいずれかに配置できます (シナリオ側で <code>viz.layer</code> フィールドとして保存)。</p>
 <table>
 <thead>
 <tr>
@@ -2127,8 +2127,13 @@ contract のまま <code>THREE.Object3D</code> / <code>THREE.InstancedMesh</code
 </thead>
 <tbody>
 <tr>
+<td><code>below_bg</code></td>
+<td>背景色の上、背景画像の下</td>
+<td>透過 PNG 背景の下に重ねたい場合</td>
+</tr>
+<tr>
 <td><code>above_bg</code> (既定)</td>
-<td>背景の上、キャラの下</td>
+<td>背景の上、動画レイヤー・キャラの下</td>
 <td>スペクトログラム背景、波形装飾</td>
 </tr>
 <tr>
@@ -2143,6 +2148,7 @@ contract のまま <code>THREE.Object3D</code> / <code>THREE.InstancedMesh</code
 </tr>
 </tbody>
 </table>
+<p>注: 動画レイヤー (= scene.videoLayers[]) は <code>above_bg</code> のビジュアライザーより<strong>さらに上</strong>に乗ります (= 背景の一種として扱われます)。動画レイヤーで隠したくないビジュアライザーは <code>below_bg</code> を選んでください。</p>
 <p>UI 側 (右パネルの <code>演出</code> タブ) で選択できます。プラグイン側からはこの層配置に責任を持ちません (= <code>mesh.renderOrder</code> は scene-builder が上書き)。</p>
 <h2 id="_6">開発フロー<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <ol>

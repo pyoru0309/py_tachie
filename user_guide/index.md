@@ -8,6 +8,14 @@ PSD レイヤー付きキャラクター・PNG/WebP 立ち絵・動画背景・B
 - ソースコード: <https://github.com/pyoru0309/py_tachie/>
 - インストール手順: [はじめに](tutorials/getting-started.md) (ターミナルの開き方・Git・Python・ffmpeg の入手まで含む丁寧版)
 
+## 紹介動画
+
+本ツールで作った紹介動画をニコニコ動画で公開しています。立ち絵・セリフ・テロップ・効果音・BGM の組み合わせで、どんな仕上がりになるかご覧いただけます。
+
+<iframe width="640" height="360" src="https://embed.nicovideo.jp/watch/sm46350304" frameborder="0" allowfullscreen></iframe>
+
+- 視聴ページ: <https://www.nicovideo.jp/watch/sm46350304>
+
 ## このガイドの使い方
 
 - 初めて使う場合は [はじめに](tutorials/getting-started.md) → [プロジェクトを作成する](tutorials/create-project.md) → [キャラクターをインポートする](tutorials/import-character.md) → [PNG / 動画を書き出す](tutorials/export-video.md) の順で読んでください。
