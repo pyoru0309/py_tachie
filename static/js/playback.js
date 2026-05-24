@@ -2013,11 +2013,14 @@ function _hasVideoLayers(layerData) {
 }
 
 // 直列化された buildSceneFromLayerData。前の build が終わるまで次は待つ。
-function _serialBuildScene(layerData, videoLayerProvidersById, videoLayerDurations) {
+// renderer (= シングルトン) が cover RT / blur RT を共有しているため、同期 build と
+// prefetch build が並列に走ると state が混ざって結果が壊れる。playLiveCutV2 の
+// 同期 build 経路もこの queue を通すことで、prefetch との競合を排除する。
+function _serialBuildScene(layerData, videoProvider, videoLayerProvidersById, videoLayerDurations) {
   const next = _sceneInstanceBuildQueue.then(async () => {
     const { buildSceneFromLayerData } = await import("/static/js/renderer/index.js");
     return buildSceneFromLayerData(
-      layerData, null,
+      layerData, videoProvider,
       videoLayerProvidersById, videoLayerDurations,
     );
   });
@@ -2037,10 +2040,12 @@ function prefetchSceneInstance(cut) {
     // 動画レイヤーありカットは事前 build 対象外 (provider lifecycle 制約)。
     // playLiveCutV2 で従来通り同期 build される。
     if (_hasVideoLayers(layerData)) return null;
-    // hasVideoTrack (= scene.videoTrack) も同様に provider 経由なので除外
-    if (layerData.hasVideoTrack) return null;
+    // videoTrack (= scene 全体の背景動画) も同様に provider 経由なので除外。
+    // ★ playLiveCutV2 内で書き加えられる layerData.hasVideoTrack はここでは未定義。
+    //   scene-bundle response の videoTrack.src を直接見る必要がある。
+    if (layerData.videoTrack?.src) return null;
     try {
-      return await _serialBuildScene(layerData, null, state.videoLayerDurations);
+      return await _serialBuildScene(layerData, null, null, state.videoLayerDurations);
     } catch (err) {
       console.warn("[scene-instance] prefetch build failed", err);
       return null;
@@ -2207,9 +2212,13 @@ function ensureLookahead(cuts, currentIndex, lookahead) {
     prefetchSceneBundleV2(cut);
     prefetchAudioForCut(cut);
   }
-  // Phase 3: 直後のカット (= lookahead=1 相当) は SceneInstance も裏で build。
-  // serial queue 経由なので、現カットの build が終わってから順次走る。
-  // video layer ありカットは prefetchSceneInstance 内で skip される。
+}
+
+// Phase 3: 次カットの SceneInstance を裏で build する。serial queue 経由で
+// 走るため、現カットの buildScene が終わってから順次実行される。これを
+// playLiveCutV2 の build 「後」に呼ぶことで、現カットの同期 build を
+// prefetch が遅らせない順序を保つ (= ensureLookahead と分離した理由)。
+function ensureScenePrefetch(cuts, currentIndex) {
   const nextCut = cuts[currentIndex + 1];
   if (nextCut?.id && !sceneInstancePrefetchCache.has(nextCut.id)) {
     prefetchSceneInstance(nextCut);
@@ -2381,7 +2390,9 @@ export async function playLiveCutV2(cut, _options = {}) {
 
   if (!sceneInstance) {
     try {
-      sceneInstance = await v2.buildSceneFromLayerData(
+      // serial queue 経由で build (prefetch との race を回避)。
+      // 直前の prefetch build がまだ走っていれば、それを await してから自分の build に入る。
+      sceneInstance = await _serialBuildScene(
         layerData, videoProvider,
         videoLayerProvidersById, state.videoLayerDurations,
       );
@@ -2392,6 +2403,16 @@ export async function playLiveCutV2(cut, _options = {}) {
     v2.setActiveScene(sceneInstance);
   }
   markCutPhase("buildScene");
+
+  // Phase 3: 現カットの buildScene が完了したので、次カットの SceneInstance を
+  // 裏で build するキューに積む (= serial queue は今 idle、即実行される)。
+  // ensureLookahead (= scene-bundle / audio の HTTP prefetch) よりも遅らせる
+  // ことで、現カット同期 build が先に終わる順序を保つ。
+  {
+    const cuts2 = state.scenario?.cuts || [];
+    const curIdx2 = cuts2.findIndex((c) => c.id === cut.id);
+    if (curIdx2 >= 0) ensureScenePrefetch(cuts2, curIdx2);
+  }
 
   showLivePreviewCanvas(true);
   resetAudioMeter();
