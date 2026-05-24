@@ -277,6 +277,14 @@
   display: none;
 }
 
+/* 滑らかプレビュー (= 高品質 2D リサンプル) モードのとき、上に overlay する
+   2D canvas。WebGL canvas を裏に隠して (visibility: hidden)、こちらを表示。
+   ResizeObserver + RAF で毎フレーム drawImage(srcCanvas, ...) する。 */
+#livePreviewSmoothCanvas {
+  pointer-events: none;
+  z-index: 2;
+}
+
 .empty-preview {
   position: absolute;
   inset: 0;

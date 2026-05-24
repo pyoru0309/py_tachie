@@ -239,6 +239,14 @@ def default_global_config() -> dict[str, Any]:
         #   重い構成では負荷が上がる。範囲: 0〜20。
         "preview": {
             "prefetchLookahead": 3,
+            # プレビュー表示の品質。
+            # - "sharp":  WebGL canvas をそのままブラウザの CSS スケーリングで表示
+            #             (= 既定)。文字は鋭く、縮小時にポリゴンエッジがジャギーに
+            #             見えることがある (特に Windows + ANGLE)。
+            # - "smooth": 2D canvas overlay を毎フレーム drawImage で再描画して
+            #             高品質バイリニア縮小をかける。アンチエイリアスが効くが、
+            #             文字はやや柔らかく見える。
+            "smoothing": "sharp",
         },
         # scenarios/main.json 自動バックアップ。
         # autoIntervalMinutes: 周期バックアップの間隔 (分)。1〜120 にクランプ。
@@ -347,6 +355,9 @@ def load_global_config() -> dict[str, Any]:
         except (TypeError, ValueError):
             la = config["preview"]["prefetchLookahead"]
         config["preview"]["prefetchLookahead"] = max(0, min(20, la))
+    if "smoothing" in preview_in:
+        s = str(preview_in["smoothing"] or "sharp").strip().lower()
+        config["preview"]["smoothing"] = "smooth" if s == "smooth" else "sharp"
     backup_in = data.get("backup") if isinstance(data.get("backup"), dict) else {}
     if "autoIntervalMinutes" in backup_in:
         try:
@@ -479,13 +490,16 @@ def save_global_config(payload: dict[str, Any]) -> dict[str, Any]:
             config["shortcuts"] = cleaned
         preview_in = payload.get("preview") if isinstance(payload.get("preview"), dict) else None
         if preview_in is not None:
-            preview_out = config.setdefault("preview", {"prefetchLookahead": 3})
+            preview_out = config.setdefault("preview", {"prefetchLookahead": 3, "smoothing": "sharp"})
             if "prefetchLookahead" in preview_in:
                 try:
                     la = int(preview_in["prefetchLookahead"])
                 except (TypeError, ValueError):
                     raise ValueError("prefetchLookahead must be an integer")
                 preview_out["prefetchLookahead"] = max(0, min(20, la))
+            if "smoothing" in preview_in:
+                s = str(preview_in["smoothing"] or "sharp").strip().lower()
+                preview_out["smoothing"] = "smooth" if s == "smooth" else "sharp"
         backup_in = payload.get("backup") if isinstance(payload.get("backup"), dict) else None
         if backup_in is not None:
             backup_out = config.setdefault(

@@ -465,6 +465,8 @@ export const elements = {
   refreshFfmpegButton: document.querySelector("#refreshFfmpegButton"),
   globalHistorySizeInput: document.querySelector("#globalHistorySizeInput"),
   globalPreviewLookaheadInput: document.querySelector("#globalPreviewLookaheadInput"),
+  globalPreviewSmoothingSelect: document.querySelector("#globalPreviewSmoothingSelect"),
+  livePreviewSmoothCanvas: document.querySelector("#livePreviewSmoothCanvas"),
   globalBackupIntervalInput: document.querySelector("#globalBackupIntervalInput"),
   globalBackupRetentionInput: document.querySelector("#globalBackupRetentionInput"),
   globalCacheAutoPruneInput: document.querySelector("#globalCacheAutoPruneInput"),

@@ -656,6 +656,91 @@ function mouthKeyFromVolume(volume, lipSync) {
   return "open";
 }
 
+// =============================================================================
+// preview smoothing overlay (2026-05-24): WebGL canvas を CSS で縮小表示すると
+// 環境によってはアンチエイリアスが効かずポリゴンエッジがジャギーに見える
+// (特に Windows + ANGLE)。全体設定 preview.smoothing="smooth" のとき、
+// 同じ preview-frame に 2D canvas overlay を重ね、毎フレーム drawImage で
+// 高品質バイリニア縮小をかける。
+// =============================================================================
+let _smoothingRaf = 0;
+let _smoothingObserver = null;
+let _smoothingActive = false;
+
+function _smoothingResize() {
+  const dst = elements.livePreviewSmoothCanvas;
+  const src = elements.livePreviewWebglCanvas;
+  if (!dst || !src) return;
+  const rect = dst.getBoundingClientRect();
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const w = Math.max(1, Math.min(src.width || 1920, Math.round(rect.width * dpr)));
+  const h = Math.max(1, Math.min(src.height || 1080, Math.round(rect.height * dpr)));
+  if (dst.width !== w) dst.width = w;
+  if (dst.height !== h) dst.height = h;
+}
+
+function _smoothingDraw() {
+  const dst = elements.livePreviewSmoothCanvas;
+  const src = elements.livePreviewWebglCanvas;
+  if (!_smoothingActive || !dst || !src) {
+    _smoothingRaf = 0;
+    return;
+  }
+  _smoothingResize();
+  const ctx = dst.getContext("2d");
+  ctx.clearRect(0, 0, dst.width, dst.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  try {
+    ctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, dst.width, dst.height);
+  } catch (_e) { /* GL canvas が tainted 等のとき */ }
+  _smoothingRaf = requestAnimationFrame(_smoothingDraw);
+}
+
+function startPreviewSmoothing() {
+  if (_smoothingActive) return;
+  const dst = elements.livePreviewSmoothCanvas;
+  const src = elements.livePreviewWebglCanvas;
+  if (!dst || !src) return;
+  _smoothingActive = true;
+  // GL canvas は visibility で隠す (hidden 属性は renderer の初期化フローと
+  // 干渉するため避ける)。dst を表示し ResizeObserver で frame 追従。
+  src.style.visibility = "hidden";
+  dst.hidden = false;
+  dst.style.visibility = "visible";
+  if (typeof ResizeObserver === "function" && !_smoothingObserver) {
+    _smoothingObserver = new ResizeObserver(() => _smoothingResize());
+    _smoothingObserver.observe(dst);
+  }
+  _smoothingResize();
+  if (!_smoothingRaf) _smoothingRaf = requestAnimationFrame(_smoothingDraw);
+}
+
+function stopPreviewSmoothing() {
+  if (!_smoothingActive) return;
+  _smoothingActive = false;
+  if (_smoothingRaf) {
+    cancelAnimationFrame(_smoothingRaf);
+    _smoothingRaf = 0;
+  }
+  if (_smoothingObserver) {
+    try { _smoothingObserver.disconnect(); } catch (_e) {}
+    _smoothingObserver = null;
+  }
+  const dst = elements.livePreviewSmoothCanvas;
+  const src = elements.livePreviewWebglCanvas;
+  if (dst) dst.hidden = true;
+  if (src) src.style.visibility = "";
+}
+
+// 全体設定 preview.smoothing を読んで開始/停止を切替。設定保存後 / 起動時 /
+// showLivePreviewCanvas(true) の各タイミングで呼ばれる。
+export function applyPreviewSmoothingFromConfig() {
+  const mode = String(state.globalConfig?.config?.preview?.smoothing || "sharp").toLowerCase();
+  if (mode === "smooth") startPreviewSmoothing();
+  else stopPreviewSmoothing();
+}
+
 function showLivePreviewCanvas(show) {
   // v2 (WebGL) 描画。
   //   show=true: GL canvas を出して previewImage を隠す。
@@ -668,8 +753,11 @@ function showLivePreviewCanvas(show) {
   if (show) {
     if (elements.livePreviewWebglCanvas) elements.livePreviewWebglCanvas.hidden = false;
     if (elements.previewImage) elements.previewImage.style.visibility = "hidden";
+    // smoothing が有効ならここで overlay を開始 (= 描画開始タイミング)
+    applyPreviewSmoothingFromConfig();
     return;
   }
+  stopPreviewSmoothing();
   // ★ hide 経路では in-flight な renderPreviewV2 を確実に無効化する。
   //   previewRequestId をインクリメントしておけば、後追い完了した renderPreviewV2
   //   が `state.previewRequestId !== requestId` で skip されて
@@ -2043,18 +2131,12 @@ function _anyActiveVideoLayer(layerData, cutStartFrame, cutDurationFrame) {
 // prefetch build が並列に走ると state が混ざって結果が壊れる。playLiveCutV2 の
 // 同期 build 経路もこの queue を通すことで、prefetch との競合を排除する。
 function _serialBuildScene(layerData, videoProvider, videoLayerProvidersById, videoLayerDurations) {
-  const tag = layerData?.token ? `[serial-build] ${layerData.token.slice(0, 8)}` : "[serial-build]";
-  const queuedAt = performance.now();
   const next = _sceneInstanceBuildQueue.then(async () => {
-    if (window.__spliteCutPerf) console.log(`${tag} start (waited ${(performance.now() - queuedAt).toFixed(1)}ms in queue)`);
-    const startedAt = performance.now();
     const { buildSceneFromLayerData } = await import("/static/js/renderer/index.js");
-    const inst = await buildSceneFromLayerData(
+    return buildSceneFromLayerData(
       layerData, videoProvider,
       videoLayerProvidersById, videoLayerDurations,
     );
-    if (window.__spliteCutPerf) console.log(`${tag} done in ${(performance.now() - startedAt).toFixed(1)}ms`);
-    return inst;
   });
   _sceneInstanceBuildQueue = next.catch(() => {});
   return next;
@@ -2062,10 +2144,7 @@ function _serialBuildScene(layerData, videoProvider, videoLayerProvidersById, vi
 
 function prefetchSceneInstance(cut) {
   if (!cut?.id) return;
-  if (sceneInstancePrefetchCache.has(cut.id)) {
-    if (window.__spliteCutPerf) console.log(`[scene-prefetch] skip (already cached) ${cut.id}`);
-    return;
-  }
+  if (sceneInstancePrefetchCache.has(cut.id)) return;
   // cut の時間範囲を計算 (= active な videoLayer 判定のため)
   const cutStartFrameVal = cutStartFrame(cut);
   const cutDurationFrameVal = cutDurationFrame(cut);
@@ -2073,34 +2152,19 @@ function prefetchSceneInstance(cut) {
   // scene-bundle の prefetch が無ければ並行で発火させる (= bundle Promise を取る)
   prefetchSceneBundleV2(cut);
   const bundlePromise = sceneBundlePrefetchCache.get(cut.id);
-  if (!bundlePromise) {
-    if (window.__spliteCutPerf) console.log(`[scene-prefetch] no bundle promise ${cut.id}`);
-    return;
-  }
-  if (window.__spliteCutPerf) console.log(`[scene-prefetch] start ${cut.id}`);
+  if (!bundlePromise) return;
   const promise = bundlePromise.then(async (layerData) => {
-    if (!layerData) {
-      if (window.__spliteCutPerf) console.log(`[scene-prefetch] no layerData ${cut.id}`);
-      return null;
-    }
+    if (!layerData) return null;
     // videoTrack (= scene 全体の背景動画) は provider 経由なので除外。
     // ★ playLiveCutV2 内で書き加えられる layerData.hasVideoTrack はここでは未定義。
     //   scene-bundle response の videoTrack.src を直接見る必要がある。
-    if (layerData.videoTrack?.src) {
-      if (window.__spliteCutPerf) console.log(`[scene-prefetch] skip videoTrack ${cut.id}`);
-      return null;
-    }
+    if (layerData.videoTrack?.src) return null;
     // 動画レイヤーは scene-level の配列で、それぞれ時間範囲を持つ。cut の時間範囲に
     // 重なる layer が 1 つもなければ、この cut の間は動画レイヤーが描画されないので
     // provider 不要 → prefetch 対象にできる。
-    if (_anyActiveVideoLayer(layerData, cutStartFrameVal, cutDurationFrameVal)) {
-      if (window.__spliteCutPerf) console.log(`[scene-prefetch] skip active videoLayer ${cut.id}`);
-      return null;
-    }
+    if (_anyActiveVideoLayer(layerData, cutStartFrameVal, cutDurationFrameVal)) return null;
     try {
-      const inst = await _serialBuildScene(layerData, null, null, state.videoLayerDurations);
-      if (window.__spliteCutPerf) console.log(`[scene-prefetch] built ${cut.id}`);
-      return inst;
+      return await _serialBuildScene(layerData, null, null, state.videoLayerDurations);
     } catch (err) {
       console.warn("[scene-prefetch] build failed", err);
       return null;
@@ -2115,12 +2179,8 @@ function prefetchSceneInstance(cut) {
 function takePrefetchedSceneInstance(cut) {
   if (!cut?.id) return null;
   const promise = sceneInstancePrefetchCache.get(cut.id);
-  if (!promise) {
-    if (window.__spliteCutPerf) console.log(`[scene-prefetch] MISS ${cut.id}`);
-    return null;
-  }
+  if (!promise) return null;
   sceneInstancePrefetchCache.delete(cut.id);
-  if (window.__spliteCutPerf) console.log(`[scene-prefetch] HIT ${cut.id}`);
   return promise; // Promise<SceneInstance | null>
 }
 

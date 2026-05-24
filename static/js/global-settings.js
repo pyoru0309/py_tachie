@@ -128,6 +128,10 @@ function renderGlobalSettings() {
     elements.globalPreviewLookaheadInput.value =
       Number.isFinite(la) && la >= 0 ? String(la) : "3";
   }
+  if (elements.globalPreviewSmoothingSelect) {
+    const s = String(data.config.preview?.smoothing || "sharp").toLowerCase();
+    elements.globalPreviewSmoothingSelect.value = s === "smooth" ? "smooth" : "sharp";
+  }
   const backupCfg = data.config?.backup || {};
   if (elements.globalBackupIntervalInput) {
     elements.globalBackupIntervalInput.value = backupCfg.autoIntervalMinutes ?? 5;
@@ -866,6 +870,10 @@ async function saveGlobalSettings() {
         if (!Number.isFinite(raw)) return fallback;
         return Math.max(0, Math.min(20, Math.floor(raw)));
       })(),
+      smoothing: (() => {
+        const v = String(elements.globalPreviewSmoothingSelect?.value || cfg.preview?.smoothing || "sharp").toLowerCase();
+        return v === "smooth" ? "smooth" : "sharp";
+      })(),
     },
     backup: {
       autoIntervalMinutes: Math.max(
@@ -909,6 +917,11 @@ async function saveGlobalSettings() {
     } catch (e) {
       console.warn("auto backup timer restart failed", e);
     }
+    // プレビュー smoothing の設定変更を即座に反映 (= overlay 開始/停止)
+    try {
+      const { applyPreviewSmoothingFromConfig } = await import("./playback.js");
+      applyPreviewSmoothingFromConfig?.();
+    } catch (_e) { /* ignore */ }
     showToast("全体設定を保存しました");
     elements.globalSettingsDialog?.close();
     if ((data.config?.projectsPath || "") !== previousProjectsPath) {

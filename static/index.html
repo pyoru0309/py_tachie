@@ -172,6 +172,10 @@
             <img id="previewImage" alt="合成プレビュー" />
             <!-- ライブプレビュー / 静止 still render はすべて WebGL/three.js。 -->
             <canvas id="livePreviewWebglCanvas" width="1920" height="1080" hidden></canvas>
+            <!-- 滑らかプレビュー (= 高品質 2D リサンプル) 用の overlay canvas。
+                 全体設定の previewSmoothing が "smooth" のときだけ visible になり、
+                 WebGL canvas を毎フレーム drawImage で再描画してアンチエイリアスを稼ぐ。 -->
+            <canvas id="livePreviewSmoothCanvas" hidden></canvas>
             <div id="emptyPreview" class="empty-preview">プレビュー生成中</div>
           </div>
         </div>
@@ -2027,7 +2031,15 @@
                   先読みするカット数
                   <input id="globalPreviewLookaheadInput" type="number" min="0" max="20" step="1" />
                 </label>
+                <label>
+                  プレビュー表示の品質
+                  <select id="globalPreviewSmoothingSelect">
+                    <option value="sharp">シャープ (文字が鋭く、ポリゴンエッジに僅かにジャギーが出ることあり)</option>
+                    <option value="smooth">滑らか (高品質縮小でジャギー軽減、文字はやや柔らかく)</option>
+                  </select>
+                </label>
               </div>
+              <p class="asset-hint">標準は「シャープ」。Windows 等でジャギーが気になる場合は「滑らか」を選ぶと、毎フレーム高品質バイリニア縮小が掛かり輪郭が滑らかになります（書き出し品質には影響しません）。</p>
             </section>
             <section class="settings-group hidden" data-global-tab-panel="environment">
               <h3>ffmpeg バイナリのパス</h3>
