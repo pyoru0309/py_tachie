@@ -320,9 +320,9 @@ python3 tools/migrate_v3_to_v4.py projects/<id>/scenarios/main.json
 いずれも pyoru0309 (ぴょうる) が制作・所有 / 利用権を持つ素材で、改変・再配布自由 (MIT に準拠) です。
 
 - **キャラクター素材** (`assets/characters/maki_py/`, `assets/characters/moca_py/`) — pyoru0309 が自作したイラスト
-- **前景画像** (`assets/foregrounds/`) — pyoru0309 自作
-- **装飾画像** (`assets/overlays/`) — pyoru0309 自作
 - **背景画像** (`assets/backgrounds/`) — pyoru0309 が [ChatGPT Plus](https://openai.com/chatgpt) (画像生成機能) で生成したもの。プロンプト・選定は pyoru0309
+- **前景画像** (`assets/foregrounds/`) — pyoru0309 が ChatGPT Plus で生成したものを加工・調整して作成
+- **装飾画像** (`assets/overlays/`) — 大半は pyoru0309 の自作。**セリフ枠 05 / 06 は ChatGPT Plus で生成**したもの
 - **BGM・音声** (`assets/audio/`) — pyoru0309 が [Suno v5.5](https://suno.com/) で生成 / 編集したもの。プロンプト・選定は pyoru0309
 
 > 生成 AI 関連の利用規約・著作権の解釈は提供元の規約に従います。本リポジトリへの同梱は MIT ライセンスに基づき自由に再配布できますが、二次利用時は各サービスの規約 (商用利用範囲・帰属表記の要否など) もあわせてご確認ください。
