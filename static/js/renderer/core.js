@@ -35,10 +35,16 @@ export function initRenderer(canvas) {
     (typeof window === "undefined")
       ? true
       : (window.__splitePreserveDrawingBuffer !== false);
+  // antialias: true は WebGL の MSAA を有効化する。preview のポリゴンエッジ
+  // (キャラ silhouette / dialogue box border / 動画レイヤーの矩形端 etc) が
+  // ジャギーに見えていた問題への対処。Windows Chrome (ANGLE) で特に効果が大きい。
+  // GPU の fragment 処理コストは数倍になるが、preview は static 描画寄り (= 多数の
+  // texture plane を 1 度焼くだけ) なので体感差は小さい。動画書き出しは frame ごとに
+  // 大量 render するので影響を受けるが、出力品質に効くので維持。
   renderer = new THREE.WebGLRenderer({
     canvas,
     alpha: true,
-    antialias: false,
+    antialias: true,
     premultipliedAlpha: false,
     preserveDrawingBuffer,
   });
