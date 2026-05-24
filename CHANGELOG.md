@@ -5,6 +5,18 @@
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-05-25
+
+### Fixed
+- 動画レイヤーを多数 (例: 10 本以上) 含むプロジェクトの長時間プレビュー再生で、Chrome のメモリ消費が常時増加していた問題を構造的に解消。シーン全体の動画レイヤーすべてに対して `<video preload=auto>` と clean PCM `<audio preload=auto>` を常駐させていた経路を、「現カット ± lookahead カット」の時間窓内のみに絞るよう変更しました。窓外の `<video>` / `<audio>` / VideoTextureProvider は dispose されます。
+- Windows で `project.json` の保存と読み込みが極短時間に並列衝突し、`PermissionError: [Errno 13]` でサーバが例外を投げる (= プレビューが詰まる + ターミナルの Ctrl+C が効かなくなる) 不具合を修正。`write_project_file` を per-project の Lock で直列化し、`read_project_file` の retry に `PermissionError` を追加しました。再生中の playhead 連続保存で踏みやすかった経路です。
+- `stopPreviewPlayback()` で pre-built SceneInstance キャッシュも一緒にクリアするように変更 (停止 → 編集 → 再生で古い prefetch が残らないように)。
+
+### Added
+- 開発者向け観測ログ `window.__spliteVLPerf = true`。再生中、1 秒間隔で `state.playbackVideoLayerEls` 等の Map サイズと dedup 後の実リソース数、prefetch キャッシュ数、VL group 数を Console に出力します。既存の `window.__spliteCutPerf = true` と組み合わせて切替コストを観測できます。
+
+(本リリースの内容は v0.1.2 公開後に py_tachie/dev チャネルで先行配信していた変更を、Mac/Windows 両方での検証完了を受けて stable に取り込んだものです。)
+
 ## [0.1.2] - 2026-05-24
 
 ### Added
@@ -77,5 +89,8 @@
   - キャラクター素材: `maki_py`, `moca_py` (作者: pyoru0309 / 改変自由)
   - 背景・前景・装飾画像・音声: `assets/audio`, `backgrounds`, `foregrounds`, `overlays` (作者: pyoru0309 / 改変自由)
 
-[Unreleased]: https://github.com/pyoru0309/py_tachie/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/pyoru0309/py_tachie/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.1.3
+[0.1.2]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.1.2
+[0.1.1]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.1.1
 [0.1.0]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.1.0
