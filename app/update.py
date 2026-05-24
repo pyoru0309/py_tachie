@@ -103,8 +103,21 @@ def _status_porcelain() -> list[tuple[str, str]]:
     return result
 
 
-def check_for_updates() -> dict[str, Any]:
-    """origin/main を fetch して、HEAD との差分を返す。"""
+def _channel_to_branch(channel: str | None) -> str:
+    """受信チャネル名 ("stable" / "dev") から git branch 名へ変換。
+
+    "dev" のみ dev branch、それ以外 (None / "stable" / 未知の値) は main にフォールバック。
+    """
+    c = (channel or "stable").strip().lower()
+    return "dev" if c == "dev" else "main"
+
+
+def check_for_updates(channel: str | None = None) -> dict[str, Any]:
+    """origin/<channel に対応する branch> を fetch して、HEAD との差分を返す。
+
+    channel が None のときは "stable" 扱い (= origin/main)。
+    現在の local branch と target branch が違う場合は切替が必要な旨を返す。
+    """
     if not is_git_repo():
         return {
             "ok": False,
@@ -115,33 +128,54 @@ def check_for_updates() -> dict[str, Any]:
             ),
         }
 
-    branch = _current_branch()
-    if branch != "main":
+    target_branch = _channel_to_branch(channel)
+    current_branch = _current_branch()
+
+    # main / dev 以外の作業ブランチに居る場合はサポート外 (= 開発者が手動で
+    # 検証中など)。安全のため拒否。
+    if current_branch not in {"main", "dev"}:
         return {
             "ok": False,
             "isGitRepo": True,
-            "branch": branch,
+            "branch": current_branch,
+            "channel": channel or "stable",
             "message": (
-                f"現在のブランチは '{branch}' です。"
-                "アップデートは main ブランチでのみ動作します。"
+                f"現在のブランチは '{current_branch}' です。"
+                "アップデートは main / dev ブランチでのみ動作します。"
             ),
         }
 
-    # origin/main を fetch (取得のみ、マージしない)
-    code, _out, err = _git("fetch", "origin", "main")
+    # origin/<target_branch> を fetch
+    code, _out, err = _git("fetch", "origin", target_branch)
     if code != 0:
+        # dev branch がリモートに無いケース ("couldn't find remote ref dev") は
+        # ユーザーに分かりやすく案内する。
+        err_msg = (err or "").strip()
+        if "couldn't find remote ref" in err_msg or "couldn't find remote" in err_msg:
+            return {
+                "ok": False,
+                "isGitRepo": True,
+                "branch": current_branch,
+                "channel": channel or "stable",
+                "message": (
+                    f"リモートに '{target_branch}' ブランチがまだありません。"
+                    "もう少し時間を置いてから再度お試しください。"
+                ),
+            }
         return {
             "ok": False,
             "isGitRepo": True,
-            "message": f"リモートからの取得に失敗しました: {err.strip() or 'unknown error'}",
+            "message": f"リモートからの取得に失敗しました: {err_msg or 'unknown error'}",
         }
 
-    # 何 commits 遅れているか
-    code, out, _ = _git("rev-list", "--count", "HEAD..origin/main")
+    # target が origin/<target_branch>。current が target_branch と同じなら
+    # HEAD..origin/<target> で差分を見る。違う branch に居るなら、切替後 + pull
+    # で取り込まれる総差分を見せたいので、HEAD..origin/<target> で測ると
+    # 「切替分も含めた N commits 増」になる。実用上はこれで十分。
+    code, out, _ = _git("rev-list", "--count", f"HEAD..origin/{target_branch}")
     behind = int(out.strip() or 0) if code == 0 else 0
 
-    # 変更ファイル一覧 (origin/main にあって HEAD に無い差分)
-    code, out, _ = _git("diff", "--name-only", "HEAD", "origin/main")
+    code, out, _ = _git("diff", "--name-only", "HEAD", f"origin/{target_branch}")
     changed_files = [f for f in out.splitlines() if f] if code == 0 else []
 
     # ローカルの変更
@@ -149,15 +183,20 @@ def check_for_updates() -> dict[str, Any]:
     dirty_modified = [path for status, path in porcelain if not status.startswith("??")]
     dirty_untracked = [path for status, path in porcelain if status.startswith("??")]
 
+    needs_switch = current_branch != target_branch
+
     return {
         "ok": True,
         "isGitRepo": True,
-        "branch": branch,
+        "branch": current_branch,
+        "targetBranch": target_branch,
+        "channel": "dev" if target_branch == "dev" else "stable",
+        "needsBranchSwitch": needs_switch,
         "behind": behind,
         "currentTag": _describe_tag("HEAD"),
         "currentSha": _short_sha("HEAD"),
-        "latestTag": _describe_tag("origin/main"),
-        "latestSha": _short_sha("origin/main"),
+        "latestTag": _describe_tag(f"origin/{target_branch}"),
+        "latestSha": _short_sha(f"origin/{target_branch}"),
         "changedFiles": changed_files,
         "dirtyModified": dirty_modified,
         "dirtyUntracked": dirty_untracked,
@@ -204,6 +243,7 @@ def _restore_assets_from(snapshot_dir: Path) -> None:
 
 def apply_update(
     *,
+    channel: str | None = None,
     include_assets: bool = False,
     backup: bool = True,
     discard_local_changes: bool = False,
@@ -211,6 +251,9 @@ def apply_update(
     """git pull を実行してアップデートを適用する。
 
     Args:
+        channel: 受信チャネル ("stable" or "dev")。None なら "stable"。
+            target branch がローカルに無ければ origin から checkout して作成、
+            現在 branch と違う場合は switch してから pull する。
         include_assets: True なら配布アセット (``assets/`` 配下) も最新版に
             上書きする。False (デフォルト) なら git pull 後に backup から
             ``assets/`` を復元して、配布アセット領域を不変に保つ。
@@ -229,10 +272,15 @@ def apply_update(
             "message": "git リポジトリではないためアップデートできません。",
         }
 
-    if _current_branch() != "main":
+    target_branch = _channel_to_branch(channel)
+    current_branch = _current_branch()
+    if current_branch not in {"main", "dev"}:
         return {
             "ok": False,
-            "message": "アップデートは main ブランチでのみ動作します。",
+            "message": (
+                f"現在のブランチは '{current_branch}' です。"
+                "アップデートは main / dev ブランチでのみ動作します。"
+            ),
         }
 
     log_lines: list[str] = []
@@ -289,12 +337,34 @@ def apply_update(
                 "log": "\n".join(log_lines),
             }
 
-    # 4. git pull
-    result = _git("pull", "origin", "main")
-    _log_step("git pull origin main", result)
+    # 4. 必要なら target branch に切替 (= channel 変更時)
+    if current_branch != target_branch:
+        # fetch は既に check_for_updates で実行されている前提だが、apply 単独で
+        # 呼ばれた場合もあるので、念のため再 fetch しておく。
+        _log_step(f"git fetch origin {target_branch}", _git("fetch", "origin", target_branch))
+        # ローカル branch が無い場合は origin から作成、ある場合はそのまま checkout
+        local_exists_code, _, _ = _git("show-ref", "--verify", "--quiet", f"refs/heads/{target_branch}")
+        if local_exists_code == 0:
+            switch_result = _git("checkout", target_branch)
+        else:
+            switch_result = _git("checkout", "-b", target_branch, f"origin/{target_branch}")
+        _log_step(f"git checkout {target_branch}", switch_result)
+        if switch_result[0] != 0:
+            return {
+                "ok": False,
+                "message": (
+                    f"ブランチ '{target_branch}' への切替に失敗しました。"
+                ),
+                "backupPath": str(backup_dir) if backup_dir else None,
+                "log": "\n".join(log_lines),
+            }
+
+    # 5. git pull
+    result = _git("pull", "origin", target_branch)
+    _log_step(f"git pull origin {target_branch}", result)
     pull_code = result[0]
 
-    # 5. assets を復元 (include_assets=False のとき)
+    # 6. assets を復元 (include_assets=False のとき)
     if assets_snapshot is not None:
         try:
             if ASSETS_DIR.exists():
@@ -315,8 +385,8 @@ def apply_update(
             "log": "\n".join(log_lines),
         }
 
-    # 6. 適用後の状態
-    info = check_for_updates()
+    # 7. 適用後の状態
+    info = check_for_updates(channel=channel)
     new_sha = info.get("currentSha") if info.get("ok") else None
 
     return {
@@ -325,6 +395,8 @@ def apply_update(
         "newSha": new_sha,
         "newTag": info.get("currentTag") if info.get("ok") else None,
         "backupPath": str(backup_dir) if backup_dir else None,
+        "channel": "dev" if target_branch == "dev" else "stable",
+        "branch": target_branch,
         "includeAssets": include_assets,
         "log": "\n".join(log_lines),
     }

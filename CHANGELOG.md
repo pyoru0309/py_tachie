@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-05-24
+
+### Added
+- 受信チャネル選択 (stable / dev)。全体設定 → アップデートに `受信チャネル` セレクタを追加。`stable` (= origin/main、安定版) と `dev` (= origin/dev、ナイトリービルド) を切替可能。検証中コードを含むため既定は `stable`。
+- `/api/update/{check,apply}` に `channel` パラメータ対応。target branch がローカルに無い場合は origin から自動 checkout して切替する。
+
+### Docs
+- user_guide のアップデート章に dev チャネル (ナイトリービルド) 注意書きを追記。
+
 ## [0.1.0] - 2026-05-24
 
 初回公開リリース (Private)。初回 commit (2026-05-22) からタグ付けまでに NFC 正規化補強・アプリ内アップデータ・ビジュアライザーのレイヤー順再構成 (`below_bg` 新設)・カット切替時の音声途切れ解消 (audio.play() と buildScene の並列化)・scene 事前 build memory cache・プレビュー表示品質オプション (sharp/smooth)・キャッシュ retention の時間単位化、などを取り込んでいます。

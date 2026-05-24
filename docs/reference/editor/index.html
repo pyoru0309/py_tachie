@@ -1117,6 +1117,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="アップデート">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stable-dev" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        受信チャネル (stable / dev)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -2066,6 +2083,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="アップデート">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stable-dev" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        受信チャネル (stable / dev)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -3383,6 +3417,23 @@
 <p>アップデート前に <code>app_state/backups/update_&lt;timestamp&gt;/</code> にバックアップを取るオプションが既定でオンになっています。万一の事故時はこのバックアップから手動で復旧できます。</p>
 <blockquote>
 <p>アップデート完了後はサーバ (<code>python -m app</code>) を一度終了して再起動してください。ブラウザのリロードだけでは反映されません。</p>
+</blockquote>
+<h4 id="stable-dev">受信チャネル (stable / dev)<a class="headerlink" href="#stable-dev" title="Permanent link">&para;</a></h4>
+<p>「受信チャネル」セレクタで、どのブランチから更新を取得するか選べます:</p>
+<ul>
+<li><strong>stable</strong> (既定、推奨): リリース版 (<code>origin/main</code>) を受信します。検証済みの安定コードのみです。通常利用はこのまま。</li>
+<li><strong>dev</strong> (ナイトリービルド、検証用): 検証中のコード (<code>origin/dev</code>) を受信します。新機能をいち早く試せますが、<strong>不具合や互換性の問題を含む可能性があります</strong>。</li>
+</ul>
+<blockquote>
+<p>⚠ <strong>dev チャネルに関する注意</strong></p>
+<p>dev は「ナイトリービルド」扱いです。リリース前のコードを直接配布する性質上、以下のリスクを承知の上でご利用ください:</p>
+<ul>
+<li>既存プロジェクトが開けなくなる / 表示崩れが起きる可能性</li>
+<li>一部機能が一時的に動作しないことがある</li>
+<li>次回のアップデートで挙動が変わる (互換性が保たれないことがある)</li>
+</ul>
+<p>開発検証への協力を意図したチャネルです。実制作に使う環境では <strong>stable のまま</strong> にすることを強く推奨します。dev に切り替える場合は事前にプロジェクトのバックアップを取ってください。</p>
+<p>stable に戻す場合は受信チャネルを <code>stable</code> に戻し、もう一度「アップデートを確認」→「アップデートを実行」してください (= main ブランチに自動で切り替わります)。</p>
 </blockquote>
 <p>詳しくは <a href="https://github.com/pyoru0309/py_tachie/#更新方法-新しいバージョンへのアップグレード">README の「更新方法」</a> を参照してください。</p>
 

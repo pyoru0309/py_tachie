@@ -151,6 +151,10 @@ function renderGlobalSettings() {
       : 6;
     elements.globalCacheAutoPruneHoursInput.value = cacheCfg.autoPruneOlderThanHours ?? fallbackHours;
   }
+  if (elements.globalUpdateChannelSelect) {
+    const ch = String(data.config?.update?.channel || "stable").toLowerCase();
+    elements.globalUpdateChannelSelect.value = ch === "dev" ? "dev" : "stable";
+  }
   if (elements.globalFfmpegPathInput) {
     elements.globalFfmpegPathInput.value = data.config.ffmpegPath || "";
   }
@@ -682,14 +686,18 @@ function renderUpdateStatus(data) {
   if (!status || !applyBtn || !details) return;
   const current = data.currentTag || data.currentSha || "?";
   const latest = data.latestTag || data.latestSha || "?";
-  if (data.behind === 0) {
-    status.textContent = `最新版です (${current})`;
+  const channelTag = data.channel === "dev" ? "[dev] " : "";
+  const switchTag = data.needsBranchSwitch
+    ? `（${data.branch} → ${data.targetBranch} へ切替して取得）`
+    : "";
+  if (data.behind === 0 && !data.needsBranchSwitch) {
+    status.textContent = `${channelTag}最新版です (${current})`;
     applyBtn.classList.add("hidden");
     details.classList.add("hidden");
     details.innerHTML = "";
     return;
   }
-  status.textContent = `${current} → ${latest} （${data.behind} 個の更新があります）`;
+  status.textContent = `${channelTag}${current} → ${latest} （${data.behind} 個の更新）${switchTag}`;
   applyBtn.classList.remove("hidden");
   details.classList.remove("hidden");
 
@@ -724,6 +732,11 @@ function renderUpdateStatus(data) {
   details.innerHTML = lines.join("");
 }
 
+function _currentChannelValue() {
+  const v = String(elements.globalUpdateChannelSelect?.value || "stable").toLowerCase();
+  return v === "dev" ? "dev" : "stable";
+}
+
 async function checkForUpdates() {
   const button = elements.checkForUpdatesButton;
   if (button) button.disabled = true;
@@ -731,7 +744,8 @@ async function checkForUpdates() {
     elements.globalUpdateStatus.textContent = "確認中…";
   }
   try {
-    const res = await fetch("/api/update/check");
+    const channel = _currentChannelValue();
+    const res = await fetch(`/api/update/check?channel=${encodeURIComponent(channel)}`);
     const data = await res.json().catch(() => ({}));
     if (!data.ok) {
       const msg = data.message || "確認に失敗しました";
@@ -765,10 +779,11 @@ async function applyUpdate() {
     const includeAssets = document.getElementById("updateIncludeAssets")?.checked || false;
     const backup = document.getElementById("updateMakeBackup")?.checked !== false;
     const discardLocal = document.getElementById("updateDiscardLocal")?.checked || false;
+    const channel = _currentChannelValue();
     const res = await fetch("/api/update/apply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ includeAssets, backup, discardLocalChanges: discardLocal }),
+      body: JSON.stringify({ channel, includeAssets, backup, discardLocalChanges: discardLocal }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) {
@@ -891,6 +906,12 @@ async function saveGlobalSettings() {
         1,
         Math.min(8760, Number(elements.globalCacheAutoPruneHoursInput?.value) || cfg.cache?.autoPruneOlderThanHours || 6)
       ),
+    },
+    update: {
+      channel: (() => {
+        const v = String(elements.globalUpdateChannelSelect?.value || cfg.update?.channel || "stable").toLowerCase();
+        return v === "dev" ? "dev" : "stable";
+      })(),
     },
     // renderer.version は v2 固定 (UI / バックエンドとも撤去済み)。payload には乗せない。
   };

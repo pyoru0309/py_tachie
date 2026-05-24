@@ -4279,10 +4279,25 @@ def fonts_scan_detail_endpoint() -> dict[str, Any]:
 # アプリ内アップデータ (git pull ラッパ)
 # ============================================================================
 
+def _resolve_update_channel(override: str | None = None) -> str:
+    """payload/query で渡された channel を、無ければ global_config から取得する。"""
+    if override:
+        return override
+    try:
+        return str(load_global_config().get("update", {}).get("channel") or "stable")
+    except Exception:  # noqa: BLE001
+        return "stable"
+
+
 @app.get("/api/update/check")
-def update_check_endpoint() -> dict[str, Any]:
-    """origin/main を fetch して HEAD との差分を返す。UI の「アップデートを確認」用。"""
-    return update_mod.check_for_updates()
+def update_check_endpoint(channel: str | None = None) -> dict[str, Any]:
+    """origin/<channel に対応する branch> を fetch して HEAD との差分を返す。
+
+    channel: "stable" (= origin/main) or "dev" (= origin/dev)。
+    省略時は global_config の update.channel に従う。
+    """
+    resolved = _resolve_update_channel(channel)
+    return update_mod.check_for_updates(channel=resolved)
 
 
 @app.post("/api/update/apply")
@@ -4290,16 +4305,19 @@ def update_apply_endpoint(payload: dict[str, Any] | None = None) -> dict[str, An
     """git pull を実行してアップデートを適用する。
 
     Payload (全て optional):
+      - channel:       "stable" | "dev" — 省略時は global_config に従う
       - includeAssets: bool (default False) — assets/ も最新版に上書きするか
       - backup:        bool (default True)  — 適用前にバックアップを取るか
       - discardLocalChanges: bool (default False) — modified file を破棄して進めるか
     """
     payload = payload or {}
+    channel = _resolve_update_channel(payload.get("channel"))
     include_assets = bool(payload.get("includeAssets", False))
     backup = bool(payload.get("backup", True))
     discard = bool(payload.get("discardLocalChanges", False))
     try:
         return update_mod.apply_update(
+            channel=channel,
             include_assets=include_assets,
             backup=backup,
             discard_local_changes=discard,

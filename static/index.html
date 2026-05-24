@@ -2217,6 +2217,21 @@
                 あなたが作ったプロジェクトやアップロード済み素材は、アップデートで消えません。
                 既定では <code>app_state/backups/</code> にバックアップを取ってから更新します。
               </p>
+              <div class="setting-row">
+                <label>
+                  受信チャネル
+                  <select id="globalUpdateChannelSelect">
+                    <option value="stable">stable (推奨、安定版)</option>
+                    <option value="dev">dev (ナイトリービルド、検証中)</option>
+                  </select>
+                </label>
+              </div>
+              <p class="asset-hint">
+                <strong>⚠ dev チャネルについて</strong>:
+                検証中のコードを含むナイトリービルドです。新機能をいち早く試せる反面、
+                不具合や互換性の問題が含まれる可能性があります。検証目的でのみご利用ください。
+                通常利用は <strong>stable</strong> のままにしてください。
+              </p>
               <div id="globalUpdateStatus" class="asset-hint" aria-live="polite">未確認</div>
               <div class="preset-list-actions">
                 <button type="button" id="checkForUpdatesButton" class="link-button">

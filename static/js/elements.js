@@ -488,6 +488,7 @@ export const elements = {
   refreshFontScanButton: document.querySelector("#refreshFontScanButton"),
   globalFontScanList: document.querySelector("#globalFontScanList"),
   globalUpdateStatus: document.querySelector("#globalUpdateStatus"),
+  globalUpdateChannelSelect: document.querySelector("#globalUpdateChannelSelect"),
   checkForUpdatesButton: document.querySelector("#checkForUpdatesButton"),
   applyUpdateButton: document.querySelector("#applyUpdateButton"),
   globalUpdateDetails: document.querySelector("#globalUpdateDetails"),

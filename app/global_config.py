@@ -267,6 +267,14 @@ def default_global_config() -> dict[str, Any]:
             "autoPruneOnStartup": True,
             "autoPruneOlderThanHours": 6,
         },
+        # アプリ内アップデータの受信チャネル。
+        # - "stable": origin/main を pull (= 通常リリース、推奨)
+        # - "dev":    origin/dev を pull (= ナイトリービルド、検証中コードを含む)
+        # 通常は "stable" のまま。検証協力者など、意図的に最新コードを試したい
+        # 人のみ "dev" に切り替える。
+        "update": {
+            "channel": "stable",
+        },
     }
 
 
@@ -389,6 +397,10 @@ def load_global_config() -> dict[str, Any]:
         except (TypeError, ValueError):
             hours = config["cache"]["autoPruneOlderThanHours"]
         config["cache"]["autoPruneOlderThanHours"] = max(1, min(8760, hours))
+    update_in = data.get("update") if isinstance(data.get("update"), dict) else {}
+    if "channel" in update_in:
+        c = str(update_in["channel"] or "stable").strip().lower()
+        config["update"]["channel"] = "dev" if c == "dev" else "stable"
     return config
 
 
@@ -539,6 +551,12 @@ def save_global_config(payload: dict[str, Any]) -> dict[str, Any]:
                 cache_out["autoPruneOlderThanHours"] = max(1, min(8760, days * 24))
             # 旧フィールドはディスクに残さない (新クライアントに混乱を与えるため)
             cache_out.pop("autoPruneOlderThanDays", None)
+        update_in = payload.get("update") if isinstance(payload.get("update"), dict) else None
+        if update_in is not None:
+            update_out = config.setdefault("update", {"channel": "stable"})
+            if "channel" in update_in:
+                c = str(update_in["channel"] or "stable").strip().lower()
+                update_out["channel"] = "dev" if c == "dev" else "stable"
     GLOBAL_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     GLOBAL_CONFIG_PATH.write_text(
         json.dumps(config, ensure_ascii=False, indent=2),
