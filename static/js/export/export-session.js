@@ -21,7 +21,6 @@ import {
   disposeActiveScene,
   renderActiveScene,
   getActiveScene,
-  setRendererOutputSize,
 } from "/static/js/renderer/index.js";
 import * as THREE from "three";
 import { getRenderer, renderScene } from "/static/js/renderer/core.js";
@@ -238,9 +237,7 @@ function setupRendererAndCanvas(canvas, width, height, readbackMode, onLog) {
   canvas.height = height;
   initRenderer(canvas);
   const renderer = getRenderer();
-  // setRendererOutputSize 経由で出力解像度を切替。preview 経路と同じ state を
-  // 触ることで、書き出し後に preview に戻ったとき framebuffer が確実に戻る。
-  setRendererOutputSize(width, height);
+  renderer.setSize(width, height, false);
   // ★ clearColor を毎回 (0,0,0,0) に reset。renderer は singleton で preview /
   //   bench / 別 export session 間で持ち回されるため、過去に setClearColor 経由で
   //   alpha=1 が立っていると透明 codec 出力で「全面不透明」になる。

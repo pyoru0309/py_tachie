@@ -9,17 +9,10 @@
 // plane として組み込まれる。preview / 一時停止 / サムネ / 動画書き出しはすべて
 // WebGL canvas 1 枚で完結 (旧 v1 Pillow 経路は撤去済み)。
 // =============================================================================
-import {
-  initRenderer, renderScene, isRendererReady, getRenderer,
-  CANVAS_WIDTH, CANVAS_HEIGHT,
-  setRendererOutputSize, getRendererOutputSize,
-} from "./core.js";
+import { initRenderer, renderScene, isRendererReady, getRenderer, CANVAS_WIDTH, CANVAS_HEIGHT } from "./core.js";
 import { buildScene } from "./scene-builder.js";
 
-export {
-  initRenderer, isRendererReady, CANVAS_WIDTH, CANVAS_HEIGHT,
-  setRendererOutputSize, getRendererOutputSize,
-};
+export { initRenderer, isRendererReady, CANVAS_WIDTH, CANVAS_HEIGHT };
 
 // 現在描画中の SceneInstance。loadCut 等で differ なシーンに切り替わるたびに
 // dispose して作り直す (Phase B でカット切替時の差分更新に最適化予定)。
@@ -127,35 +120,14 @@ export async function captureSceneSnapshot({
   const baseCanvas = renderer?.domElement || null;
   if (!baseCanvas || !baseCanvas.width || !baseCanvas.height) return null;
 
-  // ★ preview は GL の rasterize コスト軽減のため framebuffer を低解像度に
-  //   していることがある。スナップショット (PNG / サムネ) は常にフル HD で
-  //   書き出したいので、一時的に CANVAS_WIDTH/HEIGHT に切り替えて再 render する。
-  const prev = getRendererOutputSize();
-  const needsRestore = prev.width !== CANVAS_WIDTH || prev.height !== CANVAS_HEIGHT;
-  if (needsRestore) {
-    setRendererOutputSize(CANVAS_WIDTH, CANVAS_HEIGHT);
-    try {
-      renderScene(activeSceneInstance.scene);
-    } catch (_err) { /* ignore: render 失敗は致命的ではない */ }
-  }
-
   // toBlob は Chromium で webp/png を返す。Safari は webp 非対応なので caller が
   // 失敗時に png に retry する想定。
-  const blob = await new Promise((resolve) => {
+  return new Promise((resolve) => {
     try {
-      baseCanvas.toBlob((b) => resolve(b || null), format, quality);
+      baseCanvas.toBlob((blob) => resolve(blob || null), format, quality);
     } catch (err) {
       console.warn("[renderer] captureSceneSnapshot toBlob failed:", err);
       resolve(null);
     }
   });
-
-  // preview 解像度に戻して、続く再生 / preview 描画のコストを下げ続ける。
-  if (needsRestore) {
-    setRendererOutputSize(prev.width, prev.height);
-    try {
-      renderScene(activeSceneInstance.scene);
-    } catch (_err) { /* ignore */ }
-  }
-  return blob;
 }

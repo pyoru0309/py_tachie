@@ -16,12 +16,6 @@ export const CANVAS_HEIGHT = 1080;
 let renderer = null;
 let camera = null;
 let boundCanvas = null;
-// 出力 framebuffer サイズ。scene 内座標は CANVAS_WIDTH/HEIGHT 固定だが、
-// 実際の rasterize 解像度は preview 表示時にここを下げて GL の rasterize / blend
-// コストを軽減できる (= 動画ソフトのプロクシ的な仕組み)。PNG 出力 / 動画書き出し
-// 時は呼び出し側で 1920×1080 に戻す。
-let outputWidth = CANVAS_WIDTH;
-let outputHeight = CANVAS_HEIGHT;
 
 export function initRenderer(canvas) {
   if (!canvas) throw new Error("initRenderer: canvas is required");
@@ -48,10 +42,9 @@ export function initRenderer(canvas) {
     premultipliedAlpha: false,
     preserveDrawingBuffer,
   });
-  // 出力 framebuffer は preview/export で動的に切り替える (setRendererOutputSize)。
-  // 初期値は scene 座標と同じ 1920×1080。CSS 表示サイズは container query が決めるので updateStyle=false。
+  // 1920×1080 の出力固定。CSS 表示サイズは container query が決めるので updateStyle=false。
   renderer.setPixelRatio(1);
-  renderer.setSize(outputWidth, outputHeight, false);
+  renderer.setSize(CANVAS_WIDTH, CANVAS_HEIGHT, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0x000000, 0); // 透過。背景はシーン側の plane で塗る。
 
@@ -91,25 +84,4 @@ export function disposeRenderer() {
 
 export function isRendererReady() {
   return !!renderer;
-}
-
-// 出力 framebuffer サイズを変える。scene 内座標 (camera の ortho 範囲) は
-// 変えないので、shader / mesh / texture には影響しない。GL の rasterize 段だけ
-// 軽くなる (= preview のプロクシ化)。
-//   - preview 経路: canvas の CSS サイズ × DPR (上限 CANVAS_WIDTH/HEIGHT) を渡す
-//   - PNG / 動画書き出し: CANVAS_WIDTH / CANVAS_HEIGHT を渡してフル HD に戻す
-// width/height は 1 以上の整数 (浮動小数点は round)、上限は CANVAS_WIDTH/HEIGHT。
-export function setRendererOutputSize(width, height) {
-  if (!renderer) return;
-  const w = Math.max(1, Math.min(CANVAS_WIDTH, Math.round(Number(width) || CANVAS_WIDTH)));
-  const h = Math.max(1, Math.min(CANVAS_HEIGHT, Math.round(Number(height) || CANVAS_HEIGHT)));
-  if (w === outputWidth && h === outputHeight) return;
-  outputWidth = w;
-  outputHeight = h;
-  // updateStyle=false: canvas の CSS は container 側が触る。framebuffer のみ変更。
-  renderer.setSize(w, h, false);
-}
-
-export function getRendererOutputSize() {
-  return { width: outputWidth, height: outputHeight };
 }
