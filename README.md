@@ -17,7 +17,8 @@ PSD レイヤー付きキャラクター・PNG/WebP 立ち絵・動画背景・B
 - プロジェクトは ZIP アーカイブで持ち出し / 取り込み可能
 
 - リポジトリ: <https://github.com/pyoru0309/py_tachie/>
-- ユーザー向け解説: [`user_guide/`](user_guide/index.md) (ビルド済み HTML は [`docs/`](docs/index.html)、GitHub Pages でも公開予定)
+- ユーザー向け解説: **<https://pyoru0309.github.io/py_tachie/>** (GitHub Pages で配信中)
+  - Markdown ソースは [`user_guide/`](user_guide/index.md)、ビルド済み HTML は [`docs/`](docs/index.html)
   - PSD レイヤー命名規則: [`user_guide/technical/psd-layer-rules.md`](user_guide/technical/psd-layer-rules.md)
   - シナリオデータ仕様: [`user_guide/technical/scenario-format.md`](user_guide/technical/scenario-format.md)
 
@@ -126,7 +127,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 \
 ```
 
 ブラウザで <http://127.0.0.1:8000/> を開きます。
-ヘルプドキュメント (zensical でビルドした `docs/`) は <http://127.0.0.1:8000/help/> で配信されます。GitHub Pages 公開後は同じ内容を Web 上でも閲覧できます。
+ヘルプドキュメント (zensical でビルドした `docs/`) は <http://127.0.0.1:8000/help/> でローカル配信されます。同じ内容を <https://pyoru0309.github.io/py_tachie/> でも閲覧できます。
 
 ### 5. JS ライブラリと日本語フォント (任意・初回セットアップ)
 

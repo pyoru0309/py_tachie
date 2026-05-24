@@ -74,4 +74,4 @@ zensical build
 ```
 
 ビルド後の HTML は `docs/` に出力され、立ち絵システム本体を起動した状態で `http://127.0.0.1:8000/help/` から閲覧できます。
-GitHub Pages 公開後は同じ内容を Web 上でも閲覧できます (リポジトリ: <https://github.com/pyoru0309/py_tachie/>)。
+同じ内容は <https://pyoru0309.github.io/py_tachie/> でも公開されています (リポジトリ: <https://github.com/pyoru0309/py_tachie/>)。
