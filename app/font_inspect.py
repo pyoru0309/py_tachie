@@ -53,22 +53,38 @@ def weight_id_from_class(weight_class: int) -> str:
 _METADATA_CACHE: dict[tuple[str, int, int], dict[str, Any]] = {}
 
 
-def _name_record(name_table, name_id: int) -> str:
-    """name テーブルから NameID の英語/日本語表記を best-effort で取り出す。
+# (platformID, encodingID, languageID) tuple for name table lookup.
+# 言語 ID の数値はそれぞれの platform で独立。
+# - Microsoft (platformID=3): langID は LCID (0x411=ja-JP, 0x409=en-US)
+# - Macintosh (platformID=1): langID は Mac script code (11=Japanese, 0=English)
+_NAME_LOOKUP_JA = (
+    (3, 1, 0x411),  # Microsoft Unicode BMP, ja-JP
+    (1, 1, 11),     # Mac Japanese script
+)
+_NAME_LOOKUP_EN = (
+    (3, 1, 0x409),  # Microsoft Unicode BMP, en-US
+    (1, 0, 0),      # Mac Roman, English
+)
 
-    優先順:
-    1. Microsoft Unicode BMP, en-US (3, 1, 0x409)
-    2. Mac Roman, English (1, 0, 0)
-    3. ``name_table.getDebugName(name_id)`` (任意プラットフォーム)
+
+def _name_record(name_table, name_id: int, lookups=_NAME_LOOKUP_EN) -> str:
+    """name テーブルから NameID の表記を best-effort で取り出す。
+
+    ``lookups`` は (platformID, encodingID, languageID) のタプル列。先頭から順に
+    試し、最初に decode 成功したものを返す。同一 nameID に複数言語の record が
+    あることを利用して、日本語名 (``_NAME_LOOKUP_JA``) と英語名 (``_NAME_LOOKUP_EN``)
+    を別々に取り出せる。
     """
-    rec = name_table.getName(name_id, 3, 1, 0x409)
-    if rec is None:
-        rec = name_table.getName(name_id, 1, 0, 0)
-    if rec is not None:
+    for platform_id, encoding_id, lang_id in lookups:
+        rec = name_table.getName(name_id, platform_id, encoding_id, lang_id)
+        if rec is None:
+            continue
         try:
-            return rec.toUnicode()
+            text = rec.toUnicode()
         except Exception:  # noqa: BLE001
-            pass
+            continue
+        if text:
+            return text
     try:
         debug = name_table.getDebugName(name_id)
     except Exception:  # noqa: BLE001
@@ -81,11 +97,13 @@ def inspect_font(path: Path) -> dict[str, Any]:
 
     返り値::
         {
-            "family":       "Noto Sans JP",  # name table 由来 (空文字なら不明)
-            "subfamily":    "DemiLight",
-            "weight_id":    "demi_light",    # OS/2 由来 (空文字なら不明)
-            "weight_class": 350,
-            "is_variable":  False,
+            "family":             "Chihaya Jyun",   # en-US 由来 (空文字なら不明)
+            "subfamily":          "Regular",
+            "family_localized":   "ちはや純",       # ja-JP / Mac-ja 由来 (空文字なら無し)
+            "subfamily_localized":"Regular",
+            "weight_id":          "regular",        # OS/2 由来 (空文字なら不明)
+            "weight_class":       400,
+            "is_variable":        False,
         }
 
     fontTools が無い、ファイルが壊れている、必要テーブルが無い等で失敗した場合は
@@ -94,6 +112,8 @@ def inspect_font(path: Path) -> dict[str, Any]:
     blank = {
         "family": "",
         "subfamily": "",
+        "family_localized": "",
+        "subfamily_localized": "",
         "weight_id": "",
         "weight_class": 0,
         "is_variable": False,
@@ -120,6 +140,8 @@ def inspect_font(path: Path) -> dict[str, Any]:
 
     family = ""
     subfamily = ""
+    family_localized = ""
+    subfamily_localized = ""
     weight_class = 0
     is_variable = False
     try:
@@ -127,6 +149,14 @@ def inspect_font(path: Path) -> dict[str, Any]:
             name_table = tt["name"]
             family = _name_record(name_table, 16) or _name_record(name_table, 1)
             subfamily = _name_record(name_table, 17) or _name_record(name_table, 2)
+            family_localized = (
+                _name_record(name_table, 16, _NAME_LOOKUP_JA)
+                or _name_record(name_table, 1, _NAME_LOOKUP_JA)
+            )
+            subfamily_localized = (
+                _name_record(name_table, 17, _NAME_LOOKUP_JA)
+                or _name_record(name_table, 2, _NAME_LOOKUP_JA)
+            )
         except KeyError:
             pass
 
@@ -149,6 +179,8 @@ def inspect_font(path: Path) -> dict[str, Any]:
     result = {
         "family": (family or "").strip(),
         "subfamily": (subfamily or "").strip(),
+        "family_localized": (family_localized or "").strip(),
+        "subfamily_localized": (subfamily_localized or "").strip(),
         "weight_id": weight_id_from_class(weight_class),
         "weight_class": weight_class,
         "is_variable": is_variable,

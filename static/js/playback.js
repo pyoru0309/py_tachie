@@ -1828,6 +1828,133 @@ function sceneIdleMotionConfig() {
   };
 }
 
+// motion "move" の補間状態。startFrame〜startFrame+durationFrame の間で
+// startX/Y/Opacity/Rotation/Scale → endX/Y/Opacity/Rotation/Scale を補間し、
+//   { dx, dy, opacity, rotationDeg, scaleMul }
+// を返す。dx/dy は相対オフセット (= キャラ基準位置に加算)、scaleMul は乗算係数
+// (= 1.0 で等倍、0.5 で半分)、rotationDeg は度単位の絶対回転、opacity は 0-1。
+function computeMoveOffset(move, elapsedSec) {
+  if (!move) return _moveIdentity();
+  const startFrame = Math.max(0, Number(move.startFrame) || 0);
+  const durationFrame = Math.max(1, Number(move.durationFrame) || 1);
+  const startX = Number(move.startX) || 0;
+  const startY = Number(move.startY) || 0;
+  const endX = Number(move.endX) || 0;
+  const endY = Number(move.endY) || 0;
+  const startOpacity = _moveClampOpacity(move.startOpacity, 1);
+  const endOpacity = _moveClampOpacity(move.endOpacity, 1);
+  const startRotation = Number(move.startRotation) || 0;
+  const endRotation = Number(move.endRotation) || 0;
+  const startScale = _moveClampScale(move.startScale, 1);
+  const endScale = _moveClampScale(move.endScale, 1);
+  const easing = move.easing || "linear";
+  const currentFrame = (Number(elapsedSec) || 0) * PROJECT_FPS;
+  if (currentFrame < startFrame) {
+    return {
+      dx: startX, dy: startY,
+      opacity: startOpacity, rotationDeg: startRotation, scaleMul: startScale,
+    };
+  }
+  if (currentFrame >= startFrame + durationFrame) {
+    return {
+      dx: endX, dy: endY,
+      opacity: endOpacity, rotationDeg: endRotation, scaleMul: endScale,
+    };
+  }
+  const tRaw = (currentFrame - startFrame) / durationFrame;
+  const t = _applyMoveEasing(Math.max(0, Math.min(1, tRaw)), easing);
+  return {
+    dx: startX + (endX - startX) * t,
+    dy: startY + (endY - startY) * t,
+    opacity: startOpacity + (endOpacity - startOpacity) * t,
+    rotationDeg: startRotation + (endRotation - startRotation) * t,
+    scaleMul: startScale + (endScale - startScale) * t,
+  };
+}
+
+function _moveIdentity() {
+  return { dx: 0, dy: 0, opacity: 1, rotationDeg: 0, scaleMul: 1 };
+}
+
+function _moveClampOpacity(value, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.min(1, n));
+}
+
+function _moveClampScale(value, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return n;
+}
+
+function _applyMoveEasing(t, easing) {
+  switch (easing) {
+    case "easeIn":  return t * t;
+    case "easeOut": return 1 - (1 - t) * (1 - t);
+    case "easeInOut":
+      return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) * (-2 * t + 2)) / 2;
+    case "linear":
+    default:        return t;
+  }
+}
+
+// M-2: 各キャラの character.motion から { dx, dy, scale? } を計算。
+// shake_x/y / move / zoom を 1 経路で扱う。scene-builder の motionOffsetByChar に渡す。
+function computePerCharacterMotionOffsets(characters, quantizedSec) {
+  const result = {};
+  for (const char of characters || []) {
+    if (!char.id || !char.motion) continue;
+    const offset = _computeOneMotion(char.motion, quantizedSec);
+    if (offset) result[char.id] = offset;
+  }
+  return result;
+}
+
+function _computeOneMotion(motion, quantizedSec) {
+  if (!motion?.type || motion.type === "none") return null;
+  const settings = motion.settings || {};
+  if (motion.type === "shake_x" || motion.type === "shake_y") {
+    const cfg = motion.type === "shake_x" ? (settings.shakeX || {}) : (settings.shakeY || {});
+    const amp = Number(cfg.amplitude || 0);
+    const count = Number(cfg.count || 0);
+    const dur = Number(cfg.duration || 0);
+    if (amp > 0 && count > 0 && dur > 0 && quantizedSec < dur) {
+      const offset = amp * Math.sin((2 * Math.PI * count * quantizedSec) / dur);
+      return motion.type === "shake_x" ? { dx: offset, dy: 0 } : { dx: 0, dy: offset };
+    }
+    return null;
+  }
+  if (motion.type === "move") {
+    const mo = computeMoveOffset(settings.move, quantizedSec);
+    // 全項目が「変化なし」なら null (= scene-builder 側で何も touched しない)。
+    if (mo.dx === 0 && mo.dy === 0 && mo.opacity === 1
+        && mo.rotationDeg === 0 && mo.scaleMul === 1) {
+      return null;
+    }
+    // 回転 / 拡大の基準点 (= pivot)。settings.move.pivotX/Y が数値なら採用、
+    // 無効なら null = scene-builder 側でキャラ basePos を pivot 扱い。
+    const rawPivotX = Number(settings.move?.pivotX);
+    const rawPivotY = Number(settings.move?.pivotY);
+    const pivotX = Number.isFinite(rawPivotX) ? rawPivotX : null;
+    const pivotY = Number.isFinite(rawPivotY) ? rawPivotY : null;
+    return {
+      dx: mo.dx,
+      dy: mo.dy,
+      scale: mo.scaleMul,            // scene-builder の group.scale 用
+      rotationDeg: mo.rotationDeg,    // 度→ラジアン変換は scene-builder で
+      opacity: mo.opacity,            // material.uniforms.uOpacity 用
+      pivotX, pivotY,                  // null なら basePos 中心 (= 旧挙動)
+    };
+  }
+  if (motion.type === "zoom") {
+    const sc = Number(settings.zoom?.scale || 1);
+    if (sc > 0 && sc !== 1) return { dx: 0, dy: 0, scale: sc };
+    return null;
+  }
+  return null;
+}
+
 function computeIdleMotionOffset(idleMotion, timelineSec) {
   let dy = 0;
   const t = Number(timelineSec) || 0;
@@ -1864,7 +1991,22 @@ export async function playLiveCut(cut, options = {}) {
 // 取得など) を直列化する。
 // =============================================================================
 async function renderPreviewV2(cut, requestId) {
-  const layerData = await fetchSceneBundleV2(cut);
+  // 前回 renderPreview の scene-bundle fetch を明示 abort。AbortError は
+  // 後続の except で握りつぶす (= 単に古いリクエストが捨てられただけ)。
+  _abortPendingSceneBundle();
+  const controller = new AbortController();
+  _pendingSceneBundleAbort = controller;
+  let layerData;
+  try {
+    layerData = await fetchSceneBundleV2(cut, { signal: controller.signal });
+  } catch (err) {
+    if (err?.name === "AbortError") return false;
+    throw err;
+  } finally {
+    if (_pendingSceneBundleAbort === controller) {
+      _pendingSceneBundleAbort = null;
+    }
+  }
   if (state.previewRequestId !== requestId) return false;
 
   // FontFace 待ち (未ロード時に system font に fallback されると意図と違う絵になる)。
@@ -1989,11 +2131,16 @@ async function renderPreviewV2(cut, requestId) {
       if (motionType === "shake_x") shakeDx = offset;
       else shakeDy = offset;
     }
+  } else if (motionType === "move") {
+    const moveOffset = computeMoveOffset(motionSettings.move, quantized);
+    shakeDx = moveOffset.dx;
+    shakeDy = moveOffset.dy;
   }
   const idleOffset = idleMotion
     ? computeIdleMotionOffset(idleMotion, cutStart + quantized)
     : { dx: 0, dy: 0 };
 
+  const motionOffsetByChar = computePerCharacterMotionOffsets(layerData.characters, quantized);
   const sceneState = {
     eyeKey,
     mouthKey,
@@ -2002,6 +2149,7 @@ async function renderPreviewV2(cut, requestId) {
     shakeDy,
     idleDx: idleOffset.dx,
     idleDy: idleOffset.dy,
+    motionOffsetByChar,
     elapsedSec: quantized,
     // テロップ可視判定用: 量子化前の cut-local 秒。selectTelop で playhead を
     // telop.startFrame に合わせた直後でも「animation 量子化で startFrame の
@@ -2034,7 +2182,23 @@ async function renderPreviewV2(cut, requestId) {
 // playLiveCutV2: WebGL (three.js) 経路。Phase A は静的合成 + 目パチ + 口パクのみ。
 // モーション / 色フィルタ / 光彩 / 影 / ビジュアライザ / テロップ GPU 化は Phase B+。
 // =============================================================================
-async function fetchSceneBundleV2(cut) {
+// 通常の preview/PNG 出力用 scene-bundle fetch を一元管理するための
+// AbortController。renderPreview が呼ばれるたびに前回 in-flight な fetch を
+// abort し、サーバ側で並列処理に起因する「Response content longer than
+// Content-Length」+ truncated PNG → WebGL texSubImage2D エラーで描画が
+// 真っ黒になる事象の確率を下げる。
+// prefetch (= 別キャッシュ経路) はここでは abort しない (= まったく別の
+// caller 起因のため、彼ら自身が完了するまで待つ)。
+let _pendingSceneBundleAbort = null;
+
+function _abortPendingSceneBundle() {
+  if (_pendingSceneBundleAbort) {
+    try { _pendingSceneBundleAbort.abort(); } catch (_e) {}
+    _pendingSceneBundleAbort = null;
+  }
+}
+
+async function fetchSceneBundleV2(cut, options = {}) {
   const cutState = cut.state || {};
   // ★ scene 単位の設定 (telops / videoTrack / bgmTracks / visualizer / bpm / breath /
   //   bpmBob) は cut.state には乗っていない。サーバの `_build_scene_payload` は
@@ -2081,10 +2245,12 @@ async function fetchSceneBundleV2(cut) {
   const sceneBundleUrl = projectId
     ? `/api/projects/${encodeURIComponent(projectId)}/v2/scene-bundle`
     : "/api/v2/scene-bundle";
+  const signal = options.signal || null;
   const response = await fetch(sceneBundleUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
   if (!response.ok) {
     throw new Error(`scene-bundle ${response.status}`);
@@ -2102,6 +2268,23 @@ async function fetchSceneBundleV2(cut) {
   // 光彩 / ドロップシャドウは v1 と同じく cut.state.characterEffects を JS 側で持つ
   // (サーバ scene-bundle は焼き込まないため raw を使う)。
   data.characterEffects = cutState.characterEffects || {};
+  // B-2: マルチキャラレイアウトの分割枠 + ボーダー設定。同じく raw を JS 側で
+  // 保持する (= サーバは焼き込まない、scene-builder が border plane 群を描画する)。
+  data.characterLayout = cutState.characterLayout || null;
+  // crop / layoutSlot は scene-bundle のキャラ payload 内で transport される
+  // (= サーバ側 _build_scene_payload が CharacterRequest.crop / layout_slot を含める)。
+  // ただし scene-bundle 側で character が欠落するケース (orphan 等) のフォールバック
+  // として、cutState の値で上書きする。id 一致で照合。
+  if (Array.isArray(cutState.characters) && Array.isArray(data.characters)) {
+    const byId = new Map(cutState.characters.map((c) => [c?.id, c]));
+    for (const ch of data.characters) {
+      const src = byId.get(ch?.id);
+      if (src) {
+        if (ch.crop == null && src.crop) ch.crop = src.crop;
+        if (ch.layoutSlot == null && Number.isInteger(src.layoutSlot)) ch.layoutSlot = src.layoutSlot;
+      }
+    }
+  }
   return data;
 }
 
@@ -2746,6 +2929,10 @@ export async function playLiveCutV2(cut, _options = {}) {
             if (motionType === "shake_x") shakeDx = offset;
             else shakeDy = offset;
           }
+        } else if (motionType === "move") {
+          const moveOffset = computeMoveOffset(motionSettings.move, quantized);
+          shakeDx = moveOffset.dx;
+          shakeDy = moveOffset.dy;
         }
         const idleOffset = idleMotion
           ? computeIdleMotionOffset(idleMotion, timelineOffsetSec + quantized)
@@ -2758,6 +2945,7 @@ export async function playLiveCutV2(cut, _options = {}) {
           syncVideoLayerEls(layerData.videoLayers, timelineOffsetSec + clamped, 24, true);
         }
 
+        const motionOffsetByChar = computePerCharacterMotionOffsets(layerData.characters, quantized);
         v2.renderActiveScene({
           eyeKey: "open",
           eyeKeyByChar,
@@ -2767,6 +2955,7 @@ export async function playLiveCutV2(cut, _options = {}) {
           shakeDy,
           idleDx: idleOffset.dx,
           idleDy: idleOffset.dy,
+          motionOffsetByChar,
           elapsedSec: quantized,
           // 再生中も telop の出入りは量子化していない実時間で判定する。
           // animationFps=12 で project=24 のとき、奇数フレームに乗った telop が

@@ -105,11 +105,45 @@ export function bindToolbarOverflow({
   const update = () => {
     // 一旦すべて戻して、現状の幅で再評価 (= 余裕が出たら自動復帰)。
     restoreAll();
+    // ★ 2 段階判定:
+    //   1. 「>> を出さない状態」で「ボタン本体だけで収まるか」を判定。
+    //      余裕があるならそのまま終了 (= >> も出さない)。
+    //   2. 収まらない場合のみ >> を表示し、>> 込みの clientWidth で push を進める。
+    //   こうしないと、フル HD のように本体だけで余裕がある状況で >> を出した瞬間
+    //   ボタン 1 個分のオーバーが発生し、最後の 1 個 (= 設定 / テーマ) だけが
+    //   余計に menu 行きになる現象が起きる。
+    overflowContainer.hidden = true;
+    if (window.__spliteDebugToolbarOverflow) {
+      const sw = toolbar.scrollWidth;
+      const cw = toolbar.clientWidth;
+      console.log("[toolbar-overflow] phase1 (>>非表示)", {
+        scrollWidth: sw, clientWidth: cw, diff: sw - cw,
+      });
+    }
+    if (!isOverflowing()) {
+      // 本体だけで余裕あり: 何も送らずそのまま終了。
+      closeMenu();
+      return;
+    }
+    // 本体で収まらない → >> を表示して 1 個ずつ送る。
+    overflowContainer.hidden = false;
+    if (window.__spliteDebugToolbarOverflow) {
+      console.log("[toolbar-overflow] phase2 (>>表示)", {
+        scrollWidth: toolbar.scrollWidth,
+        clientWidth: toolbar.clientWidth,
+        overflowBtnWidth: overflowContainer.offsetWidth,
+      });
+    }
     let safety = 200;
     let sentCount = 0;
     while (isOverflowing() && safety-- > 0) {
       const candidate = pickRightmostOverflowable();
       if (!candidate) break;
+      if (window.__spliteDebugToolbarOverflow) {
+        console.log("[toolbar-overflow] sending to menu",
+          candidate.id || candidate.className,
+          "candidate.width=", candidate.offsetWidth);
+      }
       captureHome(candidate);
       overflowMenu.insertBefore(candidate, overflowMenu.firstChild);
       sentCount++;

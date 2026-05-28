@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import uuid
 import zipfile
 from datetime import datetime, timezone
@@ -260,19 +261,85 @@ from . import project_import as project_import_mod  # noqa: E402
 from . import tts as tts_mod  # noqa: E402
 
 
-@app.middleware("http")
-async def _no_store_for_static_assets(request, call_next):
-    """開発環境では /static/ の HTTP キャッシュを無効化する。
+# /static/ の Cache-Control no-store は StaticFiles サブクラス側 (NoStoreStaticFiles)
+# で実装。HTTP middleware (BaseHTTPMiddleware / pure ASGI どちらの実装でも) は
+# 並列 POST + 一部レスポンスのキャンセル/タイムアウトのタイミングで Uvicorn の
+# ``RuntimeError: Response content longer than Content-Length`` を踏みやすかった
+# ため (Starlette upstream の既知問題)、middleware 経路を撤去した。
+# StaticFiles サブクラスは FileResponse の Cache-Control を直接書き換えるだけ
+# なので、body の chunked 再 emit や send 二重呼出しは発生しない。
 
-    ESM の動的 import 先 (例: /static/js/renderer/scene-builder.js) は app.js のような
-    cache-busting query を持たず、ブラウザの last-modified heuristic で古いコードを
-    つかみ続ける。サーバ再起動だけでは無効化されないため、開発の事故を減らす目的で
-    /static/ には no-store を毎回付ける。
+
+class SwallowResponseRaceMiddleware:
+    """``/project-cache/.../preview/*.png`` の配信中に Uvicorn が
+    ``RuntimeError: Response content longer than Content-Length`` を出すケースを、
+    response.start 済みの場合に限って握り潰すための最終安全網。
+
+    根本対策は preview PNG の atomic write (tmp -> os.replace、main.py の
+    ``save_layer``) で、これで FileResponse の stat 値とその後の送信量の不整合は
+    起きなくなるはず。本ミドルウェアは「念のため残す保険」であり、絞り込みを
+    強くして本物のレスポンス破損を隠さない:
+
+    - 対象 path: ``/project-cache/`` 配下のみ。出力動画 / 静的 / 通常 API は素通し。
+    - 対象例外: ``"Content-Length"`` 文字列を含む ``RuntimeError`` のみ。
+      ``more_body`` 単独や他の ASGI protocol violation は黙殺しない。
+    - 対象タイミング: ``http.response.start`` を既に送り終わった後だけ。
+      start 前の例外はクライアントが応答ヘッダ受信前なので普通に 500 を返した方が良い。
     """
-    response = await call_next(request)
-    if request.url.path.startswith("/static/"):
+
+    _TARGET_PATH_PREFIX = "/project-cache/"
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "") or ""
+        if not path.startswith(self._TARGET_PATH_PREFIX):
+            # 対象外パスは何もせず素通し。
+            await self.app(scope, receive, send)
+            return
+
+        response_started = False
+
+        async def safe_send(message: dict[str, Any]) -> None:
+            nonlocal response_started
+            if message.get("type") == "http.response.start":
+                response_started = True
+            try:
+                await send(message)
+            except RuntimeError as exc:
+                # response.start 後の Content-Length 不整合だけ握り潰す。
+                # それ以外は本物の異常なので普通に伝搬させる。
+                if response_started and "Content-Length" in str(exc):
+                    return
+                raise
+
+        await self.app(scope, receive, safe_send)
+
+
+# SwallowResponseRaceMiddleware の登録はファイル末尾に移動 (= app.mount などすべての
+# route 定義が終わったあとに ASGI ラップ)。add_middleware だと FastAPI 標準の
+# ServerErrorMiddleware の **内側** に配置されてしまい、そこから先で raise される
+# Content-Length 不整合の RuntimeError を catch できないため。
+
+
+class NoStoreStaticFiles(StaticFiles):
+    """``/static/`` のレスポンスに ``Cache-Control: no-store`` を付与する StaticFiles。
+
+    ESM の動的 import 先 (例: /static/js/renderer/scene-builder.js) は app.js の
+    ような cache-busting query を持たず、ブラウザの last-modified heuristic で古い
+    コードをつかみ続ける。サーバ再起動だけでは無効化されないため、開発の事故を
+    減らす目的で /static/ には no-store を毎回付ける。
+    """
+
+    async def get_response(self, path: str, scope: dict[str, Any]) -> Response:
+        response = await super().get_response(path, scope)
         response.headers["Cache-Control"] = "no-store, max-age=0"
-    return response
+        return response
 
 
 async def upload_asset_files(
@@ -2478,8 +2545,39 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
                 file_name = f"{base_prefix}_{suffix}.png"
                 path = preview_root / file_name
                 # stable token なので、既存ファイルへの上書きは内容も同一: skip。
+                # ★ 並列 race 対策: final path に直接 image.save すると、別の scene-bundle
+                # リクエストが「既に exists」と判定して URL を返し、FileResponse が
+                # 「保存途中で stat 時より長くなったファイル」を配信し、Uvicorn が
+                # Content-Length 不整合で RuntimeError を投げる、というローカル競合が
+                # 起きる。tmp file に書いてから os.replace で atomic rename することで、
+                # 「exists() == True なファイルは必ず完成版」を保証する。
                 if not path.exists():
-                    image.save(path)
+                    # tmp 名は pid + thread + uuid で衝突回避。並列 worker が同じ
+                    # 最終 path を狙っても、それぞれ別 tmp に書いて最後の replace が勝つ。
+                    # ★ Pillow の Image.save() は拡張子から format を推測するため
+                    # ``.tmp`` 拡張子のままだと未知 format でエラーになる。format="PNG"
+                    # を明示して、Pillow が拡張子を見ないようにする。
+                    tmp_name = f".{path.name}.{os.getpid()}-{threading.get_ident()}-{uuid.uuid4().hex[:8]}.tmp"
+                    tmp_path = path.with_name(tmp_name)
+                    try:
+                        image.save(tmp_path, format="PNG")
+                        # os.replace は POSIX で atomic。同名 file がもう存在していても
+                        # 上書きする。先に同名 final が出来ていれば、自分の tmp は捨てて
+                        # 既存を使う (先勝ち)。
+                        if path.exists():
+                            try:
+                                tmp_path.unlink()
+                            except OSError:
+                                pass
+                        else:
+                            os.replace(tmp_path, path)
+                    except Exception:
+                        # 書き込み中断時は tmp を掃除して例外を再 raise。
+                        try:
+                            tmp_path.unlink()
+                        except OSError:
+                            pass
+                        raise
                 return cache_url(f"preview/{file_name}")
 
             under_url = save_layer(baked["under"], "under")
@@ -2556,6 +2654,13 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
                 # 左右反転 (v2): scene-builder で キャラ本体 + silhouette のみ中心軸反転。
                 # glow/dropShadow plane は反転しない (影の向きは固定したいため)。
                 "flipX": bool(getattr(character_request, "flip_x", False)),
+                # B-2: マルチキャラレイアウト用。crop が None なら scene-builder は
+                # clippingPlanes 適用を skip。
+                "crop": getattr(character_request, "crop", None),
+                "layoutSlot": getattr(character_request, "layout_slot", None),
+                # M-1: per-character motion ({type, settings})。playback.js が
+                # computePerCharacterMotionOffsets で seek/再生ごとに dx/dy/scale 計算。
+                "motion": getattr(character_request, "motion", None),
             }
         )
 
@@ -2564,7 +2669,11 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
     cut_audio = str(payload.get("audio") or "")
     animation_defaults = config.get("animationDefaults") or {}
     motion_type = str(payload.get("motionType") or "none")
-    motion_settings = config.get("motion") or {}
+    # cut.state.motionSettings (= 演出タブで上書きされた値) があれば優先、
+    # 無ければ global config の motion 既定を使う。これがないと cut 単位で
+    # シェイク量や移動座標を変えても scene-bundle に乗らず描画に反映されない。
+    raw_motion_settings = payload.get("motionSettings")
+    motion_settings = raw_motion_settings if isinstance(raw_motion_settings, dict) else (config.get("motion") or {})
 
     # シーンの visualizer 設定 (GL 経路のみ)。失敗時は None で静的再生。
     # sceneOverride が来ているときは target_scene_for_lookup が override 反映済みの
@@ -2705,6 +2814,13 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
         "videoLayers": (
             list(target_scene_for_lookup.get("videoLayers") or [])
             if target_scene_for_lookup is not None else []
+        ),
+        # B-2: マルチキャラレイアウトの分割パターン + ボーダー設定。preview / export
+        # 経路の scene-builder で `buildCharacterLayoutBorder` が読み、分割線を描く。
+        # cut.state.characterLayout は normalize_cut_state でフィールド化済み。
+        "characterLayout": (
+            (target_cut_for_lookup or {}).get("state", {}).get("characterLayout")
+            if target_cut_for_lookup is not None else None
         ),
     }
 
@@ -4326,7 +4442,7 @@ def update_apply_endpoint(payload: dict[str, Any] | None = None) -> dict[str, An
         raise HTTPException(status_code=500, detail=f"アップデートの実行に失敗しました: {exc}") from exc
 
 
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/static", NoStoreStaticFiles(directory=STATIC_DIR), name="static")
 
 
 # 旧実装は `app.mount("/assets", StaticFiles(directory=PROJECT_ROOT))` で
@@ -4374,3 +4490,15 @@ def get_asset_file(rel: str) -> FileResponse:
 # 予約しているため、`/help` にマウントして衝突を回避する。
 if DOCS_DIR.exists():
     app.mount("/help", StaticFiles(directory=DOCS_DIR, html=True), name="help")
+
+
+# ★★★ 最後に SwallowResponseRaceMiddleware で ASGI ラップする ★★★
+# Starlette / FastAPI のデフォルト middleware (ServerErrorMiddleware /
+# ExceptionMiddleware) は app の最外層に位置するため、それらが raise する
+# Content-Length 不整合の RuntimeError を catch するにはさらにその外側に
+# middleware を置く必要がある。app.add_middleware だと内側にしか入らないので、
+# ファイル末尾で ASGI 呼び出し可能オブジェクトとして wrap する。
+# これ以降、`app` は FastAPI インスタンスではなくミドルウェアラッパだが、
+# uvicorn は ASGI callable として呼ぶだけなので問題ない。route 追加など
+# FastAPI の API は使えなくなる点に注意。
+app = SwallowResponseRaceMiddleware(app)

@@ -30,6 +30,8 @@ import {
   syncDialogueVoiceFromSpeaker,
 } from "./voice-dialogue.js";
 import { openCharacterLayerEditor, bindCharacterLayerEditor } from "./character-layer-editor.js";
+import { bindCharacterLayoutDialog } from "./character-layout-dialog.js";
+import { bindMotionPivotPicker, exitMotionPivotPicking } from "./motion-pivot-picker.js";
 import { bindPreviewInteractions } from "./preview-interactions.js";
 import {
   getActiveScene as _v2GetActiveScene,
@@ -154,7 +156,16 @@ import {
   unlinkSelectedItems,
   toggleLinkForSelection,
   updateLinkToggleButton,
+  syncMotionParamsVisibility,
+  collectCutMotionSettings,
+  applyCutMotionSettingsToControls,
 } from "./scenario-actions.js";
+// 「移動」モーションのピボット指定モードはカット切替で持ち越したくない。
+// loadCut の中で exit を呼ぶようにすることもできるが、シンプルに app.js から
+// elements.motionType の change で「move 以外」になったらモード解除する。
+function _exitPivotPickingOnMotionChange() {
+  if (elements.motionType?.value !== "move") exitMotionPivotPicking();
+}
 import { duplicateSelectedTelop, deleteSelectedTelops, selectAdjacentTelop } from "./telop.js";
 import { openPosterTypographyDialog } from "./poster-typography-dialog.js";
 import {
@@ -588,6 +599,9 @@ function bindControls() {
       const cut = cuts.find((c) => c.id === state.selectedCutId);
       if (cut) await loadCut(cut, { keepTelopSelection: true });
     },
+    collectCutMotionSettings,
+    applyCutMotionSettingsToControls,
+    syncMotionParamsVisibility,
   });
   bindPlayback({
     loadCut,
@@ -713,11 +727,40 @@ function bindControls() {
     elements.characterDropShadowOpacity,
     elements.characterDropShadowOffsetX,
     elements.characterDropShadowOffsetY,
+    // 演出タブのモーション cut 単位 override
+    elements.cutMotionShakeXAmplitude,
+    elements.cutMotionShakeXCount,
+    elements.cutMotionShakeXDuration,
+    elements.cutMotionShakeYAmplitude,
+    elements.cutMotionShakeYCount,
+    elements.cutMotionShakeYDuration,
+    elements.cutMotionZoomScale,
+    elements.cutMotionZoomOrigin,
+    elements.cutMotionMoveStartFrame,
+    elements.cutMotionMoveDurationFrame,
+    elements.cutMotionMoveStartX,
+    elements.cutMotionMoveStartY,
+    elements.cutMotionMoveEndX,
+    elements.cutMotionMoveEndY,
+    elements.cutMotionMoveStartOpacity,
+    elements.cutMotionMoveEndOpacity,
+    elements.cutMotionMoveStartRotation,
+    elements.cutMotionMoveEndRotation,
+    elements.cutMotionMoveStartScale,
+    elements.cutMotionMoveEndScale,
+    elements.cutMotionMovePivotX,
+    elements.cutMotionMovePivotY,
+    elements.cutMotionMoveEasing,
   ]) {
     if (!element) continue;
     element.addEventListener("input", debouncedEditorChanged);
     element.addEventListener("change", debouncedEditorChanged);
   }
+  // motionType の値が変わったら、対応する .motion-params セクションだけ可視化。
+  elements.motionType?.addEventListener("change", () => {
+    syncMotionParamsVisibility();
+    _exitPivotPickingOnMotionChange();
+  });
   elements.boxOpacity.addEventListener("change", normalizeBoxOpacityInput);
   if (elements.duration) {
     bindTimecodeInput(elements.duration, {
@@ -1019,6 +1062,13 @@ function bindControls() {
   elements.renderButton.addEventListener("click", () => renderPreview({ saveOutput: true }));
   elements.centerCharacterButton.addEventListener("click", centerCharacter);
   elements.resetCharacterButton.addEventListener("click", resetCharacter);
+  bindCharacterLayoutDialog();
+  // ピボット指定モード: preview canvas のクリック/ドラッグで pivot X/Y を更新。
+  // 値変更時に handleEditorChanged を発火 (= scenario save + 再描画)。
+  bindMotionPivotPicker({
+    canvas: elements.livePreviewWebglCanvas,
+    onChange: handleEditorChanged,
+  });
   elements.togglePreviewButton.addEventListener("click", () => {
     if (state.isPlaying) {
       stopPreviewPlayback();

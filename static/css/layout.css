@@ -88,7 +88,7 @@
 }
 
 .project-select {
-  width: min(220px, 100%);
+  width: min(160px, 100%);
   min-width: 160px;
   padding-block: 5px;
   font-size: 12px;

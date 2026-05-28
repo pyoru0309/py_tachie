@@ -146,8 +146,24 @@
 
 ## フォント
 
-フォントは共通の `assets/fonts/` とプロジェクト内の `assets/fonts/` から自動認識されます。
-対応拡張子は `.otf` と `.ttf`。ファイル名の末尾が `Bold` / `Medium` / `Regular` の場合は太さとして推定されます。
+フォントは共通の `assets/fonts/` とプロジェクト内の `assets/fonts/` から自動認識されます。対応拡張子は `.otf` と `.ttf`。
+
+### 認識のしくみ (2026-05 改修)
+
+それぞれのフォントについて次の情報を読み出し、UI 表示用の family 名と太さ (weight) を確定します。
+
+- **太さ**: OS/2 テーブルの `usWeightClass` (= フォント自身が宣言する重み) を最優先。読めなければファイル名末尾 (`Bold` / `Medium` / `Regular` / `Thin` / `Black` 等) でフォールバックし、最後は `regular` とします。
+- **family 名 (UI 表示)**: name テーブルから次の順で読み出します。
+    1. ja-JP / Mac-ja (= 日本語 family 名)
+    2. en-US / Mac-en
+    3. ファイル名 (拡張子と weight suffix を除いた部分)
+
+  これにより、たとえば `NekoSpoon.otf` → 「ねこスプーン」、`APJapanesefont.ttf` → 「あんずもじ」、`HuiFont29.ttf` → 「ふい字」のように、FontBook と同じく日本語名で識別できます。
+- **family ID (永続キー)**: scenario JSON や設定ファイルが参照する内部 ID は **ファイル名 stem 由来** で固定 (`auto_<ascii_slug>`)。純日本語ファイル名のように ASCII 文字がまったく含まれない stem では SHA1 先頭 8 文字をハッシュ化して `auto_<8hex>` を付与します (例: `花とちょうちょ.ttf` → `auto_4785310d`)。これは複数の日本語ファイル名が同じ `auto_unnamed` に潰れて 1 エントリにマージされていた不具合の対処です。
+
+### 太さ ID の上書き
+
+OS/2 値が不正確なフォント (例: 「Bold」と書いてあるのに usWeightClass=400) は、全体設定 → フォントのテーブルで weight を手動上書きできます。`fontWeightOverrides[<rel_path>]` として global config に保存されます。
 
 ライブプレビューでは manifest 上のフォント情報を `FontFace` として登録するため、サーバの Pillow とブラウザの canvas が同じ書体で描画されます。
 

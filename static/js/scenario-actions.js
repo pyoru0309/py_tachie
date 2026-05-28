@@ -165,6 +165,115 @@ function clamp01(value, fallback) {
   return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : fallback;
 }
 
+// キャラ配置タブのモーション入力から、選択中キャラの character.motion.settings に
+// 渡す settings を構築する。未入力の数値項目は manifest 既定 (= global config.motion)
+// を fallback。settings オブジェクトには shakeX/shakeY/zoom/move 全部の sub-config
+// を入れる (= motionType 切替で input 値だけ変えれば即時反映、特定 type の値だけが
+// 飛ぶことを避ける)。
+export function collectCutMotionSettings() {
+  const defaults = state.manifest?.config?.motion || {};
+  const readNum = (input, fallback) => {
+    const raw = input?.value;
+    if (raw === undefined || raw === "") return Number(fallback) || 0;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : (Number(fallback) || 0);
+  };
+  const shakeXDef = defaults.shakeX || {};
+  const shakeYDef = defaults.shakeY || {};
+  const zoomDef = defaults.zoom || {};
+  return {
+    shakeX: {
+      amplitude: readNum(elements.cutMotionShakeXAmplitude, shakeXDef.amplitude ?? 30),
+      count: readNum(elements.cutMotionShakeXCount, shakeXDef.count ?? 3),
+      duration: readNum(elements.cutMotionShakeXDuration, shakeXDef.duration ?? 0.6),
+    },
+    shakeY: {
+      amplitude: readNum(elements.cutMotionShakeYAmplitude, shakeYDef.amplitude ?? 30),
+      count: readNum(elements.cutMotionShakeYCount, shakeYDef.count ?? 3),
+      duration: readNum(elements.cutMotionShakeYDuration, shakeYDef.duration ?? 0.6),
+    },
+    zoom: {
+      scale: readNum(elements.cutMotionZoomScale, zoomDef.scale ?? 1.3),
+      origin: elements.cutMotionZoomOrigin?.value || zoomDef.origin || "center",
+    },
+    move: {
+      startFrame: readNum(elements.cutMotionMoveStartFrame, 0),
+      // 持続フレーム既定 48 = PROJECT_FPS (24) × 2 秒。短すぎると編集しづらいため。
+      durationFrame: readNum(elements.cutMotionMoveDurationFrame, 48),
+      startX: readNum(elements.cutMotionMoveStartX, 0),
+      startY: readNum(elements.cutMotionMoveStartY, 0),
+      endX: readNum(elements.cutMotionMoveEndX, 0),
+      endY: readNum(elements.cutMotionMoveEndY, 0),
+      startOpacity: readNum(elements.cutMotionMoveStartOpacity, 1),
+      endOpacity: readNum(elements.cutMotionMoveEndOpacity, 1),
+      startRotation: readNum(elements.cutMotionMoveStartRotation, 0),
+      endRotation: readNum(elements.cutMotionMoveEndRotation, 0),
+      // 拡大率は乗算係数: 1.0 で等倍 (= キャラ scale そのまま)、0.5 で半分。
+      // X/Y と同じく「キャラ自体への直接設定ではなく追加変換」という意味で "相対値"。
+      startScale: readNum(elements.cutMotionMoveStartScale, 1),
+      endScale: readNum(elements.cutMotionMoveEndScale, 1),
+      // 回転 / 拡大の基準点 (1920×1080 絶対座標)。デフォルトは画面中央。
+      pivotX: readNum(elements.cutMotionMovePivotX, 960),
+      pivotY: readNum(elements.cutMotionMovePivotY, 540),
+      easing: elements.cutMotionMoveEasing?.value || "linear",
+    },
+  };
+}
+
+// キャラの motion.settings を input に流し込む。motionSettings が無い場合 (= キャラに
+// motion 未設定) は global config.motion の既定で埋める (= 編集前は既定値が見える)。
+export function applyCutMotionSettingsToControls(motionSettings) {
+  const defaults = state.manifest?.config?.motion || {};
+  const ms = motionSettings || {};
+  const merge = (key) => ({ ...(defaults[key] || {}), ...(ms[key] || {}) });
+  const shakeX = merge("shakeX");
+  const shakeY = merge("shakeY");
+  const zoom = merge("zoom");
+  const move = ms.move || {};
+  const setNum = (input, value, fallback) => {
+    if (!input) return;
+    const n = Number(value ?? fallback);
+    input.value = Number.isFinite(n) ? String(n) : "";
+  };
+  setNum(elements.cutMotionShakeXAmplitude, shakeX.amplitude, 30);
+  setNum(elements.cutMotionShakeXCount, shakeX.count, 3);
+  setNum(elements.cutMotionShakeXDuration, shakeX.duration, 0.6);
+  setNum(elements.cutMotionShakeYAmplitude, shakeY.amplitude, 30);
+  setNum(elements.cutMotionShakeYCount, shakeY.count, 3);
+  setNum(elements.cutMotionShakeYDuration, shakeY.duration, 0.6);
+  setNum(elements.cutMotionZoomScale, zoom.scale, 1.3);
+  if (elements.cutMotionZoomOrigin) {
+    elements.cutMotionZoomOrigin.value = zoom.origin || "center";
+  }
+  setNum(elements.cutMotionMoveStartFrame, move.startFrame, 0);
+  setNum(elements.cutMotionMoveDurationFrame, move.durationFrame, 48);
+  setNum(elements.cutMotionMoveStartX, move.startX, 0);
+  setNum(elements.cutMotionMoveStartY, move.startY, 0);
+  setNum(elements.cutMotionMoveEndX, move.endX, 0);
+  setNum(elements.cutMotionMoveEndY, move.endY, 0);
+  setNum(elements.cutMotionMoveStartOpacity, move.startOpacity, 1);
+  setNum(elements.cutMotionMoveEndOpacity, move.endOpacity, 1);
+  setNum(elements.cutMotionMoveStartRotation, move.startRotation, 0);
+  setNum(elements.cutMotionMoveEndRotation, move.endRotation, 0);
+  setNum(elements.cutMotionMoveStartScale, move.startScale, 1);
+  setNum(elements.cutMotionMoveEndScale, move.endScale, 1);
+  setNum(elements.cutMotionMovePivotX, move.pivotX, 960);
+  setNum(elements.cutMotionMovePivotY, move.pivotY, 540);
+  if (elements.cutMotionMoveEasing) {
+    elements.cutMotionMoveEasing.value = move.easing || "linear";
+  }
+}
+
+// motionType の選択値に応じて .motion-params の表示 / 非表示を切替。
+// motionType.change から呼ばれる + loadCut 後にも呼ばれる。
+export function syncMotionParamsVisibility() {
+  const current = elements.motionType?.value || "none";
+  const blocks = document.querySelectorAll("[data-motion-params]");
+  for (const block of blocks) {
+    block.hidden = (block.dataset.motionParams !== current);
+  }
+}
+
 function collectCharacterEffectsFromControls() {
   const colorFilter = {
     enabled: !!elements.characterColorFilterEnabled?.checked,
@@ -289,8 +398,13 @@ export function payload() {
     backgroundColor: normalizeColorValue(elements.backgroundColor?.value || "#000000", "#000000"),
     backgroundColorOpacity: clamp01(elements.backgroundColorOpacity?.value, 0),
     foreground: elements.foreground?.value ?? "",
-    motionType: elements.motionType?.value || "none",
+    // M-1: cut.state.motionType / motionSettings は撤去。各キャラの character.motion
+    // (= updateSelectedCharacterFromControls 経由で書き込まれる) を直接使う。
     characterEffects: collectCharacterEffectsFromControls(),
+    // 編集中キャラ id を per-cut で永続化。再生→停止→同じカットへ戻ったときに
+    // 「最前面 (index=0) に勝手に戻る」現象を防ぐ (= loadCut が disk 値を最優先
+    // で復元する)。記録された id が現在の cut にいなければ index=0 にフォールバック。
+    editingCharacterId: state.currentCharacters?.[state.selectedCharacterIndex]?.id || "",
     showSpeechBox: elements.showSpeechBox.checked,
     text: elements.dialogue.value,
     speakerCharacterId,
@@ -419,7 +533,9 @@ export function cutFromCurrent() {
   // 消える。cut state schema (`_normalize_cut`) に従って維持すべき項目だけ列挙。
   const carriedFromExisting = {};
   const baseState = (existing && existing.state) || {};
-  for (const key of ["motionSettings", "speakerName"]) {
+  // motionSettings は M-1 で撤去 (= character.motion へ分散)。speakerName と
+  // characterLayout のみ carry。
+  for (const key of ["speakerName", "characterLayout"]) {
     if (key in baseState) carriedFromExisting[key] = baseState[key];
   }
   return {
@@ -810,13 +926,31 @@ export async function loadCut(cut, options = {}) {
       Object.hasOwn(data, "foreground") ? (data.foreground ?? "") : "",
     );
   }
-  if (elements.motionType) {
-    const allowed = new Set(["none", "shake_x", "shake_y", "zoom"]);
-    elements.motionType.value = allowed.has(data.motionType) ? data.motionType : "none";
-  }
+  // M-1: motionType / motionSettings は character.motion へ統合。
+  // loadCut の段階では仮 reset しておき、loadCharacterIntoControls (= 選択中キャラ
+  // が決まった後) で各キャラの motion を input に流し込む。
+  if (elements.motionType) elements.motionType.value = "none";
+  applyCutMotionSettingsToControls(null);
+  syncMotionParamsVisibility();
   applyCharacterEffectsToControls(data.characterEffects);
+  // 編集中キャラの復元優先順:
+  //   1. cut.state.editingCharacterId (= disk 保存) を最優先で復元 — カットへ
+  //      戻ってきたとき常に同じキャラから再開できる。
+  //   2. loadCut 直前まで選択していたキャラ id をフォールバック — 別カットから
+  //      切り替えた直後で、たまたま同じ id がいる場合に拾う。
+  //   3. どちらも一致しなければ 0 (= 最前面)。
+  const previousSelectedCharId = state.currentCharacters?.[state.selectedCharacterIndex]?.id || null;
   state.currentCharacters = normalizeCutCharacters(data);
-  state.selectedCharacterIndex = 0;
+  const savedEditingCharId = (typeof data.editingCharacterId === "string" && data.editingCharacterId)
+    ? data.editingCharacterId : null;
+  let restoredIndex = -1;
+  if (savedEditingCharId) {
+    restoredIndex = state.currentCharacters.findIndex((c) => c?.id === savedEditingCharId);
+  }
+  if (restoredIndex < 0 && previousSelectedCharId) {
+    restoredIndex = state.currentCharacters.findIndex((c) => c?.id === previousSelectedCharId);
+  }
+  state.selectedCharacterIndex = restoredIndex >= 0 ? restoredIndex : 0;
   elements.dialogue.value = data.text || "";
   renderCharacterSelect();
   renderSpeakerSelect(data.speakerCharacterId || "");

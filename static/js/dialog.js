@@ -762,14 +762,15 @@ export async function applyEffectSceneToAllCuts() {
   const currentCut = cuts.find((c) => c.id === state.selectedCutId);
   const cs = currentCut?.state || {};
   const source = {
-    motionType: String(cs.motionType || "none"),
     background: String(cs.background ?? ""),
     backgroundBlurPx: Math.max(0, Number(cs.backgroundBlurPx) || 0),
     backgroundColor: String(cs.backgroundColor || "#000000"),
     backgroundColorOpacity: Math.max(0, Math.min(1, Number(cs.backgroundColorOpacity) || 0)),
     foreground: String(cs.foreground ?? ""),
   };
-  const motionLabelMap = { none: "なし", shake_x: "横シェイク", shake_y: "縦シェイク", zoom: "拡大" };
+  // M-1 で motion は per-character へ移行したため、この「背景・場面の一括適用」
+  // からは motion を扱わない (= 各キャラのモーションは「同一キャラに一括適用」
+  // 経由でコピーされる)。
   const bgItem = (state.manifest?.backgrounds || []).find((b) => (b.path ?? b.id) === source.background);
   const fgItem = (state.manifest?.foregrounds || []).find((b) => (b.path ?? b.id) === source.foreground);
   const otherCount = cuts.length - 1;
@@ -778,7 +779,6 @@ export async function applyEffectSceneToAllCuts() {
     ? `${source.backgroundColor} (${Math.round(source.backgroundColorOpacity * 100)}%)`
     : "なし（透過）";
   const items = [
-    { key: "motionType", label: "モーション", valueText: motionLabelMap[source.motionType] || source.motionType },
     { key: "background", label: "背景", valueText: source.background ? (bgItem?.name || source.background) : "なし（透過）" },
     { key: "backgroundBlurPx", label: "背景ぼかし", valueText: `${source.backgroundBlurPx}px` },
     { key: "backgroundColorPair", label: "背景色 / 不透明度", valueText: bgColorText },

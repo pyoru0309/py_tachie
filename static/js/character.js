@@ -17,6 +17,10 @@ let deps = {
   renderPreview: async () => {},
   syncDialogueVoiceFromSpeaker: () => {},
   reloadCurrentCut: async () => {},
+  // M-1: モーション入力の collect / apply / 表示制御。
+  collectCutMotionSettings: () => ({}),
+  applyCutMotionSettingsToControls: () => {},
+  syncMotionParamsVisibility: () => {},
 };
 
 export function bindCharacter(injectedDeps) {
@@ -384,8 +388,38 @@ export function normalizeCutCharacters(data) {
         ...defaults.character,
         ...(item.character || {}),
       },
+      // B-1: マルチキャラレイアウト用フィールド。orphan キャラでも保持する
+      // (= 後で素材を再インポートすれば layout 設定はそのまま生きる)。
+      layoutSlot: Number.isInteger(item.layoutSlot) && item.layoutSlot >= 0 ? item.layoutSlot : null,
+      crop: _validateCropFromServer(item.crop),
+      // M-1: per-character motion ({type, settings})。未設定 (null/undefined) は
+      // "動かない" 扱い。旧 scene global motion はサーバ側 normalize で話者キャラへ
+      // 移植済みのため、ここでは透過的に保持するだけで OK。
+      motion: _validateMotionFromServer(item.motion),
     };
   });
+}
+
+function _validateMotionFromServer(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const type = String(raw.type || "none");
+  if (type === "none") return null;
+  if (!["shake_x", "shake_y", "zoom", "move"].includes(type)) return null;
+  const settings = (raw.settings && typeof raw.settings === "object") ? { ...raw.settings } : {};
+  return { type, settings };
+}
+
+// crop オブジェクトを { x, y, width, height } のみに限定して受け入れる。
+// width/height が 0 以下 / NaN なら null (= 無効) に倒す。
+function _validateCropFromServer(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const x = Number(raw.x);
+  const y = Number(raw.y);
+  const width = Number(raw.width);
+  const height = Number(raw.height);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  if (!(width > 0) || !(height > 0)) return null;
+  return { x, y, width, height };
 }
 
 export function selectedCharacter() {
@@ -422,7 +456,16 @@ export function updateSelectedCharacterFromControls() {
       y: Number(elements.characterY.value),
       scale: Number(elements.characterScale.value),
     },
+    // M-1: per-character motion ({type, settings})。motionType セレクタが "none"
+    // のときは null = 何も動かない。それ以外は {type, settings} オブジェクト。
+    motion: _collectMotionForCharacterFromControls(),
   });
+}
+
+function _collectMotionForCharacterFromControls() {
+  const type = elements.motionType?.value || "none";
+  if (type === "none") return null;
+  return { type, settings: deps.collectCutMotionSettings() };
 }
 
 export function loadCharacterIntoControls(character) {
@@ -464,6 +507,10 @@ export function loadCharacterIntoControls(character) {
     elements.characterX.value = state.manifest.defaults.character?.x ?? 448;
     elements.characterY.value = state.manifest.defaults.character?.y ?? 0;
     elements.characterScale.value = state.manifest.defaults.character?.scale ?? 1;
+    // M-1: キャラなし状態は motionType=none で入力をリセット。
+    if (elements.motionType) elements.motionType.value = "none";
+    deps.applyCutMotionSettingsToControls(null);
+    deps.syncMotionParamsVisibility();
     fillCharacterDefinitionAddSelect();
     deps.fillExpressionPresets("");
     return;
@@ -495,6 +542,13 @@ export function loadCharacterIntoControls(character) {
   elements.characterX.value = character.character?.x ?? state.manifest.defaults.character.x;
   elements.characterY.value = character.character?.y ?? state.manifest.defaults.character.y;
   elements.characterScale.value = character.character?.scale ?? state.manifest.defaults.character.scale;
+  // M-1: キャラ切替時に motionType + パラメータを input に反映。motion 未設定キャラは
+  // "none" 表示。
+  if (elements.motionType) {
+    elements.motionType.value = character.motion?.type || "none";
+  }
+  deps.applyCutMotionSettingsToControls(character.motion?.settings);
+  deps.syncMotionParamsVisibility();
   // 表情プリセットセレクタを (character.characterId に紐付く) 最新候補で再構築する。
   // これをやらないと、loadCut 経路で character は表示されているのに preset セレクタが
   // 「なし」のまま残るバグが出る (project 初期化時の fillAssetControls は state.
@@ -524,6 +578,7 @@ export function renderCharacterSelect() {
     renderSpeakerSelect("");
     fillCharacterDefinitionAddSelect();
     updateCutCharacterInstanceIdLabel();
+    updateCharacterLayoutButtonAvailability();
     return;
   }
   state.currentCharacters.forEach((character, index) => {
@@ -539,6 +594,15 @@ export function renderCharacterSelect() {
   elements.moveCharacterDownButton.disabled = state.selectedCharacterIndex >= state.currentCharacters.length - 1;
   renderSpeakerSelect(elements.speakerCharacter.value);
   updateCutCharacterInstanceIdLabel();
+  updateCharacterLayoutButtonAvailability();
+}
+
+// 「キャラを配置」ボタンはカット内 2 キャラ以上のときだけ有効。
+// renderCharacterSelect 経由で常に最新の characters.length を反映する。
+function updateCharacterLayoutButtonAvailability() {
+  const button = elements.openCharacterLayoutButton;
+  if (!button) return;
+  button.disabled = (state.currentCharacters?.length || 0) < 2;
 }
 
 // 「登場キャラ」ラベル横に、現在編集中の登場キャラのインスタンス ID
@@ -675,6 +739,11 @@ export function selectCutCharacter(index) {
   renderCharacterSelect();
   loadCharacterIntoControls(selectedCharacter());
   deps.fillExpressionPresets("");
+  // 編集中キャラ id を cut state へ反映 + 保存スケジュール。これがないと
+  // disk 上の editingCharacterId が更新されず、再生→停止→同じカットへ
+  // 戻ったときに前回の選択が復元されない。
+  deps.updateSelectedCutFromCurrent();
+  deps.scheduleScenarioSave();
   deps.renderPreview();
 }
 
@@ -720,6 +789,21 @@ export function deleteCharacter() {
   }
   state.currentCharacters.splice(state.selectedCharacterIndex, 1);
   state.selectedCharacterIndex = clamp(state.selectedCharacterIndex, 0, state.currentCharacters.length - 1);
+  // キャラ配置 (= 分割画面) はカット内 2 キャラ以上のときのみ機能する設計。
+  // 削除で 1 体以下になった場合は「キャラを配置」ボタンが disabled になり
+  // 解除手段がなくなるため、ここで強制的に layout / crop / layoutSlot をリセットする。
+  let layoutCleared = false;
+  const cut = state.scenario?.cuts?.find((c) => c.id === state.selectedCutId);
+  if (cut?.state?.characterLayout && state.currentCharacters.length < 2) {
+    cut.state.characterLayout = null;
+    for (const ch of state.currentCharacters) {
+      if (ch) {
+        ch.crop = null;
+        ch.layoutSlot = null;
+      }
+    }
+    layoutCleared = true;
+  }
   renderCharacterSelect();
   renderSpeakerSelect(elements.speakerCharacter.value);
   loadCharacterIntoControls(selectedCharacter());
@@ -728,7 +812,9 @@ export function deleteCharacter() {
   deps.scheduleScenarioSave();
   deps.renderPreview();
   recordHistory();
-  showToast("キャラクターを削除しました");
+  showToast(layoutCleared
+    ? "キャラクターを削除し、分割配置を解除しました"
+    : "キャラクターを削除しました");
 }
 
 export function moveCharacter(delta) {

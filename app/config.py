@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -177,27 +178,54 @@ def family_id_from_stem(stem_family: str) -> str:
     pretty mapping を介さないので、ハードコード一覧を増やさなくても安定 ID が出る。
     永続スキーマ上の参照 (``fontFamily: "auto_..."``) は本関数の出力に固定される
     ため、本関数の出力ロジックは原則変更しない (= 既存シナリオを壊さない)。
+
+    純非 ASCII の stem (例: ``花とちょうちょ`` / ``ちはや純``) は ASCII 化が
+    空文字になるため、SHA1 先頭 8 文字を ID に流用する。これがないと複数の
+    日本語ファイル名フォントが ``auto_unnamed`` に collapse して 1 エントリに
+    マージされてしまい、UI から個別選択できなくなる。
     """
     base = re.sub(r"[^A-Za-z0-9_]+", "_", stem_family).strip("_").lower()
-    return f"auto_{base or 'unnamed'}"
+    if base:
+        return f"auto_{base}"
+    digest = hashlib.sha1(stem_family.encode("utf-8")).hexdigest()[:8]
+    return f"auto_{digest}"
 
 
 def display_name_for_font(meta: dict[str, Any] | None, stem_family: str) -> str:
-    """UI 表示用の family 名を name table 優先で決定する。
+    """UI 表示用の family 名を **日本語 name 優先** で決定する。
 
-    - name テーブルの family (NameID 16 → 1) を最優先 (= フォント自身の申告)。
-    - 「legacy NameID 1 で subfamily が family に連結されているケース」
-      (例: family="Rounded Mplus 1c Bold" + subfamily="Bold") は suffix を
-      除去して "Rounded Mplus 1c" に正規化する。
-    - 全部空ならフォールバックで stem。
+    優先順:
+
+    1. name table の ja-JP / Mac-ja family (= ``meta.family_localized``)。
+       FontBook が「ねこスプーン」「あんずもじ」「アームドレモン」を出すのと
+       同じ仕組み。NekoSpoon/APJapanesefont/ArmedLemon 等は en-US の name より
+       こちらの方が日常的に通っている。
+    2. name table の en-US family (= ``meta.family``)。Hina Mincho 等、日本語
+       名を持たない欧文向けフォントはこちらで「Hina Mincho」と出る。
+    3. ファイル名 stem。フォントが name table を持たない / fontTools が落ちた
+       場合の最終フォールバック。
+
+    NameID 1 (legacy Family) は subfamily が連結されているケース
+    (例: ``cousagi-font-kyokan Regular`` + subfamily=``Regular``) があり、
+    末尾の suffix を除去して「素の family 名」に正規化する。
+    NameID 16 (Typographic Family) は元々 subfamily を含まないので影響なし。
     """
-    family = ((meta or {}).get("family") or "").strip()
-    if not family:
-        return stem_family
-    sub = ((meta or {}).get("subfamily") or "").strip()
-    if sub and family.endswith(" " + sub):
-        family = family[: -(len(sub) + 1)].strip()
-    return family or stem_family
+    meta = meta or {}
+
+    def _strip_subfamily(family_value: str, subfamily_value: str) -> str:
+        family_value = (family_value or "").strip()
+        subfamily_value = (subfamily_value or "").strip()
+        if subfamily_value and family_value.endswith(" " + subfamily_value):
+            return family_value[: -(len(subfamily_value) + 1)].strip()
+        return family_value
+
+    localized = _strip_subfamily(meta.get("family_localized", ""), meta.get("subfamily_localized", ""))
+    if localized:
+        return localized
+    english = _strip_subfamily(meta.get("family", ""), meta.get("subfamily", ""))
+    if english:
+        return english
+    return stem_family
 
 
 def scan_fonts(
@@ -316,7 +344,15 @@ def pretty_font_family_name(name: str) -> str:
 
 
 def normalized_font_family_name(name: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "", name.lower())
+    """name 比較用のキー。`merge_auto_fonts` で既存 entry との重複検出に使う。
+
+    純非 ASCII の name (例: ``ちはや純``) は ASCII strip で空文字になり、
+    複数の日本語名フォントが「同じキー」で重複扱いされて 1 entry にマージ
+    されてしまうため、ASCII 部分が無い場合は **原文を lowercase 化した
+    ものを返す** (空文字衝突回避)。
+    """
+    ascii_key = re.sub(r"[^a-z0-9]+", "", name.lower())
+    return ascii_key or name.lower()
 
 
 def merge_auto_fonts(config: dict[str, Any], ctx: ProjectContext | None = None) -> dict[str, Any]:

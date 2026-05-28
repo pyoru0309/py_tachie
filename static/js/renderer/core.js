@@ -53,6 +53,10 @@ export function initRenderer(canvas) {
   renderer.setSize(CANVAS_WIDTH, CANVAS_HEIGHT, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0x000000, 0); // 透過。背景はシーン側の plane で塗る。
+  // localClippingEnabled: Material 単位の clippingPlanes を有効にする。
+  // B-2: マルチキャラレイアウトの crop で各キャラ mesh を矩形クリップするのに使う。
+  // crop 未指定のキャラは clippingPlanes=[] (= 空配列) で素通し。
+  renderer.localClippingEnabled = true;
 
   // Y-down: top=0, bottom=H にすることで world y=0 が NDC top=+1 にマップされる。
   // camera.up は既定 (0, 1, 0) のままで OK (反転すると X も反転してしまう)。

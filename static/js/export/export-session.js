@@ -116,20 +116,126 @@ function computeIdleMotionOffset(idleMotion, timelineSec) {
 }
 
 // shake_x / shake_y: amp * sin(2π * count * t / duration) (cut-local)。
+// move: startFrame〜startFrame+durationFrame の間で startX/Y → endX/Y へ補間。
 function computeShakeOffset(motionType, motionSettings, elapsedSec) {
-  if (motionType !== "shake_x" && motionType !== "shake_y") return { dx: 0, dy: 0 };
-  const cfg = motionType === "shake_x"
-    ? (motionSettings?.shakeX || {})
-    : (motionSettings?.shakeY || {});
-  const amp = Number(cfg.amplitude || 0);
-  const count = Number(cfg.count || 0);
-  const duration = Number(cfg.duration || 0);
-  if (amp > 0 && count > 0 && duration > 0 && elapsedSec < duration) {
-    const offset = amp * Math.sin((2 * Math.PI * count * elapsedSec) / duration);
-    if (motionType === "shake_x") return { dx: offset, dy: 0 };
-    return { dx: 0, dy: offset };
+  if (motionType === "shake_x" || motionType === "shake_y") {
+    const cfg = motionType === "shake_x"
+      ? (motionSettings?.shakeX || {})
+      : (motionSettings?.shakeY || {});
+    const amp = Number(cfg.amplitude || 0);
+    const count = Number(cfg.count || 0);
+    const duration = Number(cfg.duration || 0);
+    if (amp > 0 && count > 0 && duration > 0 && elapsedSec < duration) {
+      const offset = amp * Math.sin((2 * Math.PI * count * elapsedSec) / duration);
+      if (motionType === "shake_x") return { dx: offset, dy: 0 };
+      return { dx: 0, dy: offset };
+    }
+    return { dx: 0, dy: 0 };
+  }
+  if (motionType === "move") {
+    return _computeMoveOffsetForExport(motionSettings?.move, elapsedSec);
   }
   return { dx: 0, dy: 0 };
+}
+
+// M-2: 各キャラの character.motion から { dx, dy, scale? } の motionOffsetByChar を構築。
+function _computePerCharacterMotionOffsetsForExport(characters, localElapsedSec) {
+  const result = {};
+  for (const char of characters || []) {
+    if (!char.id || !char.motion?.type || char.motion.type === "none") continue;
+    const mt = char.motion.type;
+    const settings = char.motion.settings || {};
+    if (mt === "shake_x" || mt === "shake_y") {
+      const cfg = mt === "shake_x" ? (settings.shakeX || {}) : (settings.shakeY || {});
+      const amp = Number(cfg.amplitude || 0);
+      const count = Number(cfg.count || 0);
+      const dur = Number(cfg.duration || 0);
+      if (amp > 0 && count > 0 && dur > 0 && localElapsedSec < dur) {
+        const offset = amp * Math.sin((2 * Math.PI * count * localElapsedSec) / dur);
+        result[char.id] = mt === "shake_x" ? { dx: offset, dy: 0 } : { dx: 0, dy: offset };
+      }
+    } else if (mt === "move") {
+      const mo = _computeMoveOffsetForExport(settings.move, localElapsedSec);
+      if (mo.dx !== 0 || mo.dy !== 0 || mo.opacity !== 1
+          || mo.rotationDeg !== 0 || mo.scaleMul !== 1) {
+        const rawPivotX = Number(settings.move?.pivotX);
+        const rawPivotY = Number(settings.move?.pivotY);
+        result[char.id] = {
+          dx: mo.dx, dy: mo.dy,
+          scale: mo.scaleMul,
+          rotationDeg: mo.rotationDeg,
+          opacity: mo.opacity,
+          pivotX: Number.isFinite(rawPivotX) ? rawPivotX : null,
+          pivotY: Number.isFinite(rawPivotY) ? rawPivotY : null,
+        };
+      }
+    } else if (mt === "zoom") {
+      const sc = Number(settings.zoom?.scale || 1);
+      if (sc > 0 && sc !== 1) result[char.id] = { dx: 0, dy: 0, scale: sc };
+    }
+  }
+  return result;
+}
+
+// Phase 1: 移動モーション (linear / easeIn / easeOut / easeInOut)。
+// startFrame / durationFrame は PROJECT_FPS (= 24fps) 基準のフレーム数。
+// 戻り値: { dx, dy, opacity, rotationDeg, scaleMul }
+function _computeMoveOffsetForExport(move, elapsedSec) {
+  const identity = { dx: 0, dy: 0, opacity: 1, rotationDeg: 0, scaleMul: 1 };
+  if (!move) return identity;
+  const FPS = 24; // PROJECT_FPS は timecode.js 由来だが export 経路では定数で十分
+  const startFrame = Math.max(0, Number(move.startFrame) || 0);
+  const durationFrame = Math.max(1, Number(move.durationFrame) || 1);
+  const startX = Number(move.startX) || 0;
+  const startY = Number(move.startY) || 0;
+  const endX = Number(move.endX) || 0;
+  const endY = Number(move.endY) || 0;
+  const clampOpacity = (v, f) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : f;
+  };
+  const clampScale = (v, f) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : f;
+  };
+  const startOpacity = clampOpacity(move.startOpacity, 1);
+  const endOpacity = clampOpacity(move.endOpacity, 1);
+  const startRot = Number(move.startRotation) || 0;
+  const endRot = Number(move.endRotation) || 0;
+  const startScale = clampScale(move.startScale, 1);
+  const endScale = clampScale(move.endScale, 1);
+  const easing = move.easing || "linear";
+  const currentFrame = (Number(elapsedSec) || 0) * FPS;
+  if (currentFrame < startFrame) {
+    return {
+      dx: startX, dy: startY,
+      opacity: startOpacity, rotationDeg: startRot, scaleMul: startScale,
+    };
+  }
+  if (currentFrame >= startFrame + durationFrame) {
+    return {
+      dx: endX, dy: endY,
+      opacity: endOpacity, rotationDeg: endRot, scaleMul: endScale,
+    };
+  }
+  const tRaw = (currentFrame - startFrame) / durationFrame;
+  const t = (() => {
+    const x = Math.max(0, Math.min(1, tRaw));
+    switch (easing) {
+      case "easeIn":  return x * x;
+      case "easeOut": return 1 - (1 - x) * (1 - x);
+      case "easeInOut":
+        return x < 0.5 ? 2 * x * x : 1 - ((-2 * x + 2) * (-2 * x + 2)) / 2;
+      default:        return x;
+    }
+  })();
+  return {
+    dx: startX + (endX - startX) * t,
+    dy: startY + (endY - startY) * t,
+    opacity: startOpacity + (endOpacity - startOpacity) * t,
+    rotationDeg: startRot + (endRot - startRot) * t,
+    scaleMul: startScale + (endScale - startScale) * t,
+  };
 }
 
 // scene-bundle の lipSyncLevels.url を Float32Array で fetch。
@@ -621,9 +727,13 @@ async function renderCutFrames({
         );
       }
     }
-    // shake: speaker のみに適用 (preview と同じ。renderActiveScene 側で speaker
-    // 判定を行うため、ここは shakeDx/Dy をそのまま渡す)。
+    // shake / move / zoom: M-2 で per-character 化。各キャラの character.motion から
+    // motionOffsetByChar を計算 (= scene global の旧経路は server normalize で
+    // 話者キャラへ migrate 済みなのでここではほぼ no-op)。
     const shake = computeShakeOffset(motionType, motionSettings, localElapsedSec);
+    const motionOffsetByChar = _computePerCharacterMotionOffsetsForExport(
+      layerData.characters, localElapsedSec,
+    );
     // idle (呼吸 / BPM bob): scene 内通算秒 (= sceneSec) で計算することで、
     // シーン跨ぎカットでも sin の位相が連続する。
     const idle = idleMotion
@@ -639,6 +749,7 @@ async function renderCutFrames({
       shakeDy: shake.dy,
       idleDx: idle.dx,
       idleDy: idle.dy,
+      motionOffsetByChar,
       elapsedSec: localElapsedSec,
       animationFps: 12,
       frameIdx: f,

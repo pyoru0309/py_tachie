@@ -190,6 +190,15 @@
                  全体設定の previewSmoothing が "smooth" のときだけ visible になり、
                  WebGL canvas を毎フレーム drawImage で再描画してアンチエイリアスを稼ぐ。 -->
             <canvas id="livePreviewSmoothCanvas" hidden></canvas>
+            <!-- 移動モーション「基準 (X,Y)」のピボット指定モード中に十字 indicator を表示。
+                 pointer-events: none で canvas のドラッグ等を阻害しない。 -->
+            <div id="motionPivotIndicator" class="motion-pivot-indicator" hidden aria-hidden="true">
+              <svg viewBox="-20 -20 40 40" width="40" height="40">
+                <circle cx="0" cy="0" r="14" stroke="#ff3b30" stroke-width="2" fill="none" />
+                <line x1="-18" y1="0" x2="18" y2="0" stroke="#ff3b30" stroke-width="2" />
+                <line x1="0" y1="-18" x2="0" y2="18" stroke="#ff3b30" stroke-width="2" />
+              </svg>
+            </div>
             <div id="emptyPreview" class="empty-preview">プレビュー生成中</div>
           </div>
         </div>
@@ -335,14 +344,16 @@
                 <span>同一キャラに一括適用</span>
               </button>
             </div>
-            <label>
-              ベース
-              <select id="baseSelect"></select>
-            </label>
-            <label>
-              表情プリセット
-              <select id="expressionPresetSelect"></select>
-            </label>
+            <div class="inline-fields">
+              <label>
+                ベース
+                <select id="baseSelect"></select>
+              </label>
+              <label>
+                表情プリセット
+                <select id="expressionPresetSelect"></select>
+              </label>
+            </div>
             <div class="inline-fields">
               <label>
                 頬
@@ -395,15 +406,166 @@
           </div>
 
           <div class="panel-section">
-            <h2>キャラを追加</h2>
+            <h2 id="characterMotionHeader">モーション</h2>
+            <p class="asset-hint">編集中のキャラに対して動作を設定します (キャラごとに個別保存)。</p>
             <label>
-              素材キャラ
-              <select id="characterDefinitionSelect"></select>
+              動作
+              <select id="motionTypeSelect">
+                <option value="none">なし</option>
+                <option value="shake_x">横シェイク</option>
+                <option value="shake_y">縦シェイク</option>
+                <option value="zoom">拡大</option>
+                <option value="move">移動</option>
+              </select>
             </label>
-            <button id="addCharacterButton" class="wide-button" type="button">
-              <span class="msym button-icon" aria-hidden="true">person_add</span>
-              <span>追加</span>
-            </button>
+            <div class="motion-params" data-motion-params="shake_x" hidden>
+              <div class="inline-fields">
+                <label>
+                  移動量 (px)
+                  <input id="cutMotionShakeXAmplitudeInput" type="number" min="0" max="200" step="1" />
+                </label>
+                <label>
+                  回数
+                  <input id="cutMotionShakeXCountInput" type="number" min="1" max="20" step="1" />
+                </label>
+                <label>
+                  速さ (秒)
+                  <input id="cutMotionShakeXDurationInput" type="number" min="0.1" max="5" step="0.1" />
+                </label>
+              </div>
+            </div>
+            <div class="motion-params" data-motion-params="shake_y" hidden>
+              <div class="inline-fields">
+                <label>
+                  移動量 (px)
+                  <input id="cutMotionShakeYAmplitudeInput" type="number" min="0" max="200" step="1" />
+                </label>
+                <label>
+                  回数
+                  <input id="cutMotionShakeYCountInput" type="number" min="1" max="20" step="1" />
+                </label>
+                <label>
+                  速さ (秒)
+                  <input id="cutMotionShakeYDurationInput" type="number" min="0.1" max="5" step="0.1" />
+                </label>
+              </div>
+            </div>
+            <div class="motion-params" data-motion-params="zoom" hidden>
+              <div class="inline-fields">
+                <label>
+                  倍率
+                  <input id="cutMotionZoomScaleInput" type="number" min="1.0" max="3" step="0.05" />
+                </label>
+                <label>
+                  原点
+                  <select id="cutMotionZoomOriginSelect">
+                    <option value="center">中央</option>
+                    <option value="bottom">下</option>
+                    <option value="top">上</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="motion-params" data-motion-params="move" hidden>
+              <div class="inline-fields">
+                <label>
+                  開始フレーム
+                  <input id="cutMotionMoveStartFrameInput" type="number" min="0" step="1" value="0" />
+                </label>
+                <label>
+                  持続フレーム
+                  <input id="cutMotionMoveDurationFrameInput" type="number" min="1" step="1" value="48" />
+                </label>
+                <label>
+                  補間曲線
+                  <select id="cutMotionMoveEasingSelect">
+                    <option value="linear">リニア</option>
+                    <option value="easeIn">イーズイン</option>
+                    <option value="easeOut">イーズアウト</option>
+                    <option value="easeInOut">イーズインアウト</option>
+                  </select>
+                </label>
+              </div>
+              <div class="inline-fields">
+                <label>
+                  開始 X
+                  <input id="cutMotionMoveStartXInput" type="number" step="1" value="0" />
+                </label>
+                <label>
+                  開始 Y
+                  <input id="cutMotionMoveStartYInput" type="number" step="1" value="0" />
+                </label>
+              </div>
+              <div class="inline-fields">
+                <label>
+                  終了 X
+                  <input id="cutMotionMoveEndXInput" type="number" step="1" value="0" />
+                </label>
+                <label>
+                  終了 Y
+                  <input id="cutMotionMoveEndYInput" type="number" step="1" value="0" />
+                </label>
+              </div>
+              <div class="inline-fields">
+                <label>
+                  開始 透明度
+                  <input id="cutMotionMoveStartOpacityInput" type="number" min="0" max="1" step="0.1" value="1" />
+                </label>
+                <label>
+                  終了 透明度
+                  <input id="cutMotionMoveEndOpacityInput" type="number" min="0" max="1" step="0.1" value="1" />
+                </label>
+              </div>
+              <div class="inline-fields">
+                <label>
+                  開始 角度 (°)
+                  <input id="cutMotionMoveStartRotationInput" type="number" min="0" max="3600" step="1" value="0" />
+                </label>
+                <label>
+                  終了 角度 (°)
+                  <input id="cutMotionMoveEndRotationInput" type="number" min="0" max="3600" step="1" value="0" />
+                </label>
+              </div>
+              <div class="inline-fields">
+                <label>
+                  開始 拡大率
+                  <input id="cutMotionMoveStartScaleInput" type="number" min="0" max="10" step="0.1" value="1" />
+                </label>
+                <label>
+                  終了 拡大率
+                  <input id="cutMotionMoveEndScaleInput" type="number" min="0" max="10" step="0.1" value="1" />
+                </label>
+              </div>
+              <div class="inline-fields motion-move-pivot-row">
+                <label>
+                  基準 X
+                  <input id="cutMotionMovePivotXInput" type="number" step="1" value="960" />
+                </label>
+                <label>
+                  基準 Y
+                  <input id="cutMotionMovePivotYInput" type="number" step="1" value="540" />
+                </label>
+                <button id="cutMotionMovePivotPickButton" type="button" class="motion-pivot-pick-button">
+                  <span class="msym button-icon" aria-hidden="true">my_location</span>
+                  <span class="motion-pivot-pick-label">指定</span>
+                </button>
+              </div>
+              <p class="asset-hint">編集中のキャラを開始 (X, Y) から終了 (X, Y) へ補間移動します。座標はキャラの基準位置からの相対オフセット、拡大率はキャラ拡大率に対する乗算係数 (1.0 = 等倍)、透明度・角度は絶対値です。基準 (X, Y) は回転・拡大の中心点 (1920×1080 絶対座標)。「指定」ボタンを押すとプレビュー上のクリック/ドラッグで指定でき、「決定」で確定します。</p>
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <h2>キャラを追加</h2>
+            <div class="character-add-row">
+              <label class="character-add-select">
+                素材キャラ
+                <select id="characterDefinitionSelect"></select>
+              </label>
+              <button id="addCharacterButton" type="button" class="character-add-button">
+                <span class="msym button-icon" aria-hidden="true">person_add</span>
+                <span>追加</span>
+              </button>
+            </div>
           </div>
 
           <div class="panel-section">
@@ -411,18 +573,26 @@
             <p class="asset-hint">
               配置済みキャラを別キャラに置換します。X / Y / 拡大率 / 前後関係 / 左右反転 / 白透過は保持され、ベース・表情・髪型は新キャラの初期値に戻ります。
             </p>
-            <label>
-              置換元 (配置済)
-              <select id="replaceCharacterSourceSelect"></select>
-            </label>
-            <label>
-              置換先
-              <select id="replaceCharacterTargetSelect"></select>
-            </label>
-            <label class="checkbox-row">
-              <input id="replaceCharacterDubVoice" type="checkbox" />
-              話者カットの音声を吹き替える (新キャラの声で再合成)
-            </label>
+            <div class="inline-fields">
+              <label>
+                置換元 (配置済)
+                <select id="replaceCharacterSourceSelect"></select>
+              </label>
+              <label>
+                置換先
+                <select id="replaceCharacterTargetSelect"></select>
+              </label>
+            </div>
+            <div class="character-replace-action-row">
+              <label class="checkbox-row character-replace-checkbox">
+                <input id="replaceCharacterDubVoice" type="checkbox" />
+                話者カットの音声を吹き替える (新キャラの声で再合成)
+              </label>
+              <button id="replaceCharacterButton" type="button" class="character-replace-button">
+                <span class="msym button-icon" aria-hidden="true">swap_horiz</span>
+                <span>置換を実行</span>
+              </button>
+            </div>
             <div id="replaceCharacterProgressArea" class="panel-section" hidden>
               <progress id="replaceCharacterProgress" max="100" value="0"></progress>
               <p id="replaceCharacterProgressLabel" class="asset-hint" aria-live="polite"></p>
@@ -431,9 +601,14 @@
                 <pre id="replaceCharacterProgressLog" class="asset-hint" style="max-height:160px;overflow:auto;"></pre>
               </details>
             </div>
-            <button id="replaceCharacterButton" class="wide-button" type="button">
-              <span class="msym button-icon" aria-hidden="true">swap_horiz</span>
-              <span>置換を実行</span>
+          </div>
+
+          <hr class="panel-divider" />
+
+          <div class="panel-section">
+            <button id="openCharacterLayoutButton" type="button" class="wide-button" disabled title="カット内に 2 キャラ以上のとき有効">
+              <span class="msym button-icon" aria-hidden="true">grid_view</span>
+              <span>キャラを配置</span>
             </button>
           </div>
         </section>
@@ -648,24 +823,15 @@
             <h2>背景・場面</h2>
             <div class="inline-fields">
               <label>
-                モーション
-                <select id="motionTypeSelect">
-                  <option value="none">なし</option>
-                  <option value="shake_x">横シェイク</option>
-                  <option value="shake_y">縦シェイク</option>
-                  <option value="zoom">拡大</option>
-                </select>
-              </label>
-              <label>
                 前景
                 <select id="foregroundSelect"></select>
               </label>
-            </div>
-            <div class="inline-fields">
               <label>
                 背景
                 <select id="backgroundSelect"></select>
               </label>
+            </div>
+            <div class="inline-fields">
               <label>
                 背景ぼかし(px)
                 <input id="backgroundBlurPxInput" type="number" min="0" max="200" step="1" />
@@ -686,7 +852,7 @@
             </div>
             <p class="asset-hint">背景画像が未指定のときに表示される色です（既定は完全透明）。背景画像を指定するとそちらが優先されます。</p>
             <div class="button-row">
-              <button id="applyEffectSceneToAllCutsButton" type="button" title="モーション・背景・背景ぼかし・背景色・前景を、他カットへ一括反映します">
+              <button id="applyEffectSceneToAllCutsButton" type="button" title="背景・背景ぼかし・背景色・前景を、他カットへ一括反映します">
                 <span class="msym button-icon" aria-hidden="true">done_all</span>
                 <span>背景・場面を一括適用</span>
               </button>
@@ -1662,6 +1828,63 @@
           <button id="cancelProjectFormButton" type="button">
             <span class="msym button-icon" aria-hidden="true">close</span>
             <span>閉じる</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="characterLayoutDialog" class="settings-dialog character-layout-dialog">
+      <form method="dialog" class="settings-panel">
+        <div class="dialog-header">
+          <div>
+            <h2>キャラを配置</h2>
+            <p>カット内の <span id="characterLayoutCharCount">0</span> 体のキャラに、分割枠とボーダーを一括設定します。</p>
+          </div>
+        </div>
+        <div class="character-layout-body">
+          <section class="character-layout-section">
+            <h3>分割パターン</h3>
+            <div id="characterLayoutPatterns" class="character-layout-patterns" role="radiogroup" aria-label="分割パターン"></div>
+          </section>
+          <section class="character-layout-section">
+            <h3>ボーダー</h3>
+            <label class="checkbox-row">
+              <input id="characterLayoutBorderEnabled" type="checkbox" />
+              ボーダーを表示する
+            </label>
+            <div class="character-layout-border-controls inline-fields">
+              <label>
+                太さ (px)
+                <input id="characterLayoutBorderWidth" type="number" min="0" max="40" step="1" value="4" />
+              </label>
+              <label>
+                色
+                <input id="characterLayoutBorderColor" type="color" value="#ffffff" />
+              </label>
+              <label class="checkbox-row">
+                <input id="characterLayoutBorderIncludeOuter" type="checkbox" />
+                外周にも線を引く
+              </label>
+            </div>
+          </section>
+          <section class="character-layout-section">
+            <h3>スロット割り当て</h3>
+            <p class="asset-hint">スロット 1 から順に、キャラを選択してください (デフォルトは現在の並び順)。</p>
+            <div id="characterLayoutSlots" class="character-layout-slots"></div>
+            <label class="checkbox-row" style="margin-top:8px;">
+              <input id="characterLayoutAutoFit" type="checkbox" checked />
+              自動サイズ調整 (スロットに合わせて拡大率と位置を再計算)
+            </label>
+            <p class="asset-hint">オフにすると、配置を実行しても各キャラの拡大率 / X / Y は今の値のまま、クロップとスロット番号だけが更新されます。ボーダーやスロット切替だけ調整したいときに使います。</p>
+          </section>
+        </div>
+        <div class="dialog-actions">
+          <button id="characterLayoutApplyButton" class="primary-button" type="button">
+            <span class="msym button-icon" aria-hidden="true">grid_view</span>
+            <span>配置を実行</span>
+          </button>
+          <button id="characterLayoutCancelButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>キャンセル</span>
           </button>
         </div>
       </form>

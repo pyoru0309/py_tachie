@@ -83,6 +83,10 @@ export const state = {
   projectDeleteTarget: null,
   currentCharacters: [],
   selectedCharacterIndex: 0,
+  // 「移動」モーションの基準 (X,Y) ピボット指定モード。true のとき preview canvas
+  // のクリック/ドラッグが pivot X/Y input の書き換え経路として動く + 通常の
+  // キャラドラッグは skip される。
+  motionPivotPickingMode: false,
   // 音声合成連携の状態 (state は最後に取得したカタログ)。
   // 起動時に /api/tts/state を fetch して入れ、以降は全体設定 / キャラ紐付け /
   // セリフパネルから参照する。

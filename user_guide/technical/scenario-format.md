@@ -158,11 +158,18 @@
 | 項目 | 説明 |
 | --- | --- |
 | `background` | カット用の静止画背景 (シーンの `videoTrack` がない場合に使用) |
+| `backgroundColor` / `backgroundColorOpacity` | 背景画像が無いときに表示される単色塗りつぶし |
+| `backgroundBlurPx` | 背景画像への Gaussian blur (0 で無効) |
 | `foreground` | カット最前面のオーバーレイ画像 (任意) |
 | `showSpeechBox` | セリフ枠を表示するかどうか |
 | `text` | セリフ本文 |
 | `characters` | カット内に登場するキャラクター配列 |
 | `textStyle` | セリフ表示設定 |
+| `speakerCharacterId` | セリフの話者として扱うキャラの `id` |
+| `characterEffects` | カット内全キャラに掛かる色フィルター / 光彩 / ドロップシャドウ |
+| `characterLayout` | マルチキャラレイアウト設定 (2026-05 追加)。 `{ "pattern": "vertical_2"\|..., "border": { "width", "color", "includeOuter" } }`。`null` で「分割なし」 |
+| `editingCharacterId` | 編集中キャラの `id` を per-cut で永続化 (2026-05 追加)。再生→停止→同じカットへ戻った際にセレクタが復元される。記録された `id` がカット内にいなければ index=0 (= 最前面) へフォールバック |
+| `motionType` / `motionSettings` | **廃止** (2026-05): scene global motion は撤廃。読込時に話者キャラの `character.motion` へ自動 migration され、normalize 後の JSON にはこれらのキーは出力されない |
 
 ## キャラクター状態
 
@@ -203,6 +210,31 @@
 | `flipX` | キャラ本体レイヤー (under / eye / mouth / over) のみを中心軸で左右反転する。光彩・ドロップシャドウは固定の向きを保つ。`character.scale` は負数化しないため、X / Y / 中央寄せ計算は影響を受けない |
 | `character.x`, `character.y` | 配置座標 |
 | `character.scale` | 拡大率 |
+| `motion` | per-character モーション (2026-05 改修)。`{ "type": "shake_x"\|"shake_y"\|"zoom"\|"move", "settings": { ... } }` 形式。未設定 (= キーが無いか `null`) なら「動かない」。旧 cut 単位の `motionType` / `motionSettings` は読込時に話者キャラの `motion` へ自動 migration されます |
+| `crop` | マルチキャラレイアウト用の矩形クリップ `{ x, y, width, height }` (1920×1080 絶対座標)。`null` / 未設定なら全画面表示 |
+| `layoutSlot` | マルチキャラレイアウトのスロット index (0 始まり)。 編集ダイアログ再開時の表示順を保つために保存 |
+
+#### `motion.settings.move` の構造 (移動モーション)
+
+```json
+{
+  "type": "move",
+  "settings": {
+    "move": {
+      "startFrame": 0,
+      "durationFrame": 48,
+      "startX": 0, "startY": 0, "endX": 0, "endY": 0,
+      "startOpacity": 0, "endOpacity": 1,
+      "startRotation": 0, "endRotation": 360,
+      "startScale": 0.5, "endScale": 1.0,
+      "pivotX": 960, "pivotY": 540,
+      "easing": "easeOut"
+    }
+  }
+}
+```
+
+X/Y はキャラ基準位置からの相対オフセット、拡大率はキャラ `character.scale` への乗算係数、透明度・角度は絶対値です。`pivotX/Y` は回転 / 拡大の中心点 (= 1920×1080 絶対座標、デフォルト画面中央)。`easing` は `linear` / `easeIn` / `easeOut` / `easeInOut`。
 
 > 内部的にレンダリングする際は、`baseId` / `hairstylePresetId` などをマニフェストの素材パスへ解決した `base` / `cheek` / `eye` / `mouth` / `bangs` / `back_hair` / `fronts` フィールドが補われます。シナリオ JSON 上は ID 参照だけが永続化されます。
 >

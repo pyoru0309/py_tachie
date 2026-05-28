@@ -81,6 +81,7 @@ const ORDER_CHAR_EYE_OFFSET = 1;
 const ORDER_CHAR_MOUTH_OFFSET = 2;
 const ORDER_CHAR_OVER_OFFSET = 3;
 const ORDER_VIZ_ABOVE_CHARS = 900; // キャラの直上、前景の下
+const ORDER_CHAR_LAYOUT_BORDER = 920; // B-2: マルチキャラレイアウトの分割線 / 外周線。キャラの上、上字幕/visualizer(above_chars) の下
 const ORDER_FG = 1000;
 const ORDER_VIDEO_LAYER_ABOVE_FG = 1250; // 前景の直上、visualizer (above_fg) の下
 const ORDER_VIZ_ABOVE_FG = 1500;   // 前景の直上、セリフの下
@@ -185,6 +186,24 @@ function makeCharPlaneShader(width, height, texture, renderOrder, colorFilter) {
   mesh.frustumCulled = false;
   mesh.visible = !!texture;
   return mesh;
+}
+
+// B-2: crop ({x,y,width,height}) をキャラ ShaderMaterial の uClipRect uniform に
+// 流し込む。three.js の clippingPlanes 機構は ShaderMaterial の動的 recompile が
+// 不安定だったため、custom uniform 経由 (fragment shader で discard) に切替。
+function _applyCropToCharacterMeshes(meshes, crop) {
+  if (!crop) return;
+  const x = Number(crop.x);
+  const y = Number(crop.y);
+  const w = Number(crop.width);
+  const h = Number(crop.height);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !(w > 0) || !(h > 0)) return;
+  for (const mesh of meshes) {
+    const uniform = mesh?.material?.uniforms?.uClipRect;
+    if (uniform?.value?.set) {
+      uniform.value.set(x, y, w, h);
+    }
+  }
 }
 
 async function buildBackground(scene, layerData, urls, renderer, videoProvider) {
@@ -688,6 +707,194 @@ async function buildVisualizer(scene, layerData, urls, renderer, backgroundInfo 
   }
 }
 
+// B-2: characterLayout.border が enabled なら分割線 + 任意で外周線を描く。
+// 各セグメントは細長い PlaneGeometry で表現 (WebGL の LineBasicMaterial は
+// 線幅 1px 固定なので不可)。renderOrder = キャラより前、テロップより後。
+function buildCharacterLayoutBorder(scene, layerData) {
+  const layout = layerData?.characterLayout;
+  const border = layout?.border;
+  const width = Number(border?.width) || 0;
+  // DEBUG (B-2): border 描画が走るかの可視化。問題切り分けが終わったら削除する。
+  if (window.__spliteDebugLayoutBorder) {
+    console.log("[layoutBorder]", { layout, border, width });
+  }
+  if (!layout || !border || width <= 0) return null;
+
+  // pattern からスロット矩形を取得 → 線分集合を作る。
+  const slotRects = _computeSlotRects(layout.pattern);
+  if (window.__spliteDebugLayoutBorder) {
+    console.log("[layoutBorder] slotRects=", slotRects.length, "pattern=", layout.pattern);
+  }
+  if (slotRects.length === 0) return null;
+
+  const segments = _collectBorderSegments(slotRects, !!border.includeOuter);
+  if (window.__spliteDebugLayoutBorder) {
+    console.log("[layoutBorder] segments=", segments.length, segments);
+  }
+  if (segments.length === 0) return null;
+
+  const color = new THREE.Color(border.color || "#ffffff");
+  // ★ transparent: true は必須。THREE は opaque pass → transparent pass の順で
+  // 描画するため、キャラやテロップ (= transparent: true) より下のレンダ順でも、
+  // border が opaque だと「opaque pass で先に描く → 後の transparent pass が上塗り」
+  // で隠れる。transparent: true にすれば同じ transparent pass 内で renderOrder の
+  // 大小に従って正しく重なる。
+  const material = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 1,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+    side: THREE.DoubleSide,
+  });
+
+  const group = new THREE.Group();
+  group.renderOrder = ORDER_CHAR_LAYOUT_BORDER;
+  // 外周線 (canvas edge) は中心が画面端にあると線幅の半分が画面外に切れて
+  // 「指定値の半分しか見えない」現象になる。境界辺は線幅 / 2 だけ内側に
+  // オフセットして、画面内に収まる形で描く。
+  const halfWidth = width / 2;
+  const W = CANVAS_WIDTH;
+  const H = CANVAS_HEIGHT;
+  const eq = (a, b) => Math.abs(a - b) < 0.5;
+  for (const seg of segments) {
+    // seg = { x1, y1, x2, y2 } in world coords (0..1920, 0..1080)
+    const dx = seg.x2 - seg.x1;
+    const dy = seg.y2 - seg.y1;
+    const length = Math.hypot(dx, dy);
+    if (length <= 0) continue;
+    let offsetX = 0;
+    let offsetY = 0;
+    if (eq(seg.x1, 0) && eq(seg.x2, 0)) offsetX = halfWidth;        // 左外周 → 右へ
+    else if (eq(seg.x1, W) && eq(seg.x2, W)) offsetX = -halfWidth;  // 右外周 → 左へ
+    if (eq(seg.y1, 0) && eq(seg.y2, 0)) offsetY = halfWidth;        // 上外周 → 下へ
+    else if (eq(seg.y1, H) && eq(seg.y2, H)) offsetY = -halfWidth;  // 下外周 → 上へ
+    const geometry = new THREE.PlaneGeometry(length, width);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(
+      (seg.x1 + seg.x2) / 2 + offsetX,
+      (seg.y1 + seg.y2) / 2 + offsetY,
+      0,
+    );
+    mesh.rotation.z = Math.atan2(dy, dx);
+    mesh.renderOrder = ORDER_CHAR_LAYOUT_BORDER;
+    mesh.frustumCulled = false;
+    if (window.__spliteDebugLayoutBorder) {
+      console.log("[layoutBorder] mesh", {
+        pos: { x: mesh.position.x, y: mesh.position.y },
+        rot: mesh.rotation.z,
+        size: { w: length, h: width },
+        color: material.color.getHexString(),
+      });
+    }
+    group.add(mesh);
+  }
+  scene.add(group);
+  if (window.__spliteDebugLayoutBorder) {
+    console.log("[layoutBorder] scene.children.length=", scene.children.length,
+      "group.children.length=", group.children.length,
+      "rendererClipEnabled=", (typeof window !== "undefined" && window.__spliteRendererCheck) ? window.__spliteRendererCheck() : "(n/a)");
+  }
+  return { group, material };
+}
+
+// pattern からスロット矩形 (1920×1080 内) を返す。
+// スロット index 0 から左→右 / 上→下 順。
+function _computeSlotRects(pattern) {
+  const W = CANVAS_WIDTH;
+  const H = CANVAS_HEIGHT;
+  switch (pattern) {
+    case "vertical_2":
+      return [{ x: 0, y: 0, w: W / 2, h: H }, { x: W / 2, y: 0, w: W / 2, h: H }];
+    case "vertical_3":
+      return [0, 1, 2].map((i) => ({ x: (W / 3) * i, y: 0, w: W / 3, h: H }));
+    case "vertical_4":
+      return [0, 1, 2, 3].map((i) => ({ x: (W / 4) * i, y: 0, w: W / 4, h: H }));
+    case "horizontal_2":
+      return [{ x: 0, y: 0, w: W, h: H / 2 }, { x: 0, y: H / 2, w: W, h: H / 2 }];
+    case "horizontal_3":
+      return [0, 1, 2].map((i) => ({ x: 0, y: (H / 3) * i, w: W, h: H / 3 }));
+    case "horizontal_4":
+      return [0, 1, 2, 3].map((i) => ({ x: 0, y: (H / 4) * i, w: W, h: H / 4 }));
+    case "grid_2x2":
+      return [
+        { x: 0, y: 0, w: W / 2, h: H / 2 },
+        { x: W / 2, y: 0, w: W / 2, h: H / 2 },
+        { x: 0, y: H / 2, w: W / 2, h: H / 2 },
+        { x: W / 2, y: H / 2, w: W / 2, h: H / 2 },
+      ];
+    case "t_top":  // 上 1 + 下 2
+      return [
+        { x: 0, y: 0, w: W, h: H / 2 },
+        { x: 0, y: H / 2, w: W / 2, h: H / 2 },
+        { x: W / 2, y: H / 2, w: W / 2, h: H / 2 },
+      ];
+    case "t_bottom":  // 上 2 + 下 1
+      return [
+        { x: 0, y: 0, w: W / 2, h: H / 2 },
+        { x: W / 2, y: 0, w: W / 2, h: H / 2 },
+        { x: 0, y: H / 2, w: W, h: H / 2 },
+      ];
+    case "l_left":  // 左 1 + 右 2
+      return [
+        { x: 0, y: 0, w: W / 2, h: H },
+        { x: W / 2, y: 0, w: W / 2, h: H / 2 },
+        { x: W / 2, y: H / 2, w: W / 2, h: H / 2 },
+      ];
+    case "l_right":  // 左 2 + 右 1
+      return [
+        { x: 0, y: 0, w: W / 2, h: H / 2 },
+        { x: 0, y: H / 2, w: W / 2, h: H / 2 },
+        { x: W / 2, y: 0, w: W / 2, h: H },
+      ];
+    default:
+      return [];
+  }
+}
+
+// スロット矩形群から、描画すべき border 線分の重複を除去した集合を返す。
+// includeOuter=true なら外周 (0,0)-(1920,1080) の 4 辺も含める。
+function _collectBorderSegments(slotRects, includeOuter) {
+  const segments = new Map();  // key: "x1,y1-x2,y2" canonical
+  const addSeg = (x1, y1, x2, y2) => {
+    // 同じ線分の重複登録を排除 (= 隣接スロットの共有辺は 1 本に集約)。
+    // 端点の order を正規化してキー化。
+    const a = `${x1.toFixed(2)},${y1.toFixed(2)}`;
+    const b = `${x2.toFixed(2)},${y2.toFixed(2)}`;
+    const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+    if (!segments.has(key)) {
+      segments.set(key, { x1, y1, x2, y2 });
+    }
+  };
+  for (const r of slotRects) {
+    const x1 = r.x, y1 = r.y, x2 = r.x + r.w, y2 = r.y + r.h;
+    addSeg(x1, y1, x2, y1);  // 上辺
+    addSeg(x2, y1, x2, y2);  // 右辺
+    addSeg(x1, y2, x2, y2);  // 下辺
+    addSeg(x1, y1, x1, y2);  // 左辺
+  }
+  const result = Array.from(segments.values());
+  if (!includeOuter) {
+    // 外周 (キャンバス端) の辺を除外。
+    return result.filter((seg) => !_isCanvasEdge(seg));
+  }
+  return result;
+}
+
+function _isCanvasEdge(seg) {
+  const W = CANVAS_WIDTH;
+  const H = CANVAS_HEIGHT;
+  const eq = (a, b) => Math.abs(a - b) < 0.5;
+  // 完全に左 / 右 / 上 / 下 端と一致する線分
+  return (
+    (eq(seg.x1, 0) && eq(seg.x2, 0)) ||
+    (eq(seg.x1, W) && eq(seg.x2, W)) ||
+    (eq(seg.y1, 0) && eq(seg.y2, 0)) ||
+    (eq(seg.y1, H) && eq(seg.y2, H))
+  );
+}
+
 async function buildCharacter(scene, char, charIndex, urls, characterEffects, characterCount) {
   // 配列上の前 (= index 小) のキャラほど手前 (= renderOrder 大) に描く。
   // UI の「登場キャラ」リストは上から順に並んでおり、「前へ」「後ろへ」ボタンが
@@ -773,6 +980,12 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
   if (mouthMesh.visible) bodyGroup.add(mouthMesh);
   if (overMesh.visible) bodyGroup.add(overMesh);
 
+  // B-2: char.crop が指定されていれば、各 ShaderMaterial の uClipRect uniform を
+  // 書き換えて fragment shader 側で矩形外を discard させる。silhouette 側
+  // (= 別 scene、makeCharPlane の MeshBasicMaterial) は今回は対象外 — glow/dropShadow
+  // 利用時は effect bleed が起こりうるが、要件次第で後回し。
+  _applyCropToCharacterMeshes([underMesh, eyeMesh, mouthMesh, overMesh], char.crop);
+
   scene.add(group);
 
   // エフェクト (光彩 / ドロップシャドウ) のセットアップ。両方 disabled なら null。
@@ -849,6 +1062,10 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
     layerWidth: w,
     layerHeight: h,
     flipX,
+    // B-2: マルチキャラレイアウトの crop (= 表示される矩形)。ヒットテストで
+    // bbox と crop の交差を取って「画面に出ていない領域はクリックでも当たらない」
+    // 挙動にするために露出する。
+    crop: char.crop || null,
     eyeMesh,
     mouthMesh,
     eyeTextures,
@@ -928,6 +1145,9 @@ export async function buildScene(
   meshes.videoLayers = all[5];
   const sceneBackgroundInfo = all[6] || null;
   meshes.characters = all.slice(7, 7 + characterCount).filter(Boolean);
+  // B-2: マルチキャラレイアウトの border (分割線 + 任意で外周線)。キャラ build 後に
+  // 1 度だけ作って scene に追加する (cut.state.characterLayout に依存)。
+  meshes.layoutBorder = buildCharacterLayoutBorder(scene, layerData);
   // テロップの neon_glow.autoAttenuateBright 等が参照する。
   // 動画背景の場合は frame ごとに変わるが、scene 開始時のサンプルで代用。
   // ★ Phase 3 で renderLayer 単位に plane を分割したため、各 layer の state に個別に underlayInfo を入れる。
@@ -951,6 +1171,10 @@ export async function buildScene(
     shakeDy = 0,
     idleDx = 0,
     idleDy = 0,
+    // M-2: per-character motion offset { [charId]: { dx, dy, scale? } }。
+    // 指定があれば shake / move / zoom はこちらを優先。指定なしのキャラは
+    // 旧 scene global の shakeDx/Dy (= speaker のみ) を fallback。
+    motionOffsetByChar = null,
     elapsedSec = 0,
     // テロップ可視判定用の「量子化していない」cut-local 秒。
     // elapsedSec は characterAnimationFps (8/12/24) で量子化されているため、
@@ -1091,15 +1315,78 @@ export async function buildScene(
         charInstance.mouthMesh.material.uniforms.uMap.value = nextMouthTex;
         charInstance.mouthMesh.visible = !!nextMouthTex;
       }
-      // モーション: shake は speaker のみ、idle は全員に適用 (v1 の挙動)。
+      // モーション:
+      //   - M-2 で per-character motion 対応。motionOffsetByChar[charId] があれば
+      //     その dx/dy/scale を使う (= shake / move / zoom を 1 経路で扱う)。
+      //   - 未指定なら旧経路 (scene global shakeDx/Dy を speaker のみに適用)。
+      //   - idle は常に全員に追加。
       const isSpeaker = charInstance.isSpeaker;
-      const dx = (isSpeaker ? shakeDx : 0) + idleDx;
-      const dy = (isSpeaker ? shakeDy : 0) + idleDy;
-      charInstance.group.position.set(
-        charInstance.basePos.x + dx,
-        charInstance.basePos.y + dy,
-        0,
-      );
+      const charMotion = motionOffsetByChar?.[charInstance.id];
+      let dx = idleDx;
+      let dy = idleDy;
+      if (charMotion) {
+        dx += Number(charMotion.dx) || 0;
+        dy += Number(charMotion.dy) || 0;
+      } else if (isSpeaker) {
+        dx += shakeDx;
+        dy += shakeDy;
+      }
+
+      // 回転 / 拡大の中心 (= pivot)。指定があればその点を中心に回転・拡大した
+      // 結果の basePos を group.position として書く (= group 構造は変えない)。
+      // 指定なし or scale=1, rotation=0 のときは basePos そのまま (= 旧挙動)。
+      const motionScaleRaw = Number(charMotion?.scale);
+      const motionScale = (Number.isFinite(motionScaleRaw) && motionScaleRaw > 0) ? motionScaleRaw : 1;
+      const motionRotDeg = Number(charMotion?.rotationDeg);
+      const motionRotRad = Number.isFinite(motionRotDeg) ? motionRotDeg * Math.PI / 180 : 0;
+      const pivotXRaw = Number(charMotion?.pivotX);
+      const pivotYRaw = Number(charMotion?.pivotY);
+      const hasCustomPivot = Number.isFinite(pivotXRaw) && Number.isFinite(pivotYRaw);
+      let positionX = charInstance.basePos.x + dx;
+      let positionY = charInstance.basePos.y + dy;
+      if (hasCustomPivot && (motionScale !== 1 || motionRotRad !== 0)) {
+        // pivot 中心の scale + rotation 合成:
+        //   new_pos = pivot + R(θ) · (S · (basePos - pivot)) + (dx, dy)
+        // ここで S = motionScale, R(θ) = 2D 回転行列。
+        const offX = (charInstance.basePos.x - pivotXRaw) * motionScale;
+        const offY = (charInstance.basePos.y - pivotYRaw) * motionScale;
+        const cosθ = Math.cos(motionRotRad);
+        const sinθ = Math.sin(motionRotRad);
+        positionX = pivotXRaw + (offX * cosθ - offY * sinθ) + dx;
+        positionY = pivotYRaw + (offX * sinθ + offY * cosθ) + dy;
+      }
+      if (window.__spliteDebugMotion && charMotion) {
+        console.log("[scene-builder] motion apply", {
+          charId: charInstance.id,
+          basePos: { x: charInstance.basePos.x, y: charInstance.basePos.y },
+          charMotion,
+          finalPos: { x: positionX, y: positionY },
+          dx, dy, hasCustomPivot,
+        });
+      }
+      charInstance.group.position.set(positionX, positionY, 0);
+      if (motionScale !== 1) {
+        charInstance.group.scale.set(motionScale, motionScale, 1);
+      } else if (charInstance.group.scale.x !== 1 || charInstance.group.scale.y !== 1) {
+        charInstance.group.scale.set(1, 1, 1);
+      }
+      if (charInstance.group.rotation.z !== motionRotRad) {
+        charInstance.group.rotation.z = motionRotRad;
+      }
+      // move motion: 各 mesh material の uAlphaMul uniform に opacity を流し込む。
+      // ShaderMaterial uniform を直接書き換え (= 再 compile 不要)。
+      const motionOpacity = Number.isFinite(Number(charMotion?.opacity))
+        ? Math.max(0, Math.min(1, Number(charMotion.opacity))) : 1;
+      const _applyOpacityToMesh = (mesh) => {
+        const u = mesh?.material?.uniforms?.uAlphaMul;
+        if (u && u.value !== motionOpacity) u.value = motionOpacity;
+      };
+      _applyOpacityToMesh(charInstance.bodyGroup?.children?.[0]); // under
+      // bodyGroup 直下の全 mesh に伝搬。flipX で bodyGroup.scale.x=-1 になっていても
+      // uniforms の伝搬は children 走査で十分。
+      if (charInstance.bodyGroup) {
+        for (const child of charInstance.bodyGroup.children) _applyOpacityToMesh(child);
+      }
 
       // エフェクト (光彩 / ドロップシャドウ)。renderer が無い (= 初期化失敗) ときは
       // skip。silhouette + blur は重い (1184x1696 RT を毎フレーム 3 pass 等)

@@ -70,24 +70,58 @@ export function bindPreviewInteractions(injectedDeps = {}) {
   // SceneInstance.meshes.characters は配列順序が cut.state.characters と一致する
   // (= 配列上の前 [index 小] が renderOrder 大 = 視覚的に手前)。よって front-to-back
   // にヒットテストするには index 0 から走査する。
+  //
+  // ただし「編集中のキャラクター」セレクタで奥のキャラを指定した場合は、その選択
+  // 中キャラの bbox 内クリックを最前面より優先する。これがないと、重なって裏に
+  // いるキャラはセレクタで指定しても画面上で掴めず (= 常に最前面が hit)、編集中
+  // キャラと実際にドラッグされるキャラが食い違う。bbox 外をクリックしたときは
+  // 通常通り最前面 → 別キャラに切替、という従来挙動を残す。
+  function _hitTestInstance(inst, sceneX, sceneY) {
+    if (!inst || !inst.basePos) return false;
+    const halfW = (Number(inst.layerWidth) || 0) / 2;
+    const halfH = (Number(inst.layerHeight) || 0) / 2;
+    if (halfW <= 0 || halfH <= 0) return false;
+    const cx = inst.basePos.x;
+    const cy = inst.basePos.y;
+    let left = cx - halfW;
+    let right = cx + halfW;
+    let top = cy - halfH;
+    let bottom = cy + halfH;
+    // crop が設定されているなら bbox と crop の交差矩形でテスト。
+    // (= 画像 bbox は crop 外まで広がっているが、実際に画面に出ているのは crop 内のみ。
+    //  bbox 全体で判定すると「見えていない領域のクリック」で後ろのキャラが取れない。)
+    if (inst.crop) {
+      const cropLeft = Number(inst.crop.x);
+      const cropTop = Number(inst.crop.y);
+      const cropRight = cropLeft + Number(inst.crop.width);
+      const cropBottom = cropTop + Number(inst.crop.height);
+      if (Number.isFinite(cropLeft) && Number.isFinite(cropTop)
+          && cropRight > cropLeft && cropBottom > cropTop) {
+        left = Math.max(left, cropLeft);
+        right = Math.min(right, cropRight);
+        top = Math.max(top, cropTop);
+        bottom = Math.min(bottom, cropBottom);
+      }
+    }
+    if (right <= left || bottom <= top) return false;
+    return sceneX >= left && sceneX <= right && sceneY >= top && sceneY <= bottom;
+  }
+
   function pickCharacterAt(sceneX, sceneY) {
     const sceneInstance = deps.getActiveScene();
     const charInstances = sceneInstance?.meshes?.characters || [];
+
+    const selected = state.currentCharacters?.[state.selectedCharacterIndex];
+    if (selected?.id) {
+      const selIndex = charInstances.findIndex((inst) => inst?.id === selected.id);
+      if (selIndex >= 0 && _hitTestInstance(charInstances[selIndex], sceneX, sceneY)) {
+        return { instance: charInstances[selIndex], index: selIndex };
+      }
+    }
+
     for (let i = 0; i < charInstances.length; i += 1) {
-      const inst = charInstances[i];
-      if (!inst || !inst.basePos) continue;
-      const cx = inst.basePos.x;
-      const cy = inst.basePos.y;
-      const halfW = (Number(inst.layerWidth) || 0) / 2;
-      const halfH = (Number(inst.layerHeight) || 0) / 2;
-      if (halfW <= 0 || halfH <= 0) continue;
-      if (
-        sceneX >= cx - halfW &&
-        sceneX <= cx + halfW &&
-        sceneY >= cy - halfH &&
-        sceneY <= cy + halfH
-      ) {
-        return { instance: inst, index: i };
+      if (_hitTestInstance(charInstances[i], sceneX, sceneY)) {
+        return { instance: charInstances[i], index: i };
       }
     }
     return null;
@@ -113,40 +147,55 @@ export function bindPreviewInteractions(injectedDeps = {}) {
     renderCharacterSelect();
     loadCharacterIntoControls(selectedCharacter());
     deps.fillExpressionPresets("");
+    // 編集中キャラ id を cut state へ反映 + 保存スケジュール (= disk 上の
+    // editingCharacterId が更新される。再生→停止で同じカットに戻ったとき復元できる)。
+    deps.updateSelectedCutFromCurrent();
+    deps.scheduleScenarioSave();
   }
 
   canvas.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return; // 左クリックのみ
     if (state.isPlaying) return;
     if (!isCharacterTabActive()) return;
+    // 「移動」モーションの基準ピボット指定モード中は、通常のキャラドラッグを止めて
+    // motion-pivot-picker.js 側に委ねる (= canvas クリックで pivot 座標が指定される)。
+    if (state.motionPivotPickingMode) return;
+    // 「ドラッグ対象は常に編集中キャラ」「クリックは別キャラへの切替」のセマンティクス。
+    // crop で各キャラが別矩形に分かれていても、ドラッグ中は編集中キャラだけが動く。
+    // pointerup で moved=false (= クリック) かつ別キャラ bbox 内なら switchCandidate に切替。
+    const editingChar = selectedCharacter();
+    if (!editingChar) return;
+    const editingIndex = state.selectedCharacterIndex;
+    const sceneInstance = deps.getActiveScene();
+    const editingInst = (sceneInstance?.meshes?.characters || [])
+      .find((inst) => inst?.id === editingChar.id);
+    if (!editingInst?.basePos) return;
+
     const { x, y } = clientToScene(event);
+    // 切替候補: hit があり、それが編集中キャラと異なるなら候補化。
     const hit = pickCharacterAt(x, y);
-    if (!hit) return;
-    const stateIndex = findStateIndexByInstanceId(hit.instance.id);
-    if (stateIndex < 0) return;
+    const candidateIndex = hit ? findStateIndexByInstanceId(hit.instance.id) : -1;
+    const switchCandidate = (candidateIndex >= 0 && candidateIndex !== editingIndex)
+      ? candidateIndex : null;
 
-    // 既存の選択を切替 (フォーム値はピック直前に退避済み)。
-    selectCharacterByStateIndex(stateIndex);
-
-    const character = state.currentCharacters[stateIndex];
-    if (!character) return;
     // 停止中でも shake (zoom 以外) / idle motion (breath / bpmBob) が group.position
     // と basePos の差分として残っていることがある。ドラッグ中も同じオフセットを
     // 保ってキャラの「見た目位置 = カーソル」を維持するために事前に取得しておく。
-    const visualOffsetX = hit.instance.group.position.x - hit.instance.basePos.x;
-    const visualOffsetY = hit.instance.group.position.y - hit.instance.basePos.y;
+    const visualOffsetX = editingInst.group.position.x - editingInst.basePos.x;
+    const visualOffsetY = editingInst.group.position.y - editingInst.basePos.y;
     dragState = {
       pointerId: event.pointerId,
-      stateIndex,
-      instance: hit.instance,
+      stateIndex: editingIndex,
+      instance: editingInst,
       startScene: { x, y },
-      basePosStart: { x: hit.instance.basePos.x, y: hit.instance.basePos.y },
+      basePosStart: { x: editingInst.basePos.x, y: editingInst.basePos.y },
       visualOffset: { x: visualOffsetX, y: visualOffsetY },
       charStart: {
-        x: Number(character.character?.x ?? 0),
-        y: Number(character.character?.y ?? 0),
+        x: Number(editingChar.character?.x ?? 0),
+        y: Number(editingChar.character?.y ?? 0),
       },
       moved: false,
+      switchCandidate,
     };
     try { canvas.setPointerCapture(event.pointerId); } catch (_e) {}
     canvas.style.cursor = "grabbing";
@@ -192,12 +241,16 @@ export function bindPreviewInteractions(injectedDeps = {}) {
     if (event && event.pointerId !== dragState.pointerId) return;
     const moved = dragState.moved;
     const stateIndex = dragState.stateIndex;
+    const switchCandidate = dragState.switchCandidate;
     try { canvas.releasePointerCapture(dragState.pointerId); } catch (_e) {}
     canvas.style.cursor = "";
     dragState = null;
     if (!moved) {
-      // クリックのみ (ドラッグなし) → 選択切替だけで保存しない。
-      // 既に selectCharacterByStateIndex で UI 同期済。
+      // クリックのみ (ドラッグなし) → 別キャラ bbox 内なら編集中キャラを切替。
+      // 同じキャラの bbox 内クリックなら何もしない。
+      if (switchCandidate != null) {
+        selectCharacterByStateIndex(switchCandidate);
+      }
       return;
     }
     // ドロップ確定: cut.state へ反映 + 保存 + 履歴。

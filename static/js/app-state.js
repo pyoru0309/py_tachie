@@ -23,6 +23,7 @@ import {
 import { fillExpressionPresets } from "./character-manager.js";
 import { fillConfigForm } from "./settings-form.js";
 import { ensureSelectValue, loadCut, renderCutList } from "./scenario-actions.js";
+import { drawTimeline, autoScrollTimelineToCursor } from "./timeline.js";
 
 let _reloadProjectDataSeq = 0;
 
@@ -238,6 +239,13 @@ export async function reloadProjectData(options = {}) {
     state.isLoadingCut = true;
     await loadCut(targetCut);
     state.isLoadingCut = false;
+    // 復元した playhead が timeline viewport の外にあると、リロード直後に再生バーが
+    // 完全に隠れる (scrollLeft=0 のまま)。drawTimeline で layout が確定したあと
+    // 1 frame 待って autoScrollTimelineToCursor を呼び、画面内に引き込む。
+    requestAnimationFrame(() => {
+      drawTimeline();
+      autoScrollTimelineToCursor();
+    });
   } else {
     await renderPreview();
   }

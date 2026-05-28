@@ -54,6 +54,14 @@ class CharacterRequest:
     # 形に揃えてあるので、ここでは raw 値だけ保持して scene-bundle には乗せない。
     glow: dict[str, Any] | None = None
     drop_shadow: dict[str, Any] | None = None
+    # B-2: マルチキャラレイアウト用。crop ({x,y,width,height}) は scene-builder
+    # で clippingPlanes による矩形クリップに使う。layout_slot は再計算 / ダイアログ
+    # 表示用のメタ。両方 None なら従来通り (= 全画面描画 + 自由配置)。
+    crop: dict[str, Any] | None = None
+    layout_slot: int | None = None
+    # M-1: per-character motion ({type, settings})。None なら "動かない"。
+    # type は "shake_x"/"shake_y"/"zoom"/"move" のいずれか。
+    motion: dict[str, Any] | None = None
 
 
 @dataclass
@@ -826,6 +834,40 @@ def character_request_from_payload(payload: dict[str, Any], fallback: dict[str, 
         ds = effects_raw.get("dropShadow")
         if isinstance(ds, dict):
             drop_shadow_cfg = ds
+    # B-2: crop / layoutSlot は payload (= cut.state.characters[i]) から直接読む。
+    # fallback (= 1 つ目のキャラの defaults) には乗せない (= マルチキャラ間で
+    # 値が漏れない設計)。
+    raw_crop = payload.get("crop")
+    crop_cfg = None
+    if isinstance(raw_crop, dict):
+        try:
+            cw = float(raw_crop.get("width") or 0)
+            ch = float(raw_crop.get("height") or 0)
+            if cw > 0 and ch > 0:
+                crop_cfg = {
+                    "x": float(raw_crop.get("x") or 0),
+                    "y": float(raw_crop.get("y") or 0),
+                    "width": cw,
+                    "height": ch,
+                }
+        except (TypeError, ValueError):
+            crop_cfg = None
+    raw_slot = payload.get("layoutSlot")
+    layout_slot_cfg = None
+    if raw_slot is not None:
+        try:
+            slot_value = int(raw_slot)
+            if slot_value >= 0:
+                layout_slot_cfg = slot_value
+        except (TypeError, ValueError):
+            layout_slot_cfg = None
+    raw_motion = payload.get("motion") if isinstance(payload.get("motion"), dict) else None
+    motion_cfg = None
+    if raw_motion:
+        m_type = str(raw_motion.get("type") or "none")
+        if m_type in ("shake_x", "shake_y", "zoom", "move"):
+            m_settings = raw_motion.get("settings") if isinstance(raw_motion.get("settings"), dict) else {}
+            motion_cfg = {"type": m_type, "settings": dict(m_settings)}
     return CharacterRequest(
         id=str(payload.get("id") or fallback.get("id") or ""),
         name=str(payload.get("name") or fallback.get("name") or ""),
@@ -846,6 +888,9 @@ def character_request_from_payload(payload: dict[str, Any], fallback: dict[str, 
         color_filter=color_filter_cfg,
         glow=glow_cfg,
         drop_shadow=drop_shadow_cfg,
+        crop=crop_cfg,
+        layout_slot=layout_slot_cfg,
+        motion=motion_cfg,
     )
 
 

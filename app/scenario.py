@@ -949,6 +949,17 @@ def normalize_character_state(item: dict[str, Any], manifest: dict[str, Any], in
         "y": character.get("y", defaults.get("y", 0)),
         "scale": character.get("scale", defaults.get("scale", 1)),
     }
+    # B-1: マルチキャラレイアウト (任意フィールド)。
+    # crop / layoutSlot は normalize_character_state の入口で arbitrarily な dict から
+    # コピーされてこないため (CHARACTER_STATE_KEYS にも入れていない)、ここで item から
+    # 直接取り出して正規化する。
+    normalized["crop"] = _normalize_character_crop(item.get("crop"))
+    normalized["layoutSlot"] = _normalize_layout_slot(item.get("layoutSlot"))
+    # M-1: per-character motion ({type, settings})。
+    # 旧 cut.state.motionType / motionSettings (scene global, 話者のみ適用) を
+    # 個別キャラに分散する設計。type="none" のとき何も動かない。
+    normalized["motion"] = _normalize_character_motion(item.get("motion"))
+
     if is_orphan:
         # 孤児はバリデーション対象外。frontIds と eyeAboveBangs / flipX の型だけ整える。
         front_ids_raw = normalized.get("frontIds")
@@ -1017,7 +1028,20 @@ def normalize_cut_state(state: dict[str, Any], manifest: dict[str, Any]) -> dict
     if speaker_id not in character_ids:
         speaker_id = str(normalized_characters[0].get("id") or "") if state.get("text") and normalized_characters else ""
     motion_type = str(state.get("motionType") or "none")
-    if motion_type not in ("none", "shake_x", "shake_y", "zoom"):
+    if motion_type not in ("none", "shake_x", "shake_y", "zoom", "move"):
+        motion_type = "none"
+    # M-1 migration: 旧 scene global motion (state.motionType + state.motionSettings) を
+    # 話者キャラ (見つからなければ先頭キャラ) の per-character motion へ移植する。
+    # 移植後は scene global の motionType を "none"、motionSettings は破棄して、
+    # scenario save 時に旧フィールドが永久に残らないようにする。
+    if motion_type != "none" and normalized_characters:
+        raw_old_settings = state.get("motionSettings") if isinstance(state.get("motionSettings"), dict) else {}
+        target_char = next((c for c in normalized_characters if c.get("id") == speaker_id), None)
+        if target_char is None:
+            target_char = normalized_characters[0]
+        if target_char is not None and not target_char.get("motion"):
+            target_char["motion"] = {"type": motion_type, "settings": dict(raw_old_settings)}
+        # 旧フィールドはここで強制的に解除する (= 新形式へ吸収済み)。
         motion_type = "none"
     try:
         background_blur_px = max(0.0, float(state.get("backgroundBlurPx", 0.0) or 0.0))
@@ -1048,12 +1072,20 @@ def normalize_cut_state(state: dict[str, Any], manifest: dict[str, Any]) -> dict
         "characters": normalized_characters,
         "motionType": motion_type,
         "characterEffects": _normalize_character_effects(state.get("characterEffects")),
+        "characterLayout": _normalize_character_layout(state.get("characterLayout")),
         "backgroundBlurPx": round(background_blur_px, 2),
         "backgroundColor": background_color,
         "backgroundColorOpacity": round(background_color_opacity, 3),
     }
-    if "motionSettings" in state and isinstance(state["motionSettings"], dict):
-        normalized["motionSettings"] = state["motionSettings"]
+    # M-1: motionSettings は scene global motion と一緒に廃止。新仕様では各キャラの
+    # character.motion.settings に分散して保持される。旧フィールドが state に残って
+    # いても normalized には乗せない (= save で消える)。
+    # 編集中キャラ id (per-cut で永続化)。クライアントが loadCut 時に最優先で復元
+    # する。記録された id がカット内に居なくても保持する (= キャラ削除→復活時に再利用)
+    # が、空文字はそもそも書き出さない。
+    raw_editing_id = state.get("editingCharacterId")
+    if isinstance(raw_editing_id, str) and raw_editing_id:
+        normalized["editingCharacterId"] = raw_editing_id
     if "speakerName" in state:
         normalized["speakerName"] = state["speakerName"]
     # ユーザーが手動で選び直した声/感情の override (話者キャラの default を上書き)。
@@ -1129,6 +1161,104 @@ def _normalize_hex_color(value: Any, fallback: str) -> str:
     except ValueError:
         return fallback
     return s.lower()
+
+
+# =============================================================================
+# マルチキャラレイアウト (= 画面分割) 用のフィールド正規化。
+#
+# データモデルの設計 (B-1):
+# - character.crop ({x, y, width, height} | None):
+#     1920×1080 系の絶対 px 単位のクリップ矩形。描画時、キャラはこの矩形の
+#     外側を描かない (= scissor で切り取る)。None なら全画面描画 (= 従来通り)。
+# - character.layoutSlot (int | None):
+#     所属する分割枠の 0-based index。None = 未割当 (free 配置)。
+# - cut.state.characterLayout ({pattern, border} | None):
+#     pattern: 分割パターン ID (再編集 / 再計算のため保持)
+#     border: { width(px), color(hex), includeOuter(bool) }
+#
+# crop / layoutSlot / characterLayout は **すべて optional** で、未指定なら
+# 従来の単キャラ自由配置として扱う (= 旧シナリオは無改修で動く)。
+# =============================================================================
+def _normalize_character_crop(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    try:
+        x = float(raw.get("x", 0) or 0)
+        y = float(raw.get("y", 0) or 0)
+        width = float(raw.get("width", 0) or 0)
+        height = float(raw.get("height", 0) or 0)
+    except (TypeError, ValueError):
+        return None
+    if width <= 0 or height <= 0:
+        return None
+    # 1920×1080 を大きく超える矩形は弾く (= 不正データ防止)。座標は負も許容
+    # (= キャラを画面外にずらして一部だけ見せる演出余地)。
+    return {
+        "x": round(x, 2),
+        "y": round(y, 2),
+        "width": round(width, 2),
+        "height": round(height, 2),
+    }
+
+
+def _normalize_layout_slot(raw: Any) -> int | None:
+    if raw is None:
+        return None
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if value < 0:
+        return None
+    return value
+
+
+VALID_LAYOUT_PATTERNS = frozenset({
+    "vertical_2", "horizontal_2",
+    "vertical_3", "horizontal_3",
+    "t_top", "t_bottom", "l_left", "l_right",
+    "vertical_4", "horizontal_4", "grid_2x2",
+})
+
+
+def _normalize_character_layout(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    pattern = str(raw.get("pattern") or "")
+    if pattern not in VALID_LAYOUT_PATTERNS:
+        return None
+    border_raw = raw.get("border") if isinstance(raw.get("border"), dict) else {}
+    try:
+        width = max(0.0, float(border_raw.get("width", 0) or 0))
+    except (TypeError, ValueError):
+        width = 0.0
+    return {
+        "pattern": pattern,
+        "border": {
+            "width": round(width, 2),
+            "color": _normalize_hex_color(border_raw.get("color"), "#ffffff"),
+            "includeOuter": bool(border_raw.get("includeOuter", False)),
+        },
+    }
+
+
+# M-1: per-character motion ({type, settings})。
+# type は "none"/"shake_x"/"shake_y"/"zoom"/"move"。
+# settings は { shakeX: {amplitude,count,duration}, shakeY: {...}, zoom: {scale,origin},
+#               move: {startFrame,durationFrame,startX,startY,endX,endY,easing} }
+_VALID_CHARACTER_MOTION_TYPES = frozenset({"none", "shake_x", "shake_y", "zoom", "move"})
+
+
+def _normalize_character_motion(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    motion_type = str(raw.get("type") or "none")
+    if motion_type not in _VALID_CHARACTER_MOTION_TYPES:
+        motion_type = "none"
+    if motion_type == "none":
+        return None
+    raw_settings = raw.get("settings") if isinstance(raw.get("settings"), dict) else {}
+    return {"type": motion_type, "settings": dict(raw_settings)}
 
 
 def _normalize_color_filter(raw: Any) -> dict[str, Any]:
