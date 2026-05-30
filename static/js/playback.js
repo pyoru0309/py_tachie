@@ -756,9 +756,15 @@ function startPreviewSmoothing() {
   const src = elements.livePreviewWebglCanvas;
   if (!dst || !src) return;
   _smoothingActive = true;
-  // GL canvas は visibility で隠す (hidden 属性は renderer の初期化フローと
-  // 干渉するため避ける)。dst を表示し ResizeObserver で frame 追従。
-  src.style.visibility = "hidden";
+  // GL canvas は opacity:0 で透明化する (見た目は dst の smooth canvas が担う)。
+  // ★ visibility:hidden / hidden 属性は使わない:
+  //   - visibility:hidden の要素はポインタイベントを受け取らないため、上に重なる
+  //     dst (pointer-events:none) を素通りしたイベントも GL canvas に届かず、
+  //     preview-interactions.js のキャラドラッグが smooth モードで一切効かなくなる。
+  //   - hidden 属性は renderer の初期化フローと干渉する。
+  //   opacity:0 なら hit-test 対象として残るので、ドラッグ判定はそのまま機能する。
+  //   drawImage は canvas のバックバッファを読むので CSS opacity の影響を受けない。
+  src.style.opacity = "0";
   dst.hidden = false;
   dst.style.visibility = "visible";
   if (typeof ResizeObserver === "function" && !_smoothingObserver) {
@@ -783,7 +789,7 @@ function stopPreviewSmoothing() {
   const dst = elements.livePreviewSmoothCanvas;
   const src = elements.livePreviewWebglCanvas;
   if (dst) dst.hidden = true;
-  if (src) src.style.visibility = "";
+  if (src) src.style.opacity = "";
 }
 
 // 全体設定 preview.smoothing を読んで開始/停止を切替。設定保存後 / 起動時 /
