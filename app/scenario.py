@@ -959,6 +959,8 @@ def normalize_character_state(item: dict[str, Any], manifest: dict[str, Any], in
     # 旧 cut.state.motionType / motionSettings (scene global, 話者のみ適用) を
     # 個別キャラに分散する設計。type="none" のとき何も動かない。
     normalized["motion"] = _normalize_character_motion(item.get("motion"))
+    # BPM 上下ゆれ (bob)。motion とは独立した per-character エフェクト。
+    normalized["bob"] = _normalize_character_bob(item.get("bob"))
 
     if is_orphan:
         # 孤児はバリデーション対象外。frontIds と eyeAboveBangs / flipX の型だけ整える。
@@ -1054,6 +1056,18 @@ def normalize_cut_state(state: dict[str, Any], manifest: dict[str, Any]) -> dict
         background_color_opacity = max(0.0, min(1.0, float(state.get("backgroundColorOpacity", 0.0) or 0.0)))
     except (TypeError, ValueError):
         background_color_opacity = 0.0
+
+    # 前景の表示位置 (plane 左上の絶対座標, 0,0 = 画面左上)。None = 中央配置。
+    def _coord_or_none(value: Any) -> float | None:
+        if value is None or value == "":
+            return None
+        try:
+            return round(float(value), 2)
+        except (TypeError, ValueError):
+            return None
+    foreground_x = _coord_or_none(state.get("foregroundX"))
+    foreground_y = _coord_or_none(state.get("foregroundY"))
+
     normalized = {
         "background": _nfc(
             state["background"]
@@ -1065,6 +1079,8 @@ def normalize_cut_state(state: dict[str, Any], manifest: dict[str, Any]) -> dict
             if "foreground" in state and isinstance(state["foreground"], str)
             else ""
         ),
+        "foregroundX": foreground_x,
+        "foregroundY": foreground_y,
         "showSpeechBox": state.get("showSpeechBox", True),
         "text": state.get("text", ""),
         "textStyle": state.get("textStyle", defaults.get("textStyle", {})),
@@ -1261,6 +1277,20 @@ def _normalize_character_motion(raw: Any) -> dict[str, Any] | None:
     return {"type": motion_type, "settings": dict(raw_settings)}
 
 
+def _normalize_character_bob(raw: Any) -> dict[str, Any] | None:
+    """BPM 上下ゆれ (bob)。bpm / amplitudePx がともに正のときだけ有効。"""
+    if not isinstance(raw, dict):
+        return None
+    try:
+        bpm = float(raw.get("bpm") or 0)
+        amplitude_px = float(raw.get("amplitudePx") or 0)
+    except (TypeError, ValueError):
+        return None
+    if bpm <= 0 or amplitude_px <= 0:
+        return None
+    return {"bpm": round(bpm, 3), "amplitudePx": round(amplitude_px, 2)}
+
+
 def _normalize_color_filter(raw: Any) -> dict[str, Any]:
     """カット単位の乗算カラーフィルター。enabled / color / opacity を返す。"""
     if not isinstance(raw, dict):
@@ -1355,7 +1385,17 @@ def _normalize_glow_style(raw: dict[str, Any]) -> dict[str, Any]:
         "color": _normalize_hex_color(raw.get("color"), "#ffffff"),
         "blurPx": round(blur_px, 2),
         "opacity": round(opacity, 3),
+        # 強さ: ぼかしで薄くなった halo を濃くするスタック合成回数 (1〜8, 既定 1)。
+        "intensity": _normalize_effect_intensity(raw.get("intensity")),
     }
+
+
+def _normalize_effect_intensity(value: Any) -> float:
+    try:
+        n = float(value) if value is not None else 1.0
+    except (TypeError, ValueError):
+        n = 1.0
+    return round(max(1.0, min(8.0, n)), 2)
 
 
 def _normalize_drop_shadow_style(raw: dict[str, Any]) -> dict[str, Any]:
@@ -1383,6 +1423,8 @@ def _normalize_drop_shadow_style(raw: dict[str, Any]) -> dict[str, Any]:
         "offsetX": round(offset_x, 2),
         "offsetY": round(offset_y, 2),
         "opacity": round(opacity, 3),
+        # 強さ: ぼかしで薄くなった影を濃くするスタック合成回数 (1〜8, 既定 1)。
+        "intensity": _normalize_effect_intensity(raw.get("intensity")),
     }
 
 

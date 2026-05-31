@@ -62,6 +62,8 @@ class CharacterRequest:
     # M-1: per-character motion ({type, settings})。None なら "動かない"。
     # type は "shake_x"/"shake_y"/"zoom"/"move" のいずれか。
     motion: dict[str, Any] | None = None
+    # BPM 上下ゆれ (bob) ({bpm, amplitudePx})。motion とは独立。None なら無効。
+    bob: dict[str, Any] | None = None
 
 
 @dataclass
@@ -123,6 +125,9 @@ class RenderRequest:
     # cut.state.textStyle.dialogueGlow / dialogueDropShadow から流入する。
     dialogue_glow: dict[str, Any] | None = None
     dialogue_drop_shadow: dict[str, Any] | None = None
+    # 前景の表示位置 (plane 左上の絶対座標, 0,0 = 画面左上)。None = 中央配置。
+    foreground_x: float | None = None
+    foreground_y: float | None = None
 
 
 def remove_exact_white(rgba: Image.Image) -> Image.Image:
@@ -868,6 +873,16 @@ def character_request_from_payload(payload: dict[str, Any], fallback: dict[str, 
         if m_type in ("shake_x", "shake_y", "zoom", "move"):
             m_settings = raw_motion.get("settings") if isinstance(raw_motion.get("settings"), dict) else {}
             motion_cfg = {"type": m_type, "settings": dict(m_settings)}
+    raw_bob = payload.get("bob") if isinstance(payload.get("bob"), dict) else None
+    bob_cfg = None
+    if raw_bob:
+        try:
+            bob_bpm = float(raw_bob.get("bpm") or 0)
+            bob_amp = float(raw_bob.get("amplitudePx") or 0)
+        except (TypeError, ValueError):
+            bob_bpm = bob_amp = 0.0
+        if bob_bpm > 0 and bob_amp > 0:
+            bob_cfg = {"bpm": bob_bpm, "amplitudePx": bob_amp}
     return CharacterRequest(
         id=str(payload.get("id") or fallback.get("id") or ""),
         name=str(payload.get("name") or fallback.get("name") or ""),
@@ -891,6 +906,7 @@ def character_request_from_payload(payload: dict[str, Any], fallback: dict[str, 
         crop=crop_cfg,
         layout_slot=layout_slot_cfg,
         motion=motion_cfg,
+        bob=bob_cfg,
     )
 
 
@@ -946,6 +962,15 @@ def request_from_payload(
     def _radius(key: str) -> int:
         # 上限は 500px (枠半幅相当) — 余白との組合せで 1/4 楕円表現も許容する。
         return _project_default_int(key, 0, min_value=0, max_value=500)
+
+    def _coord_or_none(value: Any) -> float | None:
+        # 前景 X / Y: 空欄 / 非数値は None = 中央配置。
+        if value is None or value == "":
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
     character_payloads = payload.get("characters")
     if isinstance(character_payloads, list):
         characters = [
@@ -1068,6 +1093,8 @@ def request_from_payload(
                 else None
             )
         ),
+        foreground_x=_coord_or_none(payload.get("foregroundX")),
+        foreground_y=_coord_or_none(payload.get("foregroundY")),
     )
 
 

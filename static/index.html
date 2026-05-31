@@ -467,7 +467,7 @@
               </div>
             </div>
             <div class="motion-params" data-motion-params="move" hidden>
-              <div class="inline-fields">
+              <div class="inline-fields motion-move-row">
                 <label>
                   開始フレーム
                   <input id="cutMotionMoveStartFrameInput" type="number" min="0" step="1" value="0" />
@@ -476,6 +476,11 @@
                   持続フレーム
                   <input id="cutMotionMoveDurationFrameInput" type="number" min="1" step="1" value="48" />
                 </label>
+                <button id="cutMotionMoveDurationCalcButton" type="button" class="motion-inline-button"
+                  title="カットの表示時間 (お芝居タブ) − 開始フレーム を持続フレームに自動入力します">
+                  <span class="msym button-icon" aria-hidden="true">calculate</span>
+                  <span>計算</span>
+                </button>
                 <label>
                   補間曲線
                   <select id="cutMotionMoveEasingSelect">
@@ -486,27 +491,25 @@
                   </select>
                 </label>
               </div>
-              <div class="inline-fields">
+              <div class="inline-fields motion-move-row">
                 <label>
                   開始 X
                   <input id="cutMotionMoveStartXInput" type="number" step="1" value="0" />
                 </label>
                 <label>
-                  開始 Y
-                  <input id="cutMotionMoveStartYInput" type="number" step="1" value="0" />
-                </label>
-              </div>
-              <div class="inline-fields">
-                <label>
                   終了 X
                   <input id="cutMotionMoveEndXInput" type="number" step="1" value="0" />
+                </label>
+                <label>
+                  開始 Y
+                  <input id="cutMotionMoveStartYInput" type="number" step="1" value="0" />
                 </label>
                 <label>
                   終了 Y
                   <input id="cutMotionMoveEndYInput" type="number" step="1" value="0" />
                 </label>
               </div>
-              <div class="inline-fields">
+              <div class="inline-fields motion-move-row">
                 <label>
                   開始 透明度
                   <input id="cutMotionMoveStartOpacityInput" type="number" min="0" max="1" step="0.1" value="1" />
@@ -515,8 +518,6 @@
                   終了 透明度
                   <input id="cutMotionMoveEndOpacityInput" type="number" min="0" max="1" step="0.1" value="1" />
                 </label>
-              </div>
-              <div class="inline-fields">
                 <label>
                   開始 角度 (°)
                   <input id="cutMotionMoveStartRotationInput" type="number" min="0" max="3600" step="1" value="0" />
@@ -526,7 +527,7 @@
                   <input id="cutMotionMoveEndRotationInput" type="number" min="0" max="3600" step="1" value="0" />
                 </label>
               </div>
-              <div class="inline-fields">
+              <div class="inline-fields motion-move-pivot-row">
                 <label>
                   開始 拡大率
                   <input id="cutMotionMoveStartScaleInput" type="number" min="0" max="10" step="0.1" value="1" />
@@ -535,8 +536,6 @@
                   終了 拡大率
                   <input id="cutMotionMoveEndScaleInput" type="number" min="0" max="10" step="0.1" value="1" />
                 </label>
-              </div>
-              <div class="inline-fields motion-move-pivot-row">
                 <label>
                   基準 X
                   <input id="cutMotionMovePivotXInput" type="number" step="1" value="960" />
@@ -550,8 +549,20 @@
                   <span class="motion-pivot-pick-label">指定</span>
                 </button>
               </div>
-              <p class="asset-hint">編集中のキャラを開始 (X, Y) から終了 (X, Y) へ補間移動します。座標はキャラの基準位置からの相対オフセット、拡大率はキャラ拡大率に対する乗算係数 (1.0 = 等倍)、透明度・角度は絶対値です。基準 (X, Y) は回転・拡大の中心点 (1920×1080 絶対座標)。「指定」ボタンを押すとプレビュー上のクリック/ドラッグで指定でき、「決定」で確定します。</p>
+              <p class="asset-hint">編集中のキャラを開始 (X, Y) から終了 (X, Y) へ補間移動します。座標はキャラの基準位置からの相対オフセット、拡大率はキャラ拡大率に対する乗算係数 (1.0 = 等倍)、透明度・角度は絶対値です。基準 (X, Y) は回転・拡大の中心点 (1920×1080 絶対座標)。「計算」は表示時間の終わりまでを持続フレームに設定します。「指定」ボタンを押すとプレビュー上のクリック/ドラッグで基準点を指定でき、「決定」で確定します。</p>
             </div>
+            <h3 class="motion-subhead">BPM 上下ゆれ</h3>
+            <div class="inline-fields">
+              <label>
+                BPM
+                <input id="characterBobBpmInput" type="number" min="0" max="600" step="1" value="0" />
+              </label>
+              <label>
+                振幅 (px)
+                <input id="characterBobAmplitudeInput" type="number" min="0" max="500" step="1" value="0" />
+              </label>
+            </div>
+            <p class="asset-hint">編集中のキャラを、BPM のビートに合わせて上下にゆらします（bob = 浮き沈み）。BPM・振幅のどちらかが 0 のときは無効です。動作モーションと併用できます（揺れながら移動・拡大など）。位相はシーン全体で連続します。</p>
           </div>
 
           <div class="panel-section">
@@ -827,16 +838,25 @@
                 <select id="foregroundSelect"></select>
               </label>
               <label>
-                背景
-                <select id="backgroundSelect"></select>
+                X
+                <input id="foregroundXInput" type="number" step="10" placeholder="中央" />
+              </label>
+              <label>
+                Y
+                <input id="foregroundYInput" type="number" step="10" placeholder="中央" />
               </label>
             </div>
             <div class="inline-fields">
+              <label>
+                背景
+                <select id="backgroundSelect"></select>
+              </label>
               <label>
                 背景ぼかし(px)
                 <input id="backgroundBlurPxInput" type="number" min="0" max="200" step="1" />
               </label>
             </div>
+            <p class="asset-hint">前景の X / Y は前景画像の左上の表示位置です（0,0 = 画面左上、キャラの座標と同じルール）。空欄のときは中央に配置します。</p>
             <div class="inline-fields">
               <label>
                 背景色
@@ -1603,7 +1623,7 @@
               </label>
               <label>
                 行間 (px)
-                <input id="telopDefaultLineSpacingInput" type="number" min="-20" max="80" step="1" />
+                <input id="telopDefaultLineSpacingInput" type="number" min="-500" max="500" step="1" />
               </label>
             </div>
             <fieldset class="optical-kerning-fieldset">

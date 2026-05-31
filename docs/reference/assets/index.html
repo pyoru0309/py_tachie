@@ -1546,6 +1546,7 @@
 <p>フォントは <code>fonts/</code> に置きます。対応拡張子は <code>.otf</code> と <code>.ttf</code> です。素材再スキャン後、書体セレクタに反映されます。
 ファイル名の末尾が <code>Bold</code> / <code>Medium</code> / <code>Regular</code> などの場合は太さとして推定されます。
 ライブプレビューの canvas は manifest 上のフォント情報を <code>FontFace</code> 登録して、サーバの Pillow と同じ書体で描画します。</p>
+<p>アセット管理のフォント一覧では、見出しに <strong>フォント自身の日本語ファミリ名</strong> (name テーブルの ja-JP / Mac-ja 名、例: <code>NekoSpoon.otf</code> → 「ねこスプーン」) を優先表示します。日本語名を持たない欧文フォントは英語ファミリ名で表示されます。実ファイル名は見出しの下に併記されます。</p>
 <h2 id="png">セリフ枠の装飾 PNG<a class="headerlink" href="#png" title="Permanent link">&para;</a></h2>
 <p>装飾 PNG は <code>overlays/</code> に置きます。設定画面の <code>装飾 PNG</code> で選択すると、セリフ枠に重ねて描画されます。</p>
 <h2 id="_9">キャラクター<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>

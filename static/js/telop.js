@@ -44,8 +44,8 @@ export function bindTelop(injectedDeps) {
   deps = { ...deps, ...injectedDeps };
 }
 
-export const TELOP_GLOW_DEFAULT = { enabled: false, color: "#ffffff", blurPx: 12, opacity: 0.8 };
-export const TELOP_DROP_SHADOW_DEFAULT = { enabled: false, color: "#000000", blurPx: 6, offsetX: 4, offsetY: 4, opacity: 0.7 };
+export const TELOP_GLOW_DEFAULT = { enabled: false, color: "#ffffff", blurPx: 12, opacity: 0.8, intensity: 1 };
+export const TELOP_DROP_SHADOW_DEFAULT = { enabled: false, color: "#000000", blurPx: 6, offsetX: 4, offsetY: 4, opacity: 0.7, intensity: 1 };
 
 // TextClip 拡張キーの client 側の既定値。サーバ _normalize_telop の補完値と一致させる。
 // caption は effectPreset=null、animation/in/out/body=null、occlusion.mode="none"。
@@ -114,27 +114,64 @@ export function defaultTelop() {
 // 色入力 UI: ネイティブ <input type="color"> + HEX テキスト並置 (.color-control / .color-value)。
 // 「初期実装で <input type="color"> だけ置きがち」だが、それは見た目が分かりにくいので
 // 必ず本関数を経由すること (= feedback_color_input_use_swatch)。
+// HEX 文字列 (先頭 # 省略可 / 3 桁 or 6 桁) を検証して #rrggbb に正規化する。
+// 不正なら null。入力途中の live プレビュー判定にも使う。
+function _parseHexInput(raw, fallback) {
+  let t = String(raw || "").trim();
+  if (t && t[0] !== "#") t = `#${t}`;
+  if (/^#[0-9a-f]{3}$/i.test(t) || /^#[0-9a-f]{6}$/i.test(t)) {
+    return normalizeColorValue(t, fallback);
+  }
+  return null;
+}
+
 export function buildColorSwatch(initialValue, fallback, onChange) {
   const wrap = document.createElement("span");
   wrap.className = "color-control";
   const input = document.createElement("input");
   input.type = "color";
-  const value = document.createElement("span");
+  // HEX 値は編集可能なテキスト入力にする (= ネイティブのカラーパレットを開かずに
+  // #rrggbb を直接打ち替えられる)。スウォッチ (input[type=color]) は従来通り
+  // クリックで OS パレットが開く。
+  const value = document.createElement("input");
+  value.type = "text";
   value.className = "color-value";
-  const v0 = normalizeColorValue(initialValue, fallback);
-  input.value = v0;
-  value.textContent = v0;
-  value.style.setProperty("--color-value", v0);
-  wrap.append(input, value);
-  const handler = () => {
-    const v = normalizeColorValue(input.value, fallback);
+  value.spellcheck = false;
+  value.maxLength = 7;
+  value.setAttribute("aria-label", "色 (HEX)");
+  let current = normalizeColorValue(initialValue, fallback);
+  const applyChip = (v) => {
     input.value = v;
-    value.textContent = v;
     value.style.setProperty("--color-value", v);
-    onChange(v);
   };
-  input.addEventListener("input", handler);
-  input.addEventListener("change", handler);
+  input.value = current;
+  value.value = current;
+  applyChip(current);
+
+  // ネイティブパレット (input[type=color]) からの変更。
+  const fromPicker = () => {
+    current = normalizeColorValue(input.value, fallback);
+    value.value = current;
+    applyChip(current);
+    onChange(current);
+  };
+  input.addEventListener("input", fromPicker);
+  input.addEventListener("change", fromPicker);
+
+  // HEX テキスト直接編集: 入力中 (input) は live プレビューのみ、
+  // 確定 (change = blur / Enter) で commit。不正値は直前の有効値へ戻す。
+  value.addEventListener("input", () => {
+    const v = _parseHexInput(value.value, fallback);
+    if (v) applyChip(v);
+  });
+  value.addEventListener("change", () => {
+    const v = _parseHexInput(value.value, fallback) || current;
+    current = v;
+    value.value = v;
+    applyChip(v);
+    onChange(v);
+  });
+  wrap.append(input, value);
   return wrap;
 }
 
@@ -198,6 +235,22 @@ function buildTelopGlowSection(telop, editTelopStyle) {
     updateGlow({ opacity: v });
   });
   row1.append(opLabel);
+
+  // 強さ: ぼかしを大きくして薄くなった光彩を濃くする (スタック合成回数)。
+  const intensityInput = document.createElement("input");
+  intensityInput.type = "number";
+  intensityInput.min = "1";
+  intensityInput.max = "8";
+  intensityInput.step = "0.5";
+  intensityInput.value = Number(cur.intensity ?? 1);
+  const intensityLabel = document.createElement("label");
+  intensityLabel.append("強さ", intensityInput);
+  intensityInput.addEventListener("change", () => {
+    const v = Math.max(1, Math.min(8, Number(intensityInput.value) || 1));
+    intensityInput.value = v;
+    updateGlow({ intensity: v });
+  });
+  row1.append(intensityLabel);
   details.append(row1);
 
   return details;
@@ -263,6 +316,22 @@ function buildTelopDropShadowSection(telop, editTelopStyle) {
     update({ opacity: v });
   });
   row1.append(opLabel);
+
+  // 強さ: ぼかしを大きくして薄くなった影を濃くする (スタック合成回数)。
+  const intensityInput = document.createElement("input");
+  intensityInput.type = "number";
+  intensityInput.min = "1";
+  intensityInput.max = "8";
+  intensityInput.step = "0.5";
+  intensityInput.value = Number(cur.intensity ?? 1);
+  const intensityLabel = document.createElement("label");
+  intensityLabel.append("強さ", intensityInput);
+  intensityInput.addEventListener("change", () => {
+    const v = Math.max(1, Math.min(8, Number(intensityInput.value) || 1));
+    intensityInput.value = v;
+    update({ intensity: v });
+  });
+  row1.append(intensityLabel);
   details.append(row1);
 
   const row2 = document.createElement("div");
@@ -660,28 +729,11 @@ export function renderTelopEditor() {
 
   const colorLabel = document.createElement("label");
   colorLabel.append("文字色");
-  const colorControl = document.createElement("span");
-  colorControl.className = "color-control";
-  const colorInput = document.createElement("input");
-  colorInput.type = "color";
-  const colorValue = document.createElement("span");
-  colorValue.className = "color-value";
-  colorInput.value = normalizeColorValue(telop.style?.color, "#ffffff");
-  colorValue.textContent = colorInput.value;
-  colorValue.style.setProperty("--color-value", colorInput.value);
-  colorControl.append(colorInput, colorValue);
-  colorLabel.append(colorControl);
-  const onColorChange = () => {
-    const v = normalizeColorValue(colorInput.value, "#ffffff");
-    colorInput.value = v;
-    colorValue.textContent = v;
-    colorValue.style.setProperty("--color-value", v);
+  colorLabel.append(buildColorSwatch(telop.style?.color, "#ffffff", (v) => {
     editTelopStyle((style) => { style.color = v; });
     deps.scheduleScenarioSave();
     deps.renderPreview();
-  };
-  colorInput.addEventListener("input", onColorChange);
-  colorInput.addEventListener("change", onColorChange);
+  }));
   rowColor.append(colorLabel);
 
   const outlineWidthInput = document.createElement("input");
@@ -703,28 +755,11 @@ export function renderTelopEditor() {
 
   const outlineColorLabel = document.createElement("label");
   outlineColorLabel.append("アウトライン色");
-  const outlineColorControl = document.createElement("span");
-  outlineColorControl.className = "color-control";
-  const outlineColorInput = document.createElement("input");
-  outlineColorInput.type = "color";
-  const outlineColorValue = document.createElement("span");
-  outlineColorValue.className = "color-value";
-  outlineColorInput.value = normalizeColorValue(telop.style?.outlineColor, "#000000");
-  outlineColorValue.textContent = outlineColorInput.value;
-  outlineColorValue.style.setProperty("--color-value", outlineColorInput.value);
-  outlineColorControl.append(outlineColorInput, outlineColorValue);
-  outlineColorLabel.append(outlineColorControl);
-  const onOutlineColorChange = () => {
-    const v = normalizeColorValue(outlineColorInput.value, "#000000");
-    outlineColorInput.value = v;
-    outlineColorValue.textContent = v;
-    outlineColorValue.style.setProperty("--color-value", v);
+  outlineColorLabel.append(buildColorSwatch(telop.style?.outlineColor, "#000000", (v) => {
     editTelopStyle((style) => { style.outlineColor = v; });
     deps.scheduleScenarioSave();
     deps.renderPreview();
-  };
-  outlineColorInput.addEventListener("input", onOutlineColorChange);
-  outlineColorInput.addEventListener("change", onOutlineColorChange);
+  }));
   rowColor.append(outlineColorLabel);
   body.append(rowColor);
 
@@ -773,15 +808,15 @@ export function renderTelopEditor() {
 
   const spInput = document.createElement("input");
   spInput.type = "number";
-  spInput.min = "-20";
-  spInput.max = "80";
+  spInput.min = "-500";
+  spInput.max = "500";
   spInput.step = "1";
   spInput.value = Number(telop.style?.lineSpacing ?? 0);
   const spLabel = document.createElement("label");
   spLabel.append("行間 (px)", spInput);
   spInput.addEventListener("change", () => {
     editTelopStyle((style) => {
-      style.lineSpacing = Math.max(-20, Math.min(80, Number(spInput.value) || 0));
+      style.lineSpacing = Math.max(-500, Math.min(500, Number(spInput.value) || 0));
     });
     deps.scheduleScenarioSave();
     deps.renderPreview();

@@ -90,86 +90,100 @@ export function drawTextLines(ctx, params) {
       useNativeLetterSpacing = false;
     }
   }
-  if (useStroke && outlineWidth > 0) {
+  const doStroke = useStroke && outlineWidth > 0;
+  if (doStroke) {
     ctx.strokeStyle = strokeStyle;
     ctx.lineWidth = outlineWidth * 2;
     ctx.lineJoin = "round";
+    ctx.lineCap = "round";
     ctx.miterLimit = 2;
   }
-  let glyphTopY = textTop + outlineWidth;
-  let globalCharIdx = 0;   // 行をまたいだ通し文字インデックス (glyphTransformFn に渡す)
+  // ★ アウトラインの「穴」対策 (グリフ間): 全グリフ stroke → 全グリフ fill の 2 パス化。
+  //   per-glyph に stroke→fill を交互に描くと、隣接グリフ / 負の行間で重なった隣接行の
+  //   stroke が直前グリフの fill を上書きし、塗り内部に縁色のスジ / 穴ができる。
+  //   stroke を全部先に敷けば fill より前面に出ないので重なりもきれいに塗り潰される。
+  //   ※ strokeText 自体の巻き方向起因の穴 (濁点等) は drawCaptionClip 側の
+  //     「塗りシルエット膨張アウトライン」で対処するため、ここは素の strokeText でよい。
   const { baseLineDescents } = params;
-  for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i] || " ";
-    const lineW = baseLineWidths[i];
-    let x = textLeft + outlineWidth;
-    if (align === "right") x = textLeft + outlineWidth + (baseW - lineW);
-    else if (align !== "left") x = textLeft + outlineWidth + (baseW - lineW) / 2;
-    const bottomY = glyphTopY + baseLineHeights[i];
-    if (enableOpticalKerning) {
-      // optical kerning: layoutTextRun が決めた glyph[].x で 1 文字ずつ。
-      // baseline は手動 letter_spacing 経路と同じ理由で alphabetic に揃える。
-      ctx.textBaseline = "alphabetic";
-      const baselineY = bottomY - (baseLineDescents?.[i] ?? 0);
-      const run = layoutTextRun(ctx, line, {
-        fontSpec,
-        fontSize,
-        letterSpacing: lsPx,
-        opticalKerning: true,
-        opticalKerningHighQuality,
-        outlineWidth,
-      });
-      for (const g of run.glyphs) {
-        if (g.drawable === false) {
-          // drawable=false (空白トークン) は描画スキップだが、グリフ番号は進める
-          // (pop_per_char の per-char delay が空白で詰まないようにする)。
+  ctx.fillStyle = fillStyle;
+  const phases = doStroke ? ["stroke", "fill"] : ["fill"];
+  for (const phase of phases) {
+    const isStroke = phase === "stroke";
+    // 1 グリフ分の stroke or fill を描く小ヘルパ (transform は呼び出し側で適用済み)。
+    const paint = (str, px, py) => {
+      if (isStroke) ctx.strokeText(str, px, py);
+      else ctx.fillText(str, px, py);
+    };
+    let glyphTopY = textTop + outlineWidth;
+    let globalCharIdx = 0;   // 行をまたいだ通し文字インデックス (glyphTransformFn に渡す)
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = lines[i] || " ";
+      const lineW = baseLineWidths[i];
+      let x = textLeft + outlineWidth;
+      if (align === "right") x = textLeft + outlineWidth + (baseW - lineW);
+      else if (align !== "left") x = textLeft + outlineWidth + (baseW - lineW) / 2;
+      const bottomY = glyphTopY + baseLineHeights[i];
+      if (enableOpticalKerning) {
+        // optical kerning: layoutTextRun が決めた glyph[].x で 1 文字ずつ。
+        // baseline は手動 letter_spacing 経路と同じ理由で alphabetic に揃える。
+        ctx.textBaseline = "alphabetic";
+        const baselineY = bottomY - (baseLineDescents?.[i] ?? 0);
+        const run = layoutTextRun(ctx, line, {
+          fontSpec,
+          fontSize,
+          letterSpacing: lsPx,
+          opticalKerning: true,
+          opticalKerningHighQuality,
+          outlineWidth,
+        });
+        for (const g of run.glyphs) {
+          if (g.drawable === false) {
+            // drawable=false (空白トークン) は描画スキップだが、グリフ番号は進める
+            // (pop_per_char の per-char delay が空白で詰まないようにする)。
+            globalCharIdx += 1;
+            continue;
+          }
+          const gx = x + g.x;
+          const t = glyphTransformFn ? glyphTransformFn(globalCharIdx, g.text) : null;
+          if (t && t.visible === false) {
+            globalCharIdx += 1;
+            continue;
+          }
+          if (t && (t.dx || t.dy || (t.scale != null && t.scale !== 1) || (t.alpha != null && t.alpha !== 1))) {
+            ctx.save();
+            const dx = Number(t.dx) || 0;
+            const dy = Number(t.dy) || 0;
+            const sc = (t.scale != null && Number.isFinite(t.scale)) ? Number(t.scale) : 1;
+            const al = (t.alpha != null && Number.isFinite(t.alpha)) ? Number(t.alpha) : 1;
+            ctx.translate(gx + dx, baselineY + dy);
+            if (sc !== 1) ctx.scale(sc, sc);
+            if (al !== 1) ctx.globalAlpha = (ctx.globalAlpha ?? 1) * al;
+            paint(g.text, 0, 0);
+            ctx.restore();
+          } else {
+            paint(g.text, gx, baselineY);
+          }
           globalCharIdx += 1;
-          continue;
         }
-        const gx = x + g.x;
-        const t = glyphTransformFn ? glyphTransformFn(globalCharIdx, g.text) : null;
-        if (t && t.visible === false) {
-          globalCharIdx += 1;
-          continue;
+        ctx.textBaseline = "bottom";
+      } else if (useNativeLetterSpacing || lsPx === 0) {
+        paint(line, x, bottomY);
+      } else {
+        // 手動 letterSpacing 経路: 1 文字ずつ描く必要がある。textBaseline="bottom" のまま
+        // 描くと各文字の bbox 下端で揃ってしまい (v は baseline、y は descender 底)、
+        // v/y が他の文字に対して浮き上がって見える。alphabetic baseline に切り替えて
+        // 「全文字共通のベースライン」で並べる。
+        ctx.textBaseline = "alphabetic";
+        const baselineY = bottomY - (baseLineDescents?.[i] ?? 0);
+        let cx = x;
+        for (const ch of line) {
+          paint(ch, cx, baselineY);
+          cx += ctx.measureText(ch).width + lsPx;
         }
-        if (t && (t.dx || t.dy || (t.scale != null && t.scale !== 1) || (t.alpha != null && t.alpha !== 1))) {
-          ctx.save();
-          const dx = Number(t.dx) || 0;
-          const dy = Number(t.dy) || 0;
-          const sc = (t.scale != null && Number.isFinite(t.scale)) ? Number(t.scale) : 1;
-          const al = (t.alpha != null && Number.isFinite(t.alpha)) ? Number(t.alpha) : 1;
-          ctx.translate(gx + dx, baselineY + dy);
-          if (sc !== 1) ctx.scale(sc, sc);
-          if (al !== 1) ctx.globalAlpha = (ctx.globalAlpha ?? 1) * al;
-          if (useStroke && outlineWidth > 0) ctx.strokeText(g.text, 0, 0);
-          ctx.fillText(g.text, 0, 0);
-          ctx.restore();
-        } else {
-          if (useStroke && outlineWidth > 0) ctx.strokeText(g.text, gx, baselineY);
-          ctx.fillText(g.text, gx, baselineY);
-        }
-        globalCharIdx += 1;
+        ctx.textBaseline = "bottom";
       }
-      ctx.textBaseline = "bottom";
-    } else if (useNativeLetterSpacing || lsPx === 0) {
-      if (useStroke && outlineWidth > 0) ctx.strokeText(line, x, bottomY);
-      ctx.fillText(line, x, bottomY);
-    } else {
-      // 手動 letterSpacing 経路: 1 文字ずつ描く必要がある。textBaseline="bottom" のまま
-      // 描くと各文字の bbox 下端で揃ってしまい (v は baseline、y は descender 底)、
-      // v/y が他の文字に対して浮き上がって見える。alphabetic baseline に切り替えて
-      // 「全文字共通のベースライン」で並べる。
-      ctx.textBaseline = "alphabetic";
-      const baselineY = bottomY - (baseLineDescents?.[i] ?? 0);
-      let cx = x;
-      for (const ch of line) {
-        if (useStroke && outlineWidth > 0) ctx.strokeText(ch, cx, baselineY);
-        ctx.fillText(ch, cx, baselineY);
-        cx += ctx.measureText(ch).width + lsPx;
-      }
-      ctx.textBaseline = "bottom";
+      glyphTopY += baseLineHeights[i] + lineGap + outlineWidth * 2;
     }
-    glyphTopY += baseLineHeights[i] + lineGap + outlineWidth * 2;
   }
   ctx.restore();
 }
@@ -187,7 +201,30 @@ const _textScratch = {
   silhouette: null,
   shadowTinted: null,
   glowTinted: null,
+  outlineTinted: null,
 };
+
+// 塗りシルエット img を半径 radius のディスク状に密スタンプして「膨張 (dilation)」する。
+// strokeText の巻き方向起因の穴を避けるアウトライン描画用。img は solid な塗り
+// シルエットなので、重ねても巻き方向で打ち消されず、union がそのまま膨張形になる。
+function _stampDilate(ctx, img, x, y, radius) {
+  const r = Math.max(0, Number(radius) || 0);
+  if (r < 0.6) { ctx.drawImage(img, x, y); return; }
+  // グリッド刻み (<= 2px) でディスク内部を埋める → 内部に塗り残しが出ない。
+  const step = Math.max(1, Math.min(2, r / 6));
+  for (let dy = -r; dy <= r + 1e-6; dy += step) {
+    const span = Math.sqrt(Math.max(0, r * r - dy * dy));
+    for (let dx = -span; dx <= span + 1e-6; dx += step) {
+      ctx.drawImage(img, x + dx, y + dy);
+    }
+  }
+  // 外周リングを一周してグリッド端の欠け (円弧の取りこぼし) を埋める。
+  const ringN = Math.max(8, Math.ceil((2 * Math.PI * r) / step));
+  for (let k = 0; k < ringN; k += 1) {
+    const a = (2 * Math.PI * k) / ringN;
+    ctx.drawImage(img, x + Math.cos(a) * r, y + Math.sin(a) * r);
+  }
+}
 
 function _acquireTextScratch(slot, width, height) {
   let c = _textScratch[slot];
@@ -206,6 +243,22 @@ function _acquireTextScratch(slot, width, height) {
   ctx.globalCompositeOperation = "source-over";
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   return c;
+}
+
+// ぼかし済みの halo / 影を strength 回スタック合成して密度を上げる。
+// strength=1 で 1 回 (= 従来)。小数は端数を globalAlpha で 1 回足す (連続調整用)。
+// 呼び出し側で ctx.filter (blur) / globalCompositeOperation を設定済みの前提。
+function _stackDrawImage(ctx, img, dx, dy, strength) {
+  const reps = Math.max(1, Number(strength) || 1);
+  const full = Math.floor(reps);
+  const frac = reps - full;
+  for (let k = 0; k < full; k += 1) ctx.drawImage(img, dx, dy);
+  if (frac > 0.001) {
+    const prevAlpha = ctx.globalAlpha == null ? 1 : ctx.globalAlpha;
+    ctx.globalAlpha = prevAlpha * frac;
+    ctx.drawImage(img, dx, dy);
+    ctx.globalAlpha = prevAlpha;
+  }
 }
 
 export function releaseTextScratch() {
@@ -384,7 +437,13 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
     baseW = Math.max(baseW, lineW);
   }
   ctx.restore();
-  const lineGap = Math.max(0, Math.max(2, Math.floor(fontSize / 6)) + lineSpacingExtra);
+  // lineSpacingExtra は負値を許容する (= 行間を詰める / 行を重ねる)。大きい
+  // フォントサイズでは既定 gap (fontSize/6) が大きく、従来の `Math.max(0, ...)`
+  // だと負の行間を指定しても gap=0 止まりで詰められなかった。下限はベース行高の
+  // 全否定 (= 行順の反転) を避けるため `-baseLineHeight` 付近までに留める。
+  const baseGap = Math.max(2, Math.floor(fontSize / 6));
+  const maxBaseLineHeight = baseLineHeights.length ? Math.max(...baseLineHeights) : fontSize;
+  const lineGap = Math.max(-maxBaseLineHeight, baseGap + lineSpacingExtra);
 
   const nLines = Math.max(1, lines.length);
   const visibleW = baseW + outlineWidth * 2;
@@ -473,11 +532,17 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
   const glowEnabled = !!(glow && glow.enabled);
   const shadowEnabled = !!(shadow && shadow.enabled);
 
-  if (glowEnabled || shadowEnabled) {
+  if (glowEnabled || shadowEnabled || outlineWidth > 0) {
     const gBlur = glowEnabled ? Math.max(0, Number(glow.blurPx) || 0) : 0;
     const sBlur = shadowEnabled ? Math.max(0, Number(shadow.blurPx) || 0) : 0;
     const sOx = shadowEnabled ? (Number(shadow.offsetX) || 0) : 0;
     const sOy = shadowEnabled ? (Number(shadow.offsetY) || 0) : 0;
+    // ★ 強さ (intensity): ぼかしを大きくすると alpha が拡散して薄くなる問題への対策。
+    //   ぼかし済みの halo / 影を intensity 回スタック合成して密度を上げる
+    //   (alpha_out = 1-(1-a)^n 的に濃くなる)。Photoshop の「スプレッド/強さ」相当。
+    //   既定 1 = 従来と完全同一。1 未満は 1 にクランプ。
+    const gIntensity = glowEnabled ? Math.max(1, Number(glow.intensity) || 1) : 1;
+    const sIntensity = shadowEnabled ? Math.max(1, Number(shadow.intensity) || 1) : 1;
     // ★ glow.passes (任意): 多段発光のパス配列 [{ blurMult, opacityMult }, ...]。
     //   未指定なら 1 パス (= 既存テロップの 1 段 glow と完全互換)。
     //   neon_glow プリセットが指定して「内側くっきり + 外側広く + 加算重ね」のネオン感を出す。
@@ -495,7 +560,9 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
     // bbox は visible text + blur halo を全部包む大きさ。ガウシアン blur の有効半径は
     // 3σ なので 1σ 余裕を見て 4σ ぶんの margin を取る。silhouette/tinted を全面
     // 1920×1080 で確保していた旧実装より backing store は概ね 20-50 倍小さくなる。
-    const blurMargin = Math.ceil(4 * Math.max(gBlurMaxEff, sBlur));
+    //   アウトライン (= 塗りシルエット膨張) ぶんの余白も確保する。
+    const outlineMargin = outlineWidth > 0 ? Math.ceil(outlineWidth) + 2 : 0;
+    const blurMargin = Math.max(outlineMargin, Math.ceil(4 * Math.max(gBlurMaxEff, sBlur)));
     const bboxX = Math.floor(textLeft - blurMargin);
     const bboxY = Math.floor(textTop - blurMargin);
     const bboxW = Math.max(1, Math.ceil(visibleW + blurMargin * 2));
@@ -529,7 +596,7 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
     if (shadowEnabled && shadowTinted) {
       ctx.save();
       if (sBlur > 0) ctx.filter = `blur(${sBlur}px)`;
-      ctx.drawImage(shadowTinted, bboxX + sOx, bboxY + sOy);
+      _stackDrawImage(ctx, shadowTinted, bboxX + sOx, bboxY + sOy, sIntensity);
       ctx.restore();
     }
     if (glowEnabled) {
@@ -561,17 +628,33 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
         ctx.save();
         if (passBlur > 0) ctx.filter = `blur(${passBlur}px)`;
         ctx.globalCompositeOperation = passOp;
-        ctx.drawImage(tinted, bboxX, bboxY);
+        _stackDrawImage(ctx, tinted, bboxX, bboxY, gIntensity);
         ctx.restore();
       }
     }
+    // ★ アウトライン本体: strokeText は 1 回の nonzero 塗りで全輪郭をまとめるため、
+    //   フォントの巻き方向が不揃いだと重なったストロークが打ち消し合って穴になる
+    //   (濁点・拗音で顕著、サイズが大きいほど悪化)。代わりに「塗りシルエット (fill 由来=
+    //   solid・巻き方向に依存しない) を outline 色で着色し、outlineWidth ぶん密スタンプ
+    //   して膨張」させる。union 合成なので穴が原理的に出ない。本体 fill はこの上に重ねる。
+    if (outlineWidth > 0) {
+      const outlineSil = createTextSilhouetteCanvas(bboxW, bboxH, localDrawParams, "fill");
+      const outlineTinted = tintSilhouetteCanvas(outlineSil, outlineColor, 1, "outlineTinted");
+      ctx.save();
+      ctx.filter = "none";
+      ctx.globalCompositeOperation = "source-over";
+      _stampDilate(ctx, outlineTinted, bboxX, bboxY, outlineWidth);
+      ctx.restore();
+    }
   }
 
+  // 本体 fill。アウトラインは上のシルエット膨張で描いたので、ここでは stroke しない
+  // (strokeText 由来の穴を避ける)。outlineWidth=0 のときも従来どおり fill のみ。
   drawTextLines(ctx, {
     ...drawParams,
     fillStyle: color,
     strokeStyle: outlineColor,
-    useStroke: outlineWidth > 0,
+    useStroke: false,
   });
   if (rotationActive) ctx.restore();
   return true;

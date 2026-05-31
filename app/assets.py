@@ -461,11 +461,30 @@ def asset_url(rel_path: str | None) -> str | None:
     return f"{url}?v={mtime_ns}"
 
 
+def _font_display_name(path: Path) -> str | None:
+    """フォントファイルの UI 表示名 (日本語 name 優先) を返す。失敗時は None。
+
+    アセット管理のフォント一覧で、ファイル名 (NekoSpoon.otf) ではなく
+    name table 由来の family 名 (ねこスプーン) を見出しに出すため。
+    fontTools 未導入などで解決できないときは None でファイル名表示に倒す。
+    """
+    try:
+        from .font_inspect import inspect_font
+        from .config import display_name_for_font, font_family_and_weight
+
+        meta = inspect_font(path)
+        stem_family, _ = font_family_and_weight(path.stem)
+        name = display_name_for_font(meta, stem_family)
+        return name or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def file_metadata(path: Path, scope_root: Path) -> dict[str, Any]:
     stat = path.stat()
     rel_under_scope = path.relative_to(scope_root).as_posix()
     rel_root = relative_to_root(path).replace("\\", "/")
-    return {
+    meta: dict[str, Any] = {
         "name": path.name,
         "stem": path.stem,
         "ext": path.suffix.lower(),
@@ -476,6 +495,11 @@ def file_metadata(path: Path, scope_root: Path) -> dict[str, Any]:
         "modifiedAt": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
         "kind": "file",
     }
+    if path.suffix.lower() in (".otf", ".ttf"):
+        display = _font_display_name(path)
+        if display:
+            meta["displayName"] = display
+    return meta
 
 
 def scan_character_directory_summary(char_dir: Path, scope_root: Path) -> dict[str, Any]:

@@ -455,16 +455,35 @@ button:disabled {
   white-space: nowrap;
 }
 
-/* 移動モーションの「基準 X / Y / 指定」を 1 行 3 列で並べる */
-.motion-move-pivot-row {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+/* 移動モーション: パラメータを 4 列で詰めて並べる (横幅に余裕があるため)。
+   ラベル付き入力とボタン/セレクトの高さを揃えるため align-items: end。 */
+.motion-move-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: end;
 }
 
+/* 最終行は「開始拡大率 / 終了拡大率 / 基準X / 基準Y / 指定」の 5 要素。
+   数値 4 列は等幅、末尾の「指定」ボタンだけ内容幅に詰める。 */
+.motion-move-pivot-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  align-items: end;
+}
+
+.motion-inline-button,
 .motion-pivot-pick-button {
   white-space: nowrap;
   height: auto;
   align-self: end;
+}
+
+/* モーション内のサブ見出し (BPM 上下ゆれ等、動作とは独立したエフェクト群の区切り) */
+.motion-subhead {
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fg-muted);
 }
 
 /* 指定モード中は accent 色で強調表示 (= 操作待ちであることを明示) */

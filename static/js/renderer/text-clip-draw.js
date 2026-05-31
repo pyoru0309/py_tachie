@@ -290,8 +290,8 @@ function _staticClipFingerprint(clip) {
     s.enableOpticalKerning ? 1 : 0,
     s.opticalKerningHighQuality ? 1 : 0,
     s.rotation ?? 0,
-    s.glow ? `g${s.glow.enabled ? 1 : 0}:${s.glow.color}:${s.glow.blurPx}:${s.glow.opacity}` : "",
-    s.dropShadow ? `d${s.dropShadow.enabled ? 1 : 0}:${s.dropShadow.color}:${s.dropShadow.blurPx}:${s.dropShadow.offsetX}:${s.dropShadow.offsetY}:${s.dropShadow.opacity}` : "",
+    s.glow ? `g${s.glow.enabled ? 1 : 0}:${s.glow.color}:${s.glow.blurPx}:${s.glow.opacity}:${s.glow.intensity ?? 1}` : "",
+    s.dropShadow ? `d${s.dropShadow.enabled ? 1 : 0}:${s.dropShadow.color}:${s.dropShadow.blurPx}:${s.dropShadow.offsetX}:${s.dropShadow.offsetY}:${s.dropShadow.opacity}:${s.dropShadow.intensity ?? 1}` : "",
     // ★ 静的 effect / animation も見た目に影響するため含める。
     clip.effectPreset || "",
     JSON.stringify(clip.effectParams || {}),

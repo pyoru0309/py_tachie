@@ -1,5 +1,5 @@
-import { opacityToUi, debounce } from "./utils.js";
-import { bindTimecodeInput, PROJECT_FPS } from "./timecode.js";
+import { opacityToUi, debounce, normalizeColorValue } from "./utils.js";
+import { bindTimecodeInput, PROJECT_FPS, parseTimecode } from "./timecode.js";
 import { cutDurationFrame, cutStartSec, cutDurationSec } from "./scenario.js";
 import {
   fillFontWeights,
@@ -672,6 +672,8 @@ function bindControls() {
     elements.backgroundColor,
     elements.backgroundColorOpacity,
     elements.foreground,
+    elements.foregroundX,
+    elements.foregroundY,
     elements.base,
     elements.expressionPreset,
     elements.cheek,
@@ -685,6 +687,8 @@ function bindControls() {
     elements.characterX,
     elements.characterY,
     elements.characterScale,
+    elements.characterBobBpm,
+    elements.characterBobAmplitude,
     elements.dialogue,
     elements.fontSize,
     elements.fontFamily,
@@ -1172,27 +1176,106 @@ function bindControls() {
     input.addEventListener("input", updateSpeechPreview);
     input.addEventListener("change", updateSpeechPreview);
   }
-  const COLOR_INPUT_SWATCHES = [
-    [elements.cutTextColor, elements.cutTextColorValue],
-    [elements.cutTextOutlineColor, elements.cutTextOutlineColorValue],
-    [elements.characterColorFilterColor, elements.characterColorFilterColorValue],
-    [elements.characterGlowColor, elements.characterGlowColorValue],
-    [elements.characterDropShadowColor, elements.characterDropShadowColorValue],
-    [elements.cutDialogueGlowColor, elements.cutDialogueGlowColorValue],
-    [elements.cutDialogueDropShadowColor, elements.cutDialogueDropShadowColorValue],
-    [elements.backgroundColor, elements.backgroundColorValue],
+  // 文字色などのカラー入力: スウォッチ (input[type=color]) 隣の HEX 表示 (span) を
+  // 編集可能なテキスト入力に格上げする (= ネイティブのカラーパレットを開かずに
+  // #rrggbb を直接打ち替えられる)。確定 (change) 時に input[type=color] へ書き戻し、
+  // input/change を再発火させることで既存の debouncedEditorChanged 経路を通して
+  // シナリオへ反映する。差し替えた input は elements[<valueKey>] に再代入して、
+  // scenario-actions の同期コード (setColorInputWithSwatch 等) が新ノードを参照する
+  // ようにする。
+  const COLOR_SWATCH_KEYS = [
+    ["cutTextColor", "cutTextColorValue", "#ffffff"],
+    ["cutTextOutlineColor", "cutTextOutlineColorValue", "#666666"],
+    ["characterColorFilterColor", "characterColorFilterColorValue", "#ffe8f9"],
+    ["characterGlowColor", "characterGlowColorValue", "#ffffff"],
+    ["characterDropShadowColor", "characterDropShadowColorValue", "#000000"],
+    ["cutDialogueGlowColor", "cutDialogueGlowColorValue", "#ffffff"],
+    ["cutDialogueDropShadowColor", "cutDialogueDropShadowColorValue", "#000000"],
+    ["backgroundColor", "backgroundColorValue", "#000000"],
+    // 全体設定ダイアログ (テロップ/セリフ既定) + セリフ枠
+    ["boxBorderColor", "boxBorderColorValue", "#ffffff"],
+    ["boxBackgroundColor", "boxBackgroundColorValue", "#000000"],
+    ["textColor", "textColorValue", "#ffffff"],
+    ["textOutlineColor", "textOutlineColorValue", "#666666"],
+    ["telopDefaultColor", "telopDefaultColorValue", "#ffffff"],
+    ["telopDefaultOutlineColor", "telopDefaultOutlineColorValue", "#000000"],
+    ["telopDefaultGlowColor", "telopDefaultGlowColorValue", "#ffffff"],
+    ["telopDefaultDropShadowColor", "telopDefaultDropShadowColorValue", "#000000"],
+    ["defaultDialogueGlowColor", "defaultDialogueGlowColorValue", "#ffffff"],
+    ["defaultDialogueDropShadowColor", "defaultDialogueDropShadowColorValue", "#000000"],
   ];
-  for (const [input, valueEl] of COLOR_INPUT_SWATCHES) {
-    if (!input) continue;
-    const sync = () => {
-      if (valueEl) {
-        valueEl.textContent = input.value;
-        valueEl.style.setProperty("--color-value", input.value);
-      }
+  const parseHexInput = (raw, fallback) => {
+    let t = String(raw || "").trim();
+    if (t && t[0] !== "#") t = `#${t}`;
+    if (/^#[0-9a-f]{3}$/i.test(t) || /^#[0-9a-f]{6}$/i.test(t)) {
+      return normalizeColorValue(t, fallback);
+    }
+    return null;
+  };
+  for (const [inputKey, valueKey, fallback] of COLOR_SWATCH_KEYS) {
+    const input = elements[inputKey];
+    const span = elements[valueKey];
+    if (!input || !span || span.tagName === "INPUT") continue;
+    const text = document.createElement("input");
+    text.type = "text";
+    text.id = span.id;
+    text.className = span.className;
+    text.spellcheck = false;
+    text.maxLength = 7;
+    text.setAttribute("aria-label", "色 (HEX)");
+    const initial = normalizeColorValue(input.value, fallback);
+    text.value = initial;
+    text.style.setProperty("--color-value", initial);
+    span.replaceWith(text);
+    elements[valueKey] = text;
+    // picker (input[type=color]) → text 同期。プログラム的な change でも追従させる。
+    const syncFromPicker = () => {
+      const v = normalizeColorValue(input.value, fallback);
+      text.value = v;
+      text.style.setProperty("--color-value", v);
     };
-    input.addEventListener("input", sync);
-    input.addEventListener("change", sync);
+    input.addEventListener("input", syncFromPicker);
+    input.addEventListener("change", syncFromPicker);
+    // 入力中 (input) は live プレビューのみ、確定 (change) で picker へ書き戻す。
+    text.addEventListener("input", () => {
+      const v = parseHexInput(text.value, fallback);
+      if (v) text.style.setProperty("--color-value", v);
+    });
+    text.addEventListener("change", () => {
+      const v = parseHexInput(text.value, fallback) || normalizeColorValue(input.value, fallback);
+      text.value = v;
+      text.style.setProperty("--color-value", v);
+      if (input.value !== v) {
+        input.value = v;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
   }
+
+  // 移動モーション「計算」: カットの表示時間 (お芝居タブの duration) を frame に
+  // 直し、開始フレームを引いた残り (= 表示終端までの尺) を持続フレームへ自動入力する。
+  if (elements.cutMotionMoveDurationCalcButton) {
+    elements.cutMotionMoveDurationCalcButton.addEventListener("click", () => {
+      // duration 入力は bindTimecodeInput が dataset.frames に確定値を保持する。
+      // 未確定の編集中でも拾えるよう、dataset → 表示値の parse の順でフォールバック。
+      const dsFrames = Number(elements.duration?.dataset?.frames);
+      const totalFrames = Number.isFinite(dsFrames) && dsFrames > 0
+        ? Math.round(dsFrames)
+        : parseTimecode(elements.duration?.value, PROJECT_FPS);
+      if (totalFrames == null) {
+        showToast("カットの表示時間を読み取れませんでした", "error");
+        return;
+      }
+      const startFrame = Math.max(0, Math.floor(Number(elements.cutMotionMoveStartFrame?.value) || 0));
+      const durationFrame = Math.max(1, totalFrames - startFrame);
+      if (!elements.cutMotionMoveDurationFrame) return;
+      elements.cutMotionMoveDurationFrame.value = String(durationFrame);
+      // change を発火して既存の編集反映 (debouncedEditorChanged) 経路へ載せる。
+      elements.cutMotionMoveDurationFrame.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
   elements.closeSettingsButton.addEventListener("click", () => {
     elements.settingsDialog.close();
   });

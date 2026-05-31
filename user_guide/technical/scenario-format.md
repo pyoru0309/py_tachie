@@ -161,6 +161,7 @@
 | `backgroundColor` / `backgroundColorOpacity` | 背景画像が無いときに表示される単色塗りつぶし |
 | `backgroundBlurPx` | 背景画像への Gaussian blur (0 で無効) |
 | `foreground` | カット最前面のオーバーレイ画像 (任意) |
+| `foregroundX` / `foregroundY` | 前景画像の左上の表示位置 (px, 0,0 = 画面左上、2026-06 追加)。`null` (未指定) なら中央配置。キャラの `character.x/y` と同じ座標ルール |
 | `showSpeechBox` | セリフ枠を表示するかどうか |
 | `text` | セリフ本文 |
 | `characters` | カット内に登場するキャラクター配列 |
@@ -211,6 +212,7 @@
 | `character.x`, `character.y` | 配置座標 |
 | `character.scale` | 拡大率 |
 | `motion` | per-character モーション (2026-05 改修)。`{ "type": "shake_x"\|"shake_y"\|"zoom"\|"move", "settings": { ... } }` 形式。未設定 (= キーが無いか `null`) なら「動かない」。旧 cut 単位の `motionType` / `motionSettings` は読込時に話者キャラの `motion` へ自動 migration されます |
+| `bob` | per-character の BPM 同期上下ゆれ (2026-06 追加)。`{ "bpm", "amplitudePx" }`。どちらかが 0 / 未設定 (`null`) なら無効。`motion` とは独立に加算されるため、移動・拡大と併用できる。位相はシーン内通算秒で計算し、カットを跨いで連続する |
 | `crop` | マルチキャラレイアウト用の矩形クリップ `{ x, y, width, height }` (1920×1080 絶対座標)。`null` / 未設定なら全画面表示 |
 | `layoutSlot` | マルチキャラレイアウトのスロット index (0 始まり)。 編集ダイアログ再開時の表示順を保つために保存 |
 
@@ -346,7 +348,7 @@ X/Y はキャラ基準位置からの相対オフセット、拡大率はキャ�
 | `position` | `top` / `bottom` / `center` / `custom` のいずれか。`custom` のときだけ `x` / `y` を見る |
 | `x` / `y` | 任意座標 (px)。`position` が `custom` のときに有効。`null` のままなら定型位置のフォールバックが使われる |
 | `style.align` | 文字揃え。`left` / `center` / `right` |
-| `style.glow` / `style.dropShadow` | テロップ文字の光彩 / ドロップシャドウ (各 `{enabled, color, blurPx, opacity[, offsetX, offsetY]}`)。テロップ既定値 (`telopDefaults.glow` / `telopDefaults.dropShadow`) の上書き |
+| `style.glow` / `style.dropShadow` | テロップ文字の光彩 / ドロップシャドウ (各 `{enabled, color, blurPx, opacity, intensity[, offsetX, offsetY]}`)。テロップ既定値 (`telopDefaults.glow` / `telopDefaults.dropShadow`) の上書き。`intensity` (1〜8, 既定 1, 2026-06 追加) はぼかしで薄くなった発光・影を濃くするスタック合成回数 |
 | `style` | 書体・色・アウトライン・サイズ・文字揃え・行間・字間・光彩・ドロップシャドウ |
 | `linkedCutId` | 任意。設定時はその ID のカットに紐付き、カット並び替え / 複製 / 削除 / duration 変更に追従する。存在しない ID を指していたら正規化で `null` に倒される。`soundEffects[]` / `videoLayers[]` も同名のフィールドで同じ意味 |
 

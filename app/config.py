@@ -658,7 +658,7 @@ def save_config_payload(payload: dict[str, Any], ctx: ProjectContext | None = No
                 "opacity": max(0.0, min(1.0, float(ds_payload.get("opacity", base["dropShadow"]["opacity"])))),
             },
             "letterSpacing": max(-500, min(1000, int(telop_defaults.get("letterSpacing", 0) or 0))),
-            "lineSpacing": max(-20, min(80, int(telop_defaults.get("lineSpacing", 0) or 0))),
+            "lineSpacing": max(-500, min(500, int(telop_defaults.get("lineSpacing", 0) or 0))),
             "enableOpticalKerning": bool(telop_defaults.get("enableOpticalKerning", False)),
             "opticalKerningHighQuality": bool(telop_defaults.get("opticalKerningHighQuality", False)),
         }

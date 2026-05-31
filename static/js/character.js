@@ -396,6 +396,7 @@ export function normalizeCutCharacters(data) {
       // "動かない" 扱い。旧 scene global motion はサーバ側 normalize で話者キャラへ
       // 移植済みのため、ここでは透過的に保持するだけで OK。
       motion: _validateMotionFromServer(item.motion),
+      bob: _validateBobFromServer(item.bob),
     };
   });
 }
@@ -407,6 +408,14 @@ function _validateMotionFromServer(raw) {
   if (!["shake_x", "shake_y", "zoom", "move"].includes(type)) return null;
   const settings = (raw.settings && typeof raw.settings === "object") ? { ...raw.settings } : {};
   return { type, settings };
+}
+
+function _validateBobFromServer(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const bpm = Number(raw.bpm);
+  const amplitudePx = Number(raw.amplitudePx);
+  if (!(bpm > 0) || !(amplitudePx > 0)) return null;
+  return { bpm, amplitudePx };
 }
 
 // crop オブジェクトを { x, y, width, height } のみに限定して受け入れる。
@@ -459,6 +468,8 @@ export function updateSelectedCharacterFromControls() {
     // M-1: per-character motion ({type, settings})。motionType セレクタが "none"
     // のときは null = 何も動かない。それ以外は {type, settings} オブジェクト。
     motion: _collectMotionForCharacterFromControls(),
+    // BPM 上下ゆれ (bob)。motion とは独立。bpm/振幅どちらか 0 なら null。
+    bob: _collectBobForCharacterFromControls(),
   });
 }
 
@@ -466,6 +477,13 @@ function _collectMotionForCharacterFromControls() {
   const type = elements.motionType?.value || "none";
   if (type === "none") return null;
   return { type, settings: deps.collectCutMotionSettings() };
+}
+
+function _collectBobForCharacterFromControls() {
+  const bpm = Number(elements.characterBobBpm?.value) || 0;
+  const amplitudePx = Number(elements.characterBobAmplitude?.value) || 0;
+  if (!(bpm > 0) || !(amplitudePx > 0)) return null;
+  return { bpm, amplitudePx };
 }
 
 export function loadCharacterIntoControls(character) {
@@ -511,6 +529,8 @@ export function loadCharacterIntoControls(character) {
     if (elements.motionType) elements.motionType.value = "none";
     deps.applyCutMotionSettingsToControls(null);
     deps.syncMotionParamsVisibility();
+    if (elements.characterBobBpm) elements.characterBobBpm.value = "0";
+    if (elements.characterBobAmplitude) elements.characterBobAmplitude.value = "0";
     fillCharacterDefinitionAddSelect();
     deps.fillExpressionPresets("");
     return;
@@ -549,6 +569,13 @@ export function loadCharacterIntoControls(character) {
   }
   deps.applyCutMotionSettingsToControls(character.motion?.settings);
   deps.syncMotionParamsVisibility();
+  // BPM 上下ゆれ。未設定キャラは 0 (= 無効) 表示。
+  if (elements.characterBobBpm) {
+    elements.characterBobBpm.value = String(Number(character.bob?.bpm) || 0);
+  }
+  if (elements.characterBobAmplitude) {
+    elements.characterBobAmplitude.value = String(Number(character.bob?.amplitudePx) || 0);
+  }
   // 表情プリセットセレクタを (character.characterId に紐付く) 最新候補で再構築する。
   // これをやらないと、loadCut 経路で character は表示されているのに preset セレクタが
   // 「なし」のまま残るバグが出る (project 初期化時の fillAssetControls は state.

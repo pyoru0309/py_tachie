@@ -306,8 +306,12 @@ async function buildForeground(scene, layerData, urls) {
   const scale = Math.min(CANVAS_WIDTH / srcW, CANVAS_HEIGHT / srcH);
   const planeW = Math.max(1, Math.round(srcW * scale));
   const planeH = Math.max(1, Math.round(srcH * scale));
-  const x = Math.floor((CANVAS_WIDTH - planeW) / 2);
-  const y = Math.floor((CANVAS_HEIGHT - planeH) / 2);
+  // 表示位置 (plane 左上)。foreground.x / y が数値なら絶対座標 (0,0 = 画面左上、
+  // キャラ x/y と同じルール)、未指定 (null) なら従来どおり中央配置。
+  const fgX = Number(layerData.foreground?.x);
+  const fgY = Number(layerData.foreground?.y);
+  const x = Number.isFinite(fgX) ? Math.round(fgX) : Math.floor((CANVAS_WIDTH - planeW) / 2);
+  const y = Number.isFinite(fgY) ? Math.round(fgY) : Math.floor((CANVAS_HEIGHT - planeH) / 2);
   const mesh = makePlane(planeW, planeH, texture, ORDER_FG, x, y);
   scene.add(mesh);
   return mesh;
@@ -750,7 +754,13 @@ function buildCharacterLayoutBorder(scene, layerData) {
   });
 
   const group = new THREE.Group();
-  group.renderOrder = ORDER_CHAR_LAYOUT_BORDER;
+  // ★ group.renderOrder は設定しない (= 既定 0 のまま)。THREE の projectObject は
+  //   Group の renderOrder を子メッシュの groupOrder として伝播し、描画ソート
+  //   (painterSortStable) は groupOrder を renderOrder より先に比較する。group に
+  //   920 を入れると子の groupOrder=920 となり、scene 直下のテロップ/セリフ
+  //   (groupOrder=0, renderOrder 2000/3000) より後に描かれて border が最前面に
+  //   乗ってしまう (= テロップ文字が border に隠れる)。group は 0 のままにして、
+  //   各メッシュの mesh.renderOrder=920 (下記) だけで重ね順を決める。
   // 外周線 (canvas edge) は中心が画面端にあると線幅の半分が画面外に切れて
   // 「指定値の半分しか見えない」現象になる。境界辺は線幅 / 2 だけ内側に
   // オフセットして、画面内に収まる形で描く。
@@ -1047,6 +1057,10 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
       glowCfg,
       shadowCfg,
     };
+    // B-2: crop が指定されていれば、光彩 / ドロップシャドウの tint plane も
+    // キャラ本体と同じ world-space 矩形でクリップする (= 隣スロットへの滲み防止)。
+    // tint plane はキャラ group 配下なので uClipRect は world 座標のままでよい。
+    _applyCropToCharacterMeshes([glowPlane, shadowPlane], char.crop);
   }
 
   return {
@@ -1071,7 +1085,19 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
     eyeTextures,
     mouthTextures,
     effects,
+    // BPM 同期の上下ゆれ (bob)。motion とは独立した per-character エフェクトで、
+    // update() 内で sceneSec から sin 波の Y オフセットを計算して dy に加算する。
+    bob: _normalizeBob(char.bob),
   };
+}
+
+// BPM 上下ゆれパラメータの検証。bpm / amplitudePx がともに正のときだけ有効。
+function _normalizeBob(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const bpm = Number(raw.bpm);
+  const amplitudePx = Number(raw.amplitudePx);
+  if (!(bpm > 0) || !(amplitudePx > 0)) return null;
+  return { bpm, amplitudePx };
 }
 
 export async function buildScene(
@@ -1330,6 +1356,18 @@ export async function buildScene(
       } else if (isSpeaker) {
         dx += shakeDx;
         dy += shakeDy;
+      }
+
+      // BPM 同期の上下ゆれ (bob)。motion とは独立に加算する (= 揺れながら移動 / 拡大
+      // できる)。位相はシーン内通算秒 (cutStartSec + elapsedSec) で計算するので、
+      // カットを跨いでも波が連続する (= scene-level bpmBob と同じ時間基準)。
+      const bob = charInstance.bob;
+      if (bob) {
+        const bobSceneSec = cutStartSec + (Number(elapsedSec) || 0);
+        const period = 60 / bob.bpm;
+        if (period > 0) {
+          dy += bob.amplitudePx * Math.sin((2 * Math.PI * bobSceneSec) / period);
+        }
       }
 
       // 回転 / 拡大の中心 (= pivot)。指定があればその点を中心に回転・拡大した

@@ -12,8 +12,15 @@ import * as THREE from "three";
 
 const VERT_SHADER = /* glsl */ `
   varying vec2 vUv;
+  varying vec2 vWorldXY;
   void main() {
     vUv = uv;
+    // character-material と同じく、world 座標 (modelMatrix * position) を
+    // varying で渡して fragment で矩形クリップ (uClipRect) に使う。
+    // glow/shadow plane はキャラ group 配下なので modelMatrix に group の中心
+    // 位置 + flipX scale + shadow offset が含まれる。
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldXY = wp.xy;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
@@ -29,8 +36,21 @@ const FRAG_SHADER = /* glsl */ `
   uniform sampler2D uMap;
   uniform vec3 uColor;
   uniform float uOpacity;
+  uniform vec4 uClipRect;       // x, y, w, h (world coords)。w<=0 or h<=0 なら no-clip
   varying vec2 vUv;
+  varying vec2 vWorldXY;
   void main() {
+    // B-2: マルチキャラレイアウトの crop。キャラ本体は character-material 側で
+    // discard されるが、光彩/ドロップシャドウは別 plane なので同じ矩形でクリップ
+    // しないと crop 外 (= 隣スロット) へ滲み出る。
+    if (uClipRect.z > 0.0 && uClipRect.w > 0.0) {
+      if (vWorldXY.x < uClipRect.x
+          || vWorldXY.x > uClipRect.x + uClipRect.z
+          || vWorldXY.y < uClipRect.y
+          || vWorldXY.y > uClipRect.y + uClipRect.w) {
+        discard;
+      }
+    }
     float a = texture2D(uMap, vUv).a;
     gl_FragColor = vec4(uColor, a * uOpacity);
     #include <colorspace_fragment>
@@ -44,6 +64,7 @@ export function createTintMaterial(initialColor = "#ffffff") {
       uMap: { value: null },
       uColor: { value: color },
       uOpacity: { value: 0 },
+      uClipRect: { value: new THREE.Vector4(0, 0, 0, 0) },
     },
     vertexShader: VERT_SHADER,
     fragmentShader: FRAG_SHADER,

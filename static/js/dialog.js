@@ -767,6 +767,9 @@ export async function applyEffectSceneToAllCuts() {
     backgroundColor: String(cs.backgroundColor || "#000000"),
     backgroundColorOpacity: Math.max(0, Math.min(1, Number(cs.backgroundColorOpacity) || 0)),
     foreground: String(cs.foreground ?? ""),
+    // 前景の表示位置 (null = 中央)。前景アセットと一緒に反映する。
+    foregroundX: Number.isFinite(Number(cs.foregroundX)) && cs.foregroundX != null ? Number(cs.foregroundX) : null,
+    foregroundY: Number.isFinite(Number(cs.foregroundY)) && cs.foregroundY != null ? Number(cs.foregroundY) : null,
   };
   // M-1 で motion は per-character へ移行したため、この「背景・場面の一括適用」
   // からは motion を扱わない (= 各キャラのモーションは「同一キャラに一括適用」
@@ -799,6 +802,11 @@ export async function applyEffectSceneToAllCuts() {
         // 色 + 不透明度はペアで反映 (片方だけ反映すると意味が崩れる)
         cut.state.backgroundColor = source.backgroundColor;
         cut.state.backgroundColorOpacity = source.backgroundColorOpacity;
+      } else if (k === "foreground") {
+        // 前景アセットと表示位置 (X/Y) はセットで反映する。
+        cut.state.foreground = source.foreground;
+        cut.state.foregroundX = source.foregroundX;
+        cut.state.foregroundY = source.foregroundY;
       } else {
         cut.state[k] = source[k];
       }

@@ -176,9 +176,12 @@ function collectMotionConfig() {
 }
 
 function syncColorDisplay(input, output) {
+  if (!input || !output) return;
   const color = normalizeColorValue(input.value);
   input.value = color;
-  output.textContent = color;
+  // output は app.js init で <span> から編集可能な <input> へ格上げされる場合がある。
+  if (output.tagName === "INPUT") output.value = color;
+  else output.textContent = color;
   output.style.setProperty("--color-value", color);
 }
 
@@ -290,7 +293,7 @@ function collectTelopDefaultsConfig() {
     },
     // 1/1000 em 単位。step=100 (= 0.1em 刻み) で操作する想定。
     letterSpacing: Math.max(-500, Math.min(1000, Math.round((Number(elements.telopDefaultLetterSpacing?.value) || 0) / 100) * 100)),
-    lineSpacing: Math.max(-20, Math.min(80, Number(elements.telopDefaultLineSpacing?.value) || 0)),
+    lineSpacing: Math.max(-500, Math.min(500, Number(elements.telopDefaultLineSpacing?.value) || 0)),
     ...(() => {
       const r = readOpticalKerningRadios(elements.telopDefaultOpticalKerningModeRadios);
       return { enableOpticalKerning: r.enable, opticalKerningHighQuality: r.highQuality };

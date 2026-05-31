@@ -2661,6 +2661,9 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
                 # M-1: per-character motion ({type, settings})。playback.js が
                 # computePerCharacterMotionOffsets で seek/再生ごとに dx/dy/scale 計算。
                 "motion": getattr(character_request, "motion", None),
+                # BPM 上下ゆれ (bob) ({bpm, amplitudePx})。motion とは独立。
+                # scene-builder の update() が sceneSec から sin で dy を計算する。
+                "bob": getattr(character_request, "bob", None),
             }
         )
 
@@ -2703,9 +2706,16 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
     if bg_asset_url:
         background_payload["assetUrl"] = bg_asset_url
 
-    foreground_payload: dict[str, Any] | None = (
-        {"assetUrl": fg_asset_url} if fg_asset_url else None
-    )
+    foreground_payload: dict[str, Any] | None = None
+    if fg_asset_url:
+        foreground_payload = {"assetUrl": fg_asset_url}
+        # 前景の表示位置 (plane 左上の絶対座標, 0,0 = 画面左上)。None = 中央配置。
+        fg_x = getattr(request, "foreground_x", None)
+        fg_y = getattr(request, "foreground_y", None)
+        if fg_x is not None:
+            foreground_payload["x"] = float(fg_x)
+        if fg_y is not None:
+            foreground_payload["y"] = float(fg_y)
 
     dialogue_payload: dict[str, Any] | None = (
         {"raw": dialogue_layout} if dialogue_layout is not None else None

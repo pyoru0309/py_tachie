@@ -810,6 +810,16 @@ function createAssetCard(scope, category, view, item, audioCtx = null) {
     meta.append(idLine);
   }
 
+  // フォントは見出しに日本語 family 名 (displayName) を出すため、実ファイル名が
+  // 隠れる。削除対象を取り違えないよう、ファイル名を補助行で併記する。
+  if (itemCategory === "fonts" && item.displayName && item.displayName !== item.name) {
+    const fileLine = document.createElement("div");
+    fileLine.className = "asset-card-id";
+    fileLine.textContent = item.name || "";
+    fileLine.title = fileLine.textContent;
+    meta.append(fileLine);
+  }
+
   const detail = document.createElement("div");
   detail.className = "asset-card-detail";
   const sizeStr = formatSize(item.size || 0);

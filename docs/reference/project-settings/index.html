@@ -795,6 +795,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="フォント">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2026-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        認識のしくみ (2026-05 改修)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        太さ ID の上書き
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1328,6 +1356,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="フォント">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2026-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        認識のしくみ (2026-05 改修)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        太さ ID の上書き
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1736,7 +1792,7 @@
 </tr>
 <tr>
 <td>行間</td>
-<td><code>0</code></td>
+<td><code>0</code> (−500〜500px。負値で行を詰める / 重ねる。大きい文字サイズで行間が足りないとき用)</td>
 </tr>
 <tr>
 <td>文字揃え</td>
@@ -1840,8 +1896,22 @@
 </table>
 <p>口パクは <code>speakerCharacterId</code> のキャラだけに適用されます。シーンの BGM のうち <code>useForLipSync</code> を ON にしたトラックがあれば、そちらが解析の入力になります。</p>
 <h2 id="_14">フォント<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
-<p>フォントは共通の <code>assets/fonts/</code> とプロジェクト内の <code>assets/fonts/</code> から自動認識されます。
-対応拡張子は <code>.otf</code> と <code>.ttf</code>。ファイル名の末尾が <code>Bold</code> / <code>Medium</code> / <code>Regular</code> の場合は太さとして推定されます。</p>
+<p>フォントは共通の <code>assets/fonts/</code> とプロジェクト内の <code>assets/fonts/</code> から自動認識されます。対応拡張子は <code>.otf</code> と <code>.ttf</code>。</p>
+<h3 id="2026-05">認識のしくみ (2026-05 改修)<a class="headerlink" href="#2026-05" title="Permanent link">&para;</a></h3>
+<p>それぞれのフォントについて次の情報を読み出し、UI 表示用の family 名と太さ (weight) を確定します。</p>
+<ul>
+<li><strong>太さ</strong>: OS/2 テーブルの <code>usWeightClass</code> (= フォント自身が宣言する重み) を最優先。読めなければファイル名末尾 (<code>Bold</code> / <code>Medium</code> / <code>Regular</code> / <code>Thin</code> / <code>Black</code> 等) でフォールバックし、最後は <code>regular</code> とします。</li>
+<li><strong>family 名 (UI 表示)</strong>: name テーブルから次の順で読み出します。<ol>
+<li>ja-JP / Mac-ja (= 日本語 family 名)</li>
+<li>en-US / Mac-en</li>
+<li>ファイル名 (拡張子と weight suffix を除いた部分)</li>
+</ol>
+</li>
+</ul>
+<p>これにより、たとえば <code>NekoSpoon.otf</code> → 「ねこスプーン」、<code>APJapanesefont.ttf</code> → 「あんずもじ」、<code>HuiFont29.ttf</code> → 「ふい字」のように、FontBook と同じく日本語名で識別できます。
+- <strong>family ID (永続キー)</strong>: scenario JSON や設定ファイルが参照する内部 ID は <strong>ファイル名 stem 由来</strong> で固定 (<code>auto_&lt;ascii_slug&gt;</code>)。純日本語ファイル名のように ASCII 文字がまったく含まれない stem では SHA1 先頭 8 文字をハッシュ化して <code>auto_&lt;8hex&gt;</code> を付与します (例: <code>花とちょうちょ.ttf</code> → <code>auto_4785310d</code>)。これは複数の日本語ファイル名が同じ <code>auto_unnamed</code> に潰れて 1 エントリにマージされていた不具合の対処です。</p>
+<h3 id="id">太さ ID の上書き<a class="headerlink" href="#id" title="Permanent link">&para;</a></h3>
+<p>OS/2 値が不正確なフォント (例: 「Bold」と書いてあるのに usWeightClass=400) は、全体設定 → フォントのテーブルで weight を手動上書きできます。<code>fontWeightOverrides[&lt;rel_path&gt;]</code> として global config に保存されます。</p>
 <p>ライブプレビューでは manifest 上のフォント情報を <code>FontFace</code> として登録するため、サーバの Pillow とブラウザの canvas が同じ書体で描画されます。</p>
 <h2 id="_15">表情プリセット<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h2>
 <p>頬 + 目 + 口 の組み合わせを名前付きで保存します。プリセットはキャラクター ID ごとに紐付くため、編集画面では選択中キャラ向けのプリセットだけが表示されます。</p>

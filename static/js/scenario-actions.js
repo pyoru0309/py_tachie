@@ -297,14 +297,27 @@ function collectCharacterEffectsFromControls() {
   return { colorFilter, glow, dropShadow };
 }
 
+// 数値入力の値を数値 or null に変換する。空欄 / 非数値は null (= 未指定)。
+function _numOrNull(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+// HEX 表示要素は app.js init で <span> から編集可能な <input> へ格上げされる。
+// span のときは textContent、input のときは value に書き込む (両対応)。
+function setSwatchDisplay(swatch, color) {
+  if (!swatch) return;
+  if (swatch.tagName === "INPUT") swatch.value = color;
+  else swatch.textContent = color;
+  swatch.style.setProperty("--color-value", color);
+}
+
 function setColorInputWithSwatch(input, swatch, value, fallback) {
   if (!input) return;
   const color = normalizeColorValue(value, fallback);
   input.value = color;
-  if (swatch) {
-    swatch.textContent = color;
-    swatch.style.setProperty("--color-value", color);
-  }
+  setSwatchDisplay(swatch, color);
 }
 
 function applyCharacterEffectsToControls(effects) {
@@ -398,6 +411,10 @@ export function payload() {
     backgroundColor: normalizeColorValue(elements.backgroundColor?.value || "#000000", "#000000"),
     backgroundColorOpacity: clamp01(elements.backgroundColorOpacity?.value, 0),
     foreground: elements.foreground?.value ?? "",
+    // 前景の表示位置 (plane 左上の絶対座標, 0,0 = 画面左上)。空欄/非数値は null =
+    // 中央配置 (scene-builder 側でデフォルト中央)。キャラ x/y と同じルール。
+    foregroundX: _numOrNull(elements.foregroundX?.value),
+    foregroundY: _numOrNull(elements.foregroundY?.value),
     // M-1: cut.state.motionType / motionSettings は撤去。各キャラの character.motion
     // (= updateSelectedCharacterFromControls 経由で書き込まれる) を直接使う。
     characterEffects: collectCharacterEffectsFromControls(),
@@ -493,10 +510,7 @@ function applyDialogueGlowAndShadowToControls(textStyle) {
   if (elements.cutDialogueGlowColor) {
     const v = normalizeColorValue(glow.color, "#ffffff");
     elements.cutDialogueGlowColor.value = v;
-    if (elements.cutDialogueGlowColorValue) {
-      elements.cutDialogueGlowColorValue.textContent = v;
-      elements.cutDialogueGlowColorValue.style.setProperty("--color-value", v);
-    }
+    setSwatchDisplay(elements.cutDialogueGlowColorValue, v);
   }
   if (elements.cutDialogueGlowBlur) elements.cutDialogueGlowBlur.value = Number(glow.blurPx) || 0;
   if (elements.cutDialogueGlowOpacity) elements.cutDialogueGlowOpacity.value = Number(glow.opacity) || 0;
@@ -510,10 +524,7 @@ function applyDialogueGlowAndShadowToControls(textStyle) {
   if (elements.cutDialogueDropShadowColor) {
     const v = normalizeColorValue(ds.color, "#000000");
     elements.cutDialogueDropShadowColor.value = v;
-    if (elements.cutDialogueDropShadowColorValue) {
-      elements.cutDialogueDropShadowColorValue.textContent = v;
-      elements.cutDialogueDropShadowColorValue.style.setProperty("--color-value", v);
-    }
+    setSwatchDisplay(elements.cutDialogueDropShadowColorValue, v);
   }
   if (elements.cutDialogueDropShadowBlur) elements.cutDialogueDropShadowBlur.value = Number(ds.blurPx) || 0;
   if (elements.cutDialogueDropShadowOffsetX) elements.cutDialogueDropShadowOffsetX.value = Number(ds.offsetX) || 0;
@@ -909,10 +920,7 @@ export async function loadCut(cut, options = {}) {
   if (elements.backgroundColor) {
     const v = normalizeColorValue(data.backgroundColor || "#000000", "#000000");
     elements.backgroundColor.value = v;
-    if (elements.backgroundColorValue) {
-      elements.backgroundColorValue.textContent = v;
-      elements.backgroundColorValue.style.setProperty("--color-value", v);
-    }
+    setSwatchDisplay(elements.backgroundColorValue, v);
   }
   if (elements.backgroundColorOpacity) {
     const raw = Number(data.backgroundColorOpacity);
@@ -925,6 +933,13 @@ export async function loadCut(cut, options = {}) {
       elements.foreground,
       Object.hasOwn(data, "foreground") ? (data.foreground ?? "") : "",
     );
+  }
+  // 前景 X / Y。null / 未指定は空欄 (= 中央配置)。
+  if (elements.foregroundX) {
+    elements.foregroundX.value = _numOrNull(data.foregroundX) == null ? "" : String(_numOrNull(data.foregroundX));
+  }
+  if (elements.foregroundY) {
+    elements.foregroundY.value = _numOrNull(data.foregroundY) == null ? "" : String(_numOrNull(data.foregroundY));
   }
   // M-1: motionType / motionSettings は character.motion へ統合。
   // loadCut の段階では仮 reset しておき、loadCharacterIntoControls (= 選択中キャラ
@@ -980,10 +995,7 @@ export async function loadCut(cut, options = {}) {
       ?? state.manifest.config.textDefaults?.textColor
       ?? "#ffffff";
     elements.cutTextColor.value = normalizeColorValue(cutTextColor, "#ffffff");
-    if (elements.cutTextColorValue) {
-      elements.cutTextColorValue.textContent = elements.cutTextColor.value;
-      elements.cutTextColorValue.style.setProperty("--color-value", elements.cutTextColor.value);
-    }
+    setSwatchDisplay(elements.cutTextColorValue, elements.cutTextColor.value);
   }
   if (elements.cutTextOutlineWidth) {
     elements.cutTextOutlineWidth.value =
@@ -994,10 +1006,7 @@ export async function loadCut(cut, options = {}) {
       ?? state.manifest.config.textDefaults?.textOutlineColor
       ?? "#666666";
     elements.cutTextOutlineColor.value = normalizeColorValue(cutTextOutlineColor, "#666666");
-    if (elements.cutTextOutlineColorValue) {
-      elements.cutTextOutlineColorValue.textContent = elements.cutTextOutlineColor.value;
-      elements.cutTextOutlineColorValue.style.setProperty("--color-value", elements.cutTextOutlineColor.value);
-    }
+    setSwatchDisplay(elements.cutTextOutlineColorValue, elements.cutTextOutlineColor.value);
   }
   if (elements.cutLetterSpacing) {
     elements.cutLetterSpacing.value =
