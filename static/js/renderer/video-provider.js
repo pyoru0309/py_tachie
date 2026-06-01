@@ -330,6 +330,15 @@ export class WebCodecsVideoProvider {
   // I-frame を見たら、それ以降は次 GOP なので break。
   // 短い jump (≤ JUMP_THRESHOLD_US) では decoder reset コストの方が高いので skip。
   _keyframeSeekIfBeneficial(targetUs) {
+    // 背景 videoTrack 経路 (= _mapFn 無し) ではキーフレームシークを行わない。
+    // ストリーム途中の "sync" サンプルへ jump + decoder reconfigure すると、
+    // Windows の HW デコーダ (D3D11VA) が「途中の sync が純粋な IDR でない」ケースで
+    // 出力も error も返さず停止することがある (先頭カットは target≈0 でシーク不要 →
+    // 成功、後半カットは大きな forward jump → シーク発動 → 停止、という位置依存の
+    // 背景動画消失として 2026-06-02 に観測)。videoTrack は必ず先頭の本物の IDR
+    // (sample 0) から順次デコードする方が確実。大きな trimStart を持つ videoLayer
+    // (= _mapFn あり) では従来どおりシークして decode 量を抑える。
+    if (!this._mapFn) return;
     const JUMP_THRESHOLD_US = 1_000_000;  // 1 秒以上の forward skip で発動
     if (this.samples.length === 0) return;
     if (this.nextSampleIdx >= this.samples.length) return;
