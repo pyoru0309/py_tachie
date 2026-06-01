@@ -337,32 +337,36 @@ def apply_update(
                 "log": "\n".join(log_lines),
             }
 
-    # 4. 必要なら target branch に切替 (= channel 変更時)
-    if current_branch != target_branch:
-        # fetch は既に check_for_updates で実行されている前提だが、apply 単独で
-        # 呼ばれた場合もあるので、念のため再 fetch しておく。
-        _log_step(f"git fetch origin {target_branch}", _git("fetch", "origin", target_branch))
-        # ローカル branch が無い場合は origin から作成、ある場合はそのまま checkout
-        local_exists_code, _, _ = _git("show-ref", "--verify", "--quiet", f"refs/heads/{target_branch}")
-        if local_exists_code == 0:
-            switch_result = _git("checkout", target_branch)
-        else:
-            switch_result = _git("checkout", "-b", target_branch, f"origin/{target_branch}")
-        _log_step(f"git checkout {target_branch}", switch_result)
-        if switch_result[0] != 0:
-            return {
-                "ok": False,
-                "message": (
-                    f"ブランチ '{target_branch}' への切替に失敗しました。"
-                ),
-                "backupPath": str(backup_dir) if backup_dir else None,
-                "log": "\n".join(log_lines),
-            }
+    # 4. fetch → branch 切替 (無ければ作成) → reset --hard で origin に完全一致させる。
+    #    旧実装は `git checkout <branch>` + `git pull` (merge) だったが、作業ツリーが
+    #    dirty / 分岐していると merge が中途半端に終わり、「config.py は新しいのに
+    #    font_inspect.py が欠落」のような壊れたツリーを残して起動不能になる事故が出た
+    #    (2026-06-02, Windows)。リリース配信は「常にリモートと完全一致」が正しいので、
+    #    merge ではなく hard reset を使う。これにより欠損した tracked file も確実に
+    #    復元され、中途半端な状態が残らない。gitignore 済みの projects/ app_state/
+    #    cache/ outputs/ や未追跡ファイルは reset --hard では消えない。
+    _log_step(f"git fetch origin {target_branch}", _git("fetch", "origin", target_branch))
+    # ローカル branch が無い場合は origin から作成、ある場合は force checkout で切替。
+    local_exists_code, _, _ = _git("show-ref", "--verify", "--quiet", f"refs/heads/{target_branch}")
+    if local_exists_code == 0:
+        switch_result = _git("checkout", "-f", target_branch)
+    else:
+        switch_result = _git("checkout", "-b", target_branch, f"origin/{target_branch}")
+    _log_step(f"git checkout -f {target_branch}", switch_result)
+    if switch_result[0] != 0:
+        return {
+            "ok": False,
+            "message": (
+                f"ブランチ '{target_branch}' への切替に失敗しました。"
+            ),
+            "backupPath": str(backup_dir) if backup_dir else None,
+            "log": "\n".join(log_lines),
+        }
 
-    # 5. git pull
-    result = _git("pull", "origin", target_branch)
-    _log_step(f"git pull origin {target_branch}", result)
-    pull_code = result[0]
+    # 5. origin/<branch> に working tree + index を完全一致させる (= 適用)
+    reset_result = _git("reset", "--hard", f"origin/{target_branch}")
+    _log_step(f"git reset --hard origin/{target_branch}", reset_result)
+    pull_code = reset_result[0]
 
     # 6. assets を復元 (include_assets=False のとき)
     if assets_snapshot is not None:
@@ -378,8 +382,8 @@ def apply_update(
         return {
             "ok": False,
             "message": (
-                "git pull に失敗しました。バックアップから手動で復旧するか、"
-                "サポートに連絡してください。"
+                "アップデートの適用 (git reset --hard) に失敗しました。"
+                "バックアップから手動で復旧するか、サポートに連絡してください。"
             ),
             "backupPath": str(backup_dir) if backup_dir else None,
             "log": "\n".join(log_lines),
