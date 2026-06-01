@@ -426,8 +426,15 @@ async function runBench() {
   }
 
   // 2) scene-bundle 取得 → scene build
+  // ★ per-cut コスト計測: 本番の project 書き出しはカット毎に scene-bundle 取得
+  //    (サーバ Pillow でキャラレイヤー PNG を焼く) + buildScene (GPU 構築) を
+  //    やり直す。ここで 1 カット分の ms を出し、×(カット数) で「カット再構築が
+  //    総時間にどれだけ効くか (H1)」を見積もる。
   logLine("fetching scene bundle ...");
+  const tBundle0 = performance.now();
   const layerData = await fetchSceneBundle(cut, projectId);
+  const bundleMs = performance.now() - tBundle0;
+  logLine(`scene-bundle fetch (server bake 含む) = ${bundleMs.toFixed(0)}ms`);
   // PoC では videoTrack は無視 (前景 RGBA だけを測る方針)
   layerData.hasVideoTrack = false;
 
@@ -446,8 +453,17 @@ async function runBench() {
     // 1e9 sec = idx は常に floor(elapsed / 1e9) = 0 になる
     layerData.visualizer = { ...layerData.visualizer, frameDurationSec: 1e9 };
   }
+  const tBuild0 = performance.now();
   const sceneInstance = await buildSceneFromLayerData(layerData, null);
+  const buildMs = performance.now() - tBuild0;
   setActiveScene(sceneInstance);
+  // 本番 project 書き出しでは下記 2 つがカット数ぶん発生する。総カット数を
+  // 掛けると「カット切替の作り直し」が elapsed のどれだけを占めるか分かる。
+  const perCutMs = bundleMs + buildMs;
+  logLine(
+    `buildScene = ${buildMs.toFixed(0)}ms / per-cut 合計 (bundle+build) = `
+    + `${perCutMs.toFixed(0)}ms → 80 カットなら約 ${(perCutMs * 80 / 1000).toFixed(1)}s`,
+  );
 
   if (vizMode === "preloaded" && sceneInstance.meshes?.visualizer) {
     const tP0 = performance.now();
