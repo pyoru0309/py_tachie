@@ -235,6 +235,10 @@ export class WebCodecsVideoProvider {
    */
   async updateForFrame({ sceneSec = 0, fps = 24 } = {}) {
     if (this._disposed) return;
+    // 一度 decode が恒久失敗 (deadline 超過 / decoder error) したら、以降のフレームは
+    // decode を再試行しない。毎フレーム deadline 待ちで書き出しが極端に遅くなる
+    // (1 フレーム数秒 × 全フレーム) のを防ぎ、最後に表示できたフレームのまま継続する。
+    if (this._decodeFailed) return;
     if (this.decoderError) throw this.decoderError;
 
     // 1) target video timestamp (CTS、microseconds)
@@ -287,7 +291,14 @@ export class WebCodecsVideoProvider {
     this._keyframeSeekIfBeneficial(targetUs);
 
     // 5) target をカバーする frame が出力されるまで decoder に push
-    await this._ensureDecodedTo(targetUs);
+    try {
+      await this._ensureDecodedTo(targetUs);
+    } catch (err) {
+      // deadline 超過 / decoder error は恒久失敗として記録し、以降のフレームでは
+      // decode を再試行しない (上の _decodeFailed early-return で skip される)。
+      this._decodeFailed = true;
+      throw err;
+    }
 
     // 5) target を含む frame を queue から取り出す。古い frame は close。
     const chosen = this._popFrameAt(targetUs);
