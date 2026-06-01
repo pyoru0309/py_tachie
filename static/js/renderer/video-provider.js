@@ -469,6 +469,21 @@ export class WebCodecsVideoProvider {
   }
 
   async _ensureDecodedTo(targetUs) {
+    // 一部の OS/コーデックでは WebCodecs が isConfigSupported=true を返しても、
+    // 実 decode で output も error も返さず停止することがある (Windows の HEVC 等
+    // .mov で観測, 2026-06-02)。その場合 decodeQueueSize>16 の wait が「エラーも
+    // 出ないまま無限ループ」になり、書き出しがフレーム 0 でハング + 中止も効かなく
+    // なる。wall-clock の deadline で打ち切り、明示エラーにして上流で失敗させる。
+    const DECODE_DEADLINE_MS = 8000;
+    const tDeadline = performance.now() + DECODE_DEADLINE_MS;
+    const _checkDeadline = () => {
+      if (performance.now() > tDeadline) {
+        throw new Error(
+          "WebCodecs decode timeout: この OS/コーデックでは HW デコードが進行しません"
+          + " (背景/動画レイヤー)。素材を H.264 の mp4 に変換すると回避できる場合があります。",
+        );
+      }
+    };
     // queue の末尾 (CTS 最大) が target を超えるまで chunk を流す
     let lastSeenEnd = this._lastQueueEndUs();
     while (lastSeenEnd < targetUs && this.nextSampleIdx < this.samples.length) {
@@ -476,7 +491,9 @@ export class WebCodecsVideoProvider {
       while (this.decoder.decodeQueueSize > 16) {
         await new Promise((r) => setTimeout(r, 0));
         if (this.decoderError) throw this.decoderError;
+        _checkDeadline();
       }
+      _checkDeadline();
       const s = this.samples[this.nextSampleIdx++];
       // CTS で timestamp。is_sync で key/delta (B-frame 安全)
       const chunk = new EncodedVideoChunk({
