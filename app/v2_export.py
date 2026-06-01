@@ -406,6 +406,8 @@ def _detect_capabilities() -> dict:
             [ffmpeg_executable(), "-hide_banner", "-encoders"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=5.0,
             check=False,
         )
@@ -1133,6 +1135,7 @@ def post_export_mux(req: ExportMuxRequest) -> dict:
     try:
         proc = subprocess.run(
             cmd, capture_output=True, text=True, timeout=600.0, check=False,
+            encoding="utf-8", errors="replace",
         )
     except FileNotFoundError as exc:
         return {

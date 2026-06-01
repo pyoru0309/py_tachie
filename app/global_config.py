@@ -622,6 +622,8 @@ def detect_ffmpeg_capabilities(force: bool = False) -> dict[str, Any]:
             [ffmpeg_executable(), "-hide_banner", "-encoders"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=False,
             timeout=5,
         )

@@ -43,6 +43,8 @@ def audio_duration_seconds(audio_path: Path) -> float | None:
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     if result.returncode != 0:
@@ -221,6 +223,7 @@ def _build_clean_pcm_map(src_path: Path) -> dict | None:
     try:
         sr_result = subprocess.run(
             cmd_sr, cwd=PROJECT_ROOT, capture_output=True, text=True,
+            encoding="utf-8", errors="replace",
             timeout=60.0, check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -246,6 +249,7 @@ def _build_clean_pcm_map(src_path: Path) -> dict | None:
     try:
         fr_result = subprocess.run(
             cmd_fr, cwd=PROJECT_ROOT, capture_output=True, text=True,
+            encoding="utf-8", errors="replace",
             timeout=300.0, check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -371,6 +375,8 @@ def video_metadata(video_path: Path) -> dict[str, Any] | None:
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     if result.returncode != 0:
@@ -426,6 +432,8 @@ def video_metadata(video_path: Path) -> dict[str, Any] | None:
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     has_audio = audio_result.returncode == 0 and bool(audio_result.stdout.strip())
@@ -454,6 +462,8 @@ def audio_sample_rate(audio_path: Path) -> int:
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     if result.returncode != 0:
@@ -527,6 +537,8 @@ def audio_volume_by_frame(
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     if result.returncode != 0:

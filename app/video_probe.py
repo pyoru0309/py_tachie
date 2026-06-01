@@ -154,6 +154,7 @@ def _probe_sample_rate(src_path: Path) -> int | None:
     try:
         r = subprocess.run(
             cmd, cwd=PROJECT_ROOT, capture_output=True, text=True,
+            encoding="utf-8", errors="replace",
             timeout=60.0, check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -179,6 +180,7 @@ def _probe_audio_frames(src_path: Path) -> list[tuple[float, int]]:
     try:
         r = subprocess.run(
             cmd, cwd=PROJECT_ROOT, capture_output=True, text=True,
+            encoding="utf-8", errors="replace",
             timeout=300.0, check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):

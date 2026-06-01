@@ -193,6 +193,8 @@ async def import_character_into_root(
             check=True,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
         # PSD ルート直下に import_manifest.yml テキストレイヤーがあれば、
         # flags / preset / メタ情報を反映する (loose PSD 経路と同じ helper を流用)。

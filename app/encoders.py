@@ -85,6 +85,7 @@ def detect_h264_encoders() -> EncoderAvailability:
     try:
         r = subprocess.run(
             cmd, capture_output=True, text=True, timeout=15.0, check=False,
+            encoding="utf-8", errors="replace",
         )
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
         _log.warning("ffmpeg -encoders failed: %r", exc)

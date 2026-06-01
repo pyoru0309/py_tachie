@@ -291,6 +291,8 @@ def _run_import_psd_cli(psd_path: Path, target_dir: Path, manifest_path: Path, d
         check=True,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
 
 
