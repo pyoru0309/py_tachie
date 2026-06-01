@@ -496,13 +496,19 @@ export class WebCodecsVideoProvider {
     // なる。wall-clock の deadline で打ち切り、明示エラーにして上流で失敗させる。
     const DECODE_DEADLINE_MS = 8000;
     const tDeadline = performance.now() + DECODE_DEADLINE_MS;
+    // 診断用カウンタ: 投入した chunk 数 / これまでに出力された frame 数 (最大)。
+    let pushed = 0;
+    let maxOutput = 0;
+    const _diag = (why) => new Error(
+      `WebCodecs decode ${why}: target=${(targetUs / 1e6).toFixed(2)}s `
+      + `total=${(this.totalSec || 0).toFixed(2)}s pushed=${pushed} `
+      + `output=${this.decodedQueue.length}(max ${maxOutput}) `
+      + `decodeQueueSize=${this.decoder?.decodeQueueSize ?? "?"} `
+      + `nextIdx=${this.nextSampleIdx}/${this.samples.length} mapFn=${!!this._mapFn}. `
+      + "(この OS/コーデックで HW デコードが進まない可能性。詳細を開発に共有してください)"
+    );
     const _checkDeadline = () => {
-      if (performance.now() > tDeadline) {
-        throw new Error(
-          "WebCodecs decode timeout: この OS/コーデックでは HW デコードが進行しません"
-          + " (背景/動画レイヤー)。素材を H.264 の mp4 に変換すると回避できる場合があります。",
-        );
-      }
+      if (performance.now() > tDeadline) throw _diag("timeout");
     };
     // queue の末尾 (CTS 最大) が target を超えるまで chunk を流す
     let lastSeenEnd = this._lastQueueEndUs();
@@ -523,6 +529,8 @@ export class WebCodecsVideoProvider {
         data: s.data,
       });
       this.decoder.decode(chunk);
+      pushed += 1;
+      if (this.decodedQueue.length > maxOutput) maxOutput = this.decodedQueue.length;
       lastSeenEnd = this._lastQueueEndUs();
     }
     // 出力が反映されるのを最大 100ms wait (decoder は async output)
@@ -531,6 +539,12 @@ export class WebCodecsVideoProvider {
       await new Promise((r) => setTimeout(r, 1));
       waited += 1;
       if (this.decoderError) throw this.decoderError;
+    }
+    if (this.decodedQueue.length > maxOutput) maxOutput = this.decodedQueue.length;
+    // 診断: chunk を投入したのに 1 frame も出力されなかった = デコーダが入力を
+    // 受けても出力しない (環境側の WebCodecs 故障の可能性)。明示エラーで上流に伝える。
+    if (pushed > 0 && maxOutput === 0) {
+      throw _diag("no-output");
     }
   }
 
