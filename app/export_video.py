@@ -357,28 +357,35 @@ def video_metadata(video_path: Path) -> dict[str, Any] | None:
     なら amix から除外) で共有する。
     """
     # 1) 映像 stream の duration / width / height
-    result = subprocess.run(
-        [
-            ffprobe_executable(),
-            "-v",
-            "error",
-            "-select_streams",
-            "v:0",
-            "-show_entries",
-            "stream=width,height,duration",
-            "-show_entries",
-            "format=duration",
-            "-of",
-            "default=noprint_wrappers=1",
-            str(video_path),
-        ],
-        cwd=PROJECT_ROOT,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
+    # ffprobe が固まると /api/video-duration が永久に返らず、書き出しが 0 frame で
+    # ハングする (Windows で観測, 2026-06-02)。他の ffprobe 呼び出しと同様に timeout を
+    # 入れ、TimeoutExpired / 実行不可は None でフォールバック (呼び出し側が VL を skip)。
+    try:
+        result = subprocess.run(
+            [
+                ffprobe_executable(),
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height,duration",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1",
+                str(video_path),
+            ],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=30.0,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return None
     if result.returncode != 0:
         return None
     width = 0
@@ -416,27 +423,32 @@ def video_metadata(video_path: Path) -> dict[str, Any] | None:
     if final_duration is None or final_duration <= 0:
         return None
     # 2) audio stream の有無 (`-select_streams a:0` でヒットすれば 1 行は出る)
-    audio_result = subprocess.run(
-        [
-            ffprobe_executable(),
-            "-v",
-            "error",
-            "-select_streams",
-            "a:0",
-            "-show_entries",
-            "stream=index",
-            "-of",
-            "default=nokey=1:noprint_wrappers=1",
-            str(video_path),
-        ],
-        cwd=PROJECT_ROOT,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
-    has_audio = audio_result.returncode == 0 and bool(audio_result.stdout.strip())
+    try:
+        audio_result = subprocess.run(
+            [
+                ffprobe_executable(),
+                "-v",
+                "error",
+                "-select_streams",
+                "a:0",
+                "-show_entries",
+                "stream=index",
+                "-of",
+                "default=nokey=1:noprint_wrappers=1",
+                str(video_path),
+            ],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=30.0,
+        )
+        has_audio = audio_result.returncode == 0 and bool(audio_result.stdout.strip())
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        # audio 判定が取れないときは「音声なし」扱いで継続 (duration は確定済み)。
+        has_audio = False
     return {
         "duration": float(final_duration),
         "width": int(width),
