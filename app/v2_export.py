@@ -1314,8 +1314,25 @@ async def v2_export_ws(ws: WebSocket) -> None:
                 f"ffmpeg を起動できません ({ffmpeg_executable()}): {exc}",
             )
             return
+        except NotImplementedError as exc:
+            # Windows + SelectorEventLoop は asyncio.create_subprocess_exec 非対応で
+            # NotImplementedError (str() が空) を投げる。uvicorn の reload / workers>1 で
+            # use_subprocess=True になると Windows は SelectorEventLoop を選ぶのが原因。
+            # str(exc) が空だとフロントが "server error" にフォールバックして原因不明に
+            # なるため、ここで具体的な対処を detail に載せる。
+            await _send_error(
+                ws, ERR_FFMPEG_SPAWN_FAILED,
+                "このイベントループは非同期サブプロセスに対応していません"
+                f" [{type(exc).__name__}]。Windows では autoreload / 複数 worker での"
+                " 起動だと動画書き出しができません。reload を無効にして起動してください"
+                " (python -m app は Windows で自動的に reload を無効化します)。",
+            )
+            return
         except Exception as exc:  # noqa: BLE001
-            await _send_error(ws, ERR_FFMPEG_SPAWN_FAILED, str(exc))
+            # str(exc) が空の例外でも原因が追えるよう型名を必ず添える。
+            await _send_error(
+                ws, ERR_FFMPEG_SPAWN_FAILED, f"{type(exc).__name__}: {exc}",
+            )
             return
 
         await ws.send_text(json.dumps({

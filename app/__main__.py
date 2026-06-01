@@ -14,6 +14,9 @@ PoC 期間に得た知見:
 - ``ws_per_message_deflate=False`` を必ず明示する。圧縮ありだと PoC bench で 6.7fps、
   なしだと 110fps 出る (project_v2_export_poc_simple_baseline_2026_05_05.md)。
 - websockets 拡張は ``websockets`` パッケージが必要。requirements.txt で明示済み。
+- Windows では reload を有効にすると uvicorn が subprocess 非対応の
+  SelectorEventLoop を強制し、動画書き出し (asyncio サブプロセスで ffmpeg を起動)
+  が FFMPEG_SPAWN_FAILED になる。このため Windows では reload を自動無効化する。
 """
 
 from __future__ import annotations
@@ -72,6 +75,18 @@ def main(argv: list[str] | None = None) -> int:
 
     reload = args.reload and args.workers is None
     workers = args.workers if args.workers and args.workers > 0 else None
+
+    # Windows では uvicorn の reload / workers>1 (= use_subprocess=True) が
+    # SelectorEventLoop を強制する。Windows の SelectorEventLoop は
+    # asyncio.create_subprocess_exec を非サポートで NotImplementedError になり、
+    # 動画書き出し (app/v2_export.py の WS 経路) が FFMPEG_SPAWN_FAILED で即死する。
+    # ProactorEventLoop (subprocess 対応) を選ばせるため Windows では reload を無効化。
+    if reload and sys.platform == "win32":
+        reload = False
+        sys.stderr.write(
+            "[起動] Windows では動画書き出しとの互換性のため autoreload を無効化します"
+            " (uvicorn の reload が subprocess 非対応の SelectorEventLoop を強制するため)。\n"
+        )
 
     uvicorn.run(
         "app.main:app",
