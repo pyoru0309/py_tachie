@@ -239,7 +239,17 @@ export class WebCodecsVideoProvider {
     // decode を再試行しない。毎フレーム deadline 待ちで書き出しが極端に遅くなる
     // (1 フレーム数秒 × 全フレーム) のを防ぎ、最後に表示できたフレームのまま継続する。
     if (this._decodeFailed) return;
-    if (this.decoderError) throw this.decoderError;
+    if (this.decoderError) {
+      // decoder が壊れた (例: Windows の "Codec reclaimed due to inactivity"、HW
+      // デコーダの停止)。毎フレーム throw し続けると上流が大量の warn を出し、長尺の
+      // project 書き出しで UI が固まり実質ハングする (2026-06-02 Windows で発生)。
+      // 恒久失敗として記録し、最初の 1 回だけ throw して上流に 1 行ログさせ、以降は
+      // skip (最後に表示できたフレームを保持) して書き出しを degraded で完走させる。
+      const err = this.decoderError;
+      this._decodeFailed = true;
+      this.decoderError = null;
+      throw err;
+    }
 
     // 1) target video timestamp (CTS、microseconds)
     //    mapFn が state="inactive"/"ended" を返すレイヤーは decode を一切起動しない。

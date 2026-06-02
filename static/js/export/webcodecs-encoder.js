@@ -35,6 +35,8 @@ export async function isWebcodecsH264Supported(width, height) {
       height,
       bitrate: 16_000_000,
       framerate: 30,
+      // 実際の configure と同じ latencyMode で能力確認する (realtime = 速度優先)。
+      latencyMode: "realtime",
       avc: { format: "annexb" },
     });
     return !!(res && res.supported);
@@ -105,7 +107,14 @@ export function createH264FrameEncoder({ width, height, fps, bitrate, onChunk, o
     bitrate,
     framerate: fps,
     avc: { format: "annexb" },
-    latencyMode: "quality",
+    // latencyMode:"realtime" = スループット優先。"quality" は品質優先で lookahead /
+    // B-frame を使い得るため遅く (Windows ブラウザ実装で encode が律速 = 2026-06-02
+    // 実測 wait 44〜66%)、かつ B-frame は `-c copy` で PTS 並べ替えリスクがある。
+    // バッチ書き出しは速度優先 + ビットレートで画質担保が正解なので realtime にする。
+    latencyMode: "realtime",
+    // GPU エンコーダ (NVENC 等、Media Foundation 経由) を優先させる。ソフトウェア
+    // フォールバックを避けて Windows での encode を速くする狙い。
+    hardwareAcceleration: "prefer-hardware",
     bitrateMode: "variable",
   });
 
