@@ -190,6 +190,34 @@ git pull
 
 これでアプリのコードが最新になります。再度 `python -m app` で起動してください。
 
+### 復旧方法 (アップデート後に起動しなくなったら)
+
+アップデートの途中で中断した・古いバージョンのアップデート機能で失敗した、などで
+**サーバが起動しなくなった / ファイルが壊れた・欠落した**ときは、リモート (GitHub) の
+最新状態に強制的に一致させて復旧できます。
+
+> **データは消えません**: `projects/`・`app_state/`・`cache/`・`outputs/`・
+> `assets/fonts/`・`assets/sound_effects/` などは Git 管理外のため、この復旧では
+> 一切触れません。消えるのは「あなたが手で書き換えたコード」だけです (通常はありません)。
+
+**かんたん (同梱の復旧スクリプト):**
+
+- Windows: エクスプローラで `tools\recover.bat` を**ダブルクリック**
+- macOS / Linux: ターミナルで `bash tools/recover.sh`
+
+**手動 (スクリプトが無い古い版・スクリプトも壊れている場合):**
+リポジトリのフォルダで以下を実行します (`main` は受信チャネルが dev なら `dev` に読み替え)。
+
+```bash
+git fetch origin
+git checkout -f main
+git reset --hard origin/main
+```
+
+復旧後は `python -m app` (Windows は `python -m app`) で起動し直してください。
+それでも直らない場合は、GitHub から ZIP を再ダウンロードして入れ直し、`projects/` だけ
+元のフォルダからコピーすれば、作成済みプロジェクトを引き継げます。
+
 ## ディレクトリ構成
 
 | パス | 役割 |
