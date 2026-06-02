@@ -300,7 +300,14 @@ function emitExportSummary({ formValues, baseExportConfig, result, done, muxResu
   const W = baseExportConfig.width;
   const H = baseExportConfig.height;
   const fps = baseExportConfig.fps;
-  const encoder = baseExportConfig.encoder;
+  // baseExportConfig.encoder は preset 経路ではサーバに無視されるダミー値
+  // ("h264_videotoolbox" 固定) なので、サマリにそのまま出すと NVENC を選んでいても
+  // videotoolbox と誤表示される。実際に使う preset id と選択エンジンを出す。
+  const presetId = formValues.presetId || baseExportConfig.videoPresetId || "";
+  const presetEngine = formValues.presetOptions?.videoEncoder || "";
+  const encoderLabel = presetId
+    ? `preset=${presetId}${presetEngine ? ` engine=${presetEngine}` : ""}`
+    : `encoder=${baseExportConfig.encoder}`;
   const readbackMode = baseExportConfig.readbackMode;
   const vflipMode = baseExportConfig.vflipMode;
   const bpThresholdMB = baseExportConfig.bpThresholdMB;
@@ -313,7 +320,7 @@ function emitExportSummary({ formValues, baseExportConfig, result, done, muxResu
   const lines = [];
   lines.push(`## 設定`);
   lines.push(`project=${projectId} ${targetLabel} ${W}x${H}@${fps}`);
-  lines.push(`encoder=${encoder} readback=${readbackMode} vflip=${vflipMode} bp=${bpThresholdMB}MB`);
+  lines.push(`${encoderLabel} readback=${readbackMode} vflip=${vflipMode} bp=${bpThresholdMB}MB`);
   lines.push(``);
   lines.push(`## ブラウザ側`);
   lines.push(`framesSent = ${result.framesSent}/${totalFramesForStats}`);

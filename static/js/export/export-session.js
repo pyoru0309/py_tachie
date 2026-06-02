@@ -341,7 +341,13 @@ async function ensureManifestAndFontsLoaded(onLog, projectId) {
 function setupRendererAndCanvas(canvas, width, height, readbackMode, onLog) {
   canvas.width = width;
   canvas.height = height;
-  initRenderer(canvas);
+  // 書き出しは毎フレーム gl.readPixels する経路。Windows ANGLE(D3D11) では MSAA
+  // (antialias:true) の resolve が readback を直列化させ著しく遅くなる (2026-06-02
+  // 調査で stalls 多発・throughput 頭打ちを確認)。書き出しは専用 canvas で renderer
+  // を作り直すため、ここで antialias:false を渡しても preview (別 canvas で
+  // antialias:true) には影響しない。preserveDrawingBuffer も書き出しでは不要なので
+  // false にして present コストを削る。出力はフル HD 等倍描画で品質は十分。
+  initRenderer(canvas, { antialias: false, preserveDrawingBuffer: false });
   const renderer = getRenderer();
   renderer.setSize(width, height, false);
   // ★ clearColor を毎回 (0,0,0,0) に reset。renderer は singleton で preview /

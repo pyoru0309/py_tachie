@@ -16,10 +16,38 @@ export const CANVAS_HEIGHT = 1080;
 let renderer = null;
 let camera = null;
 let boundCanvas = null;
+// 現 renderer を生成したときの options。同一 canvas でも options が変われば
+// 作り直す必要があるので記録しておく (preview=antialias true / export=false の
+// 切替で実際に再生成させるため)。
+let rendererOpts = { antialias: null, preserveDrawingBuffer: null };
 
-export function initRenderer(canvas) {
+export function initRenderer(canvas, options = {}) {
   if (!canvas) throw new Error("initRenderer: canvas is required");
-  if (renderer && boundCanvas === canvas) {
+  // antialias: 既定 true。preview のポリゴンエッジ (キャラ silhouette /
+  // dialogue box border / 動画レイヤーの矩形端 etc) のジャギー対策で MSAA を効かせる。
+  // Windows Chrome (ANGLE) で見た目の効果が大きい一方、書き出しは frame ごとに
+  // gl.readPixels するため MSAA resolve が readback を直列化させ著しく遅くなる
+  // (2026-06-02 調査: stalls 多発・throughput 頭打ち)。そのため書き出し経路は
+  // 明示的に antialias:false を渡し、preview だけ true を使う。出力はフル HD 等倍
+  // 描画なので MSAA 無しでも品質は十分。
+  const antialias = options.antialias !== undefined ? !!options.antialias : true;
+  // preserveDrawingBuffer: 診断用に既定 true (render 後の readPixels が確実に
+  // 書き込み済み pixel を返す)。書き出しは毎フレーム描画→読み出しを同期させて
+  // いるので false で良く、余分な present コストを避けられる。options 優先、
+  // 無指定なら従来の診断デフォルト (__splitePreserveDrawingBuffer で上書き可)。
+  const preserveDrawingBuffer =
+    options.preserveDrawingBuffer !== undefined
+      ? !!options.preserveDrawingBuffer
+      : ((typeof window === "undefined")
+        ? true
+        : (window.__splitePreserveDrawingBuffer !== false));
+
+  if (
+    renderer
+    && boundCanvas === canvas
+    && rendererOpts.antialias === antialias
+    && rendererOpts.preserveDrawingBuffer === preserveDrawingBuffer
+  ) {
     return { renderer, camera };
   }
   if (renderer) {
@@ -27,24 +55,11 @@ export function initRenderer(canvas) {
     renderer = null;
   }
   boundCanvas = canvas;
-  // 診断モード中: preserveDrawingBuffer=true を既定にする。これで render 後の
-  // readPixels が確実に「実際に書き込まれた pixel」を返す (false だと一部
-  // ブラウザで present 直後にクリアされる)。原因切り分けが終わったら false に
-  // 戻す。__splitePreserveDrawingBuffer=false を明示すれば旧挙動。
-  const preserveDrawingBuffer =
-    (typeof window === "undefined")
-      ? true
-      : (window.__splitePreserveDrawingBuffer !== false);
-  // antialias: true は WebGL の MSAA を有効化する。preview のポリゴンエッジ
-  // (キャラ silhouette / dialogue box border / 動画レイヤーの矩形端 etc) が
-  // ジャギーに見えていた問題への対処。Windows Chrome (ANGLE) で特に効果が大きい。
-  // GPU の fragment 処理コストは数倍になるが、preview は static 描画寄り (= 多数の
-  // texture plane を 1 度焼くだけ) なので体感差は小さい。動画書き出しは frame ごとに
-  // 大量 render するので影響を受けるが、出力品質に効くので維持。
+  rendererOpts = { antialias, preserveDrawingBuffer };
   renderer = new THREE.WebGLRenderer({
     canvas,
     alpha: true,
-    antialias: true,
+    antialias,
     premultipliedAlpha: false,
     preserveDrawingBuffer,
   });
@@ -90,6 +105,7 @@ export function disposeRenderer() {
   }
   camera = null;
   boundCanvas = null;
+  rendererOpts = { antialias: null, preserveDrawingBuffer: null };
 }
 
 export function isRendererReady() {
