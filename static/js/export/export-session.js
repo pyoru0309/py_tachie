@@ -978,10 +978,12 @@ export async function runExportSession({
   // ここから先は browser 側からは「ffmpeg がエンコード/書き込みを仕上げる時間」。
   onPhase("finalizing");
 
+  let encodeStats = null;
   if (frameEncoder) {
     // WebCodecs: 残りフレームを encode しきってから finish。flush で全 output
     // コールバック (= sendBytesNow) が走り切る。
     await frameEncoder.flush();
+    encodeStats = frameEncoder.getStats();
     frameEncoder.close();
   } else if (readback.flushRemaining) {
     // PBO 残り flush (session 終端)
@@ -997,6 +999,7 @@ export async function runExportSession({
   sender.close();
   const tEnd = performance.now();
   const elapsedSec = (tEnd - tStart) / 1000;
+  const producedFrames = frameEncoder ? frameCtx.globalFrameIdx : sender.framesSent;
   const browserFps = sender.framesSent / Math.max(elapsedSec, 1e-6);
 
   disposeActiveScene();
@@ -1012,9 +1015,10 @@ export async function runExportSession({
     browserFps,
     framesSent: sender.framesSent,
     sentBytes: sender.sentBytes,
-    framesRendered: sender.framesSent,
+    framesRendered: producedFrames,
     elapsedSec,
     stallCount: frameCtx.stallCount,
+    encodeStats,
     negotiatedExtensions: sender.negotiatedExtensions || "",
   };
 }
@@ -1319,8 +1323,10 @@ export async function runProjectExportSession({
   onPhase("finalizing");
 
   // 全シーン送信後にだけ PBO ring を吐き切る (= warmup 分の残り)
+  let encodeStats = null;
   if (frameEncoder) {
     await frameEncoder.flush();
+    encodeStats = frameEncoder.getStats();
     frameEncoder.close();
   } else if (readback.flushRemaining) {
     await readback.flushRemaining(async (bytes) => {
@@ -1335,6 +1341,7 @@ export async function runProjectExportSession({
   sender.close();
   const tEnd = performance.now();
   const elapsedSec = (tEnd - tStart) / 1000;
+  const producedFrames = frameEncoder ? frameCtx.globalFrameIdx : sender.framesSent;
   const browserFps = sender.framesSent / Math.max(elapsedSec, 1e-6);
 
   disposeActiveScene();
@@ -1350,9 +1357,10 @@ export async function runProjectExportSession({
     browserFps,
     framesSent: sender.framesSent,
     sentBytes: sender.sentBytes,
-    framesRendered: sender.framesSent,
+    framesRendered: producedFrames,
     elapsedSec,
     stallCount: frameCtx.stallCount,
+    encodeStats,
     negotiatedExtensions: sender.negotiatedExtensions || "",
     plan,
   };

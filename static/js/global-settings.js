@@ -757,15 +757,21 @@ function renderUpdateStatus(data) {
       "アップデート前にバックアップを取る (app_state/backups/)" +
       "</label>"
   );
-  lines.push(
-    '<label class="checkbox-row"><input type="checkbox" id="updateReinstallDeps" /> ' +
-      "依存パッケージも再インストールする (pip install -r requirements.txt)" +
-      "</label>"
-  );
-  lines.push(
-    '<p class="asset-hint">依存パッケージの構成が変わったアップデートで必要になります。' +
-      "書き出しが遅い環境では、これで高速化拡張が取り込まれる場合があります。</p>"
-  );
+  // 依存再インストールは requirements.txt が変わったアップデートのときだけ提示する
+  // (毎回出ると戸惑い要素になるため)。その場合は必要なので既定チェック済み。
+  const requirementsChanged = Array.isArray(data.changedFiles)
+    && data.changedFiles.some((f) => f === "requirements.txt" || f.endsWith("/requirements.txt"));
+  if (requirementsChanged) {
+    lines.push(
+      '<label class="checkbox-row"><input type="checkbox" id="updateReinstallDeps" checked /> ' +
+        "依存パッケージも再インストールする (pip install -r requirements.txt)" +
+        "</label>"
+    );
+    lines.push(
+      '<p class="asset-hint">このアップデートには依存パッケージ (requirements.txt) の変更が' +
+        "含まれます。チェックを入れたまま更新すると自動で反映されます。</p>"
+    );
+  }
   if (Array.isArray(data.dirtyModified) && data.dirtyModified.length > 0) {
     lines.push(
       '<label class="checkbox-row"><input type="checkbox" id="updateDiscardLocal" /> ' +

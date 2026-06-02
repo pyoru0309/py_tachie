@@ -74,6 +74,11 @@ export function computeBitrate(width, height, fps, maxrateOverride) {
 export function createH264FrameEncoder({ width, height, fps, bitrate, onChunk, onError }) {
   let firstError = null;
   let chunkCount = 0;
+  // 律速診断: encodeQueueSize backpressure で待った合計時間と最大キュー深さ。
+  // encodeWaitTotalMs が elapsed に近い = エンコーダ律速 (Windows ブラウザ実装が
+  // ffmpeg/NVENC より遅い等)。≈0 なら encode は律速でなく render/decode が原因。
+  let encodeWaitTotalMs = 0;
+  let maxQueue = 0;
 
   const encoder = new window.VideoEncoder({
     output: (chunk) => {
@@ -115,12 +120,16 @@ export function createH264FrameEncoder({ width, height, fps, bitrate, onChunk, o
     const timestamp = Math.round((frameIdx * 1e6) / fps);
     const frame = new VideoFrame(canvas, { timestamp });
     try {
+      if (encoder.encodeQueueSize > maxQueue) maxQueue = encoder.encodeQueueSize;
       // produce が encode を追い越して GPU メモリを溜め込まないよう backpressure。
+      // ここで待った時間 = エンコーダが捌けていない時間 (律速診断)。
+      const tWait0 = performance.now();
       while (encoder.encodeQueueSize > 8) {
         // eslint-disable-next-line no-await-in-loop
         await new Promise((r) => setTimeout(r, 1));
         if (firstError) throw firstError;
       }
+      encodeWaitTotalMs += performance.now() - tWait0;
       encoder.encode(frame, { keyFrame: frameIdx % keyEvery === 0 });
     } finally {
       frame.close();
@@ -141,5 +150,8 @@ export function createH264FrameEncoder({ width, height, fps, bitrate, onChunk, o
     flush,
     close,
     get chunkCount() { return chunkCount; },
+    getStats() {
+      return { encodeWaitTotalMs, maxQueue, chunkCount, bitrate };
+    },
   };
 }

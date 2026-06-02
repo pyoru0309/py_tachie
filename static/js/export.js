@@ -367,6 +367,22 @@ function emitExportSummary({ formValues, baseExportConfig, result, done, muxResu
   lines.push(`browser fps = ${result.browserFps.toFixed(2)}`);
   lines.push(`stalls (PBO had to wait) = ${result.stallCount}`);
   lines.push(`sent bytes = ${(result.sentBytes / 1e6).toFixed(1)} MB`);
+  // WebCodecs 律速診断: produce(render+decode) fps と encode backpressure 待ち。
+  // encode wait が elapsed に近い → エンコーダ律速 (Win ブラウザ実装が遅い)。
+  // ≈0 なのに fps が低い → render / videoLayer decode が律速。
+  if (result.encodeStats) {
+    const es = result.encodeStats;
+    const elapsed = result.elapsedSec || 0;
+    const renderFps = elapsed > 0 ? (result.framesRendered / elapsed) : 0;
+    const waitSec = (es.encodeWaitTotalMs || 0) / 1000;
+    const waitPct = elapsed > 0 ? (waitSec / elapsed * 100) : 0;
+    lines.push(`render(produce) fps = ${renderFps.toFixed(2)} (produced ${result.framesRendered} frames)`);
+    lines.push(
+      `encode backpressure wait = ${waitSec.toFixed(1)}s / ${elapsed.toFixed(1)}s `
+      + `(${waitPct.toFixed(0)}%) maxQueue=${es.maxQueue} bitrate=${(es.bitrate / 1e6).toFixed(1)}Mbps`,
+    );
+    lines.push(`  ↑ wait% が高い=エンコーダ律速 / 低いのに遅い=render or videoLayer decode 律速`);
+  }
   lines.push(``);
   lines.push(`## サーバ側`);
   if (done && done.fps !== undefined) {
