@@ -112,9 +112,10 @@ export function createH264FrameEncoder({ width, height, fps, bitrate, onChunk, o
     // 実測 wait 44〜66%)、かつ B-frame は `-c copy` で PTS 並べ替えリスクがある。
     // バッチ書き出しは速度優先 + ビットレートで画質担保が正解なので realtime にする。
     latencyMode: "realtime",
-    // GPU エンコーダ (NVENC 等、Media Foundation 経由) を優先させる。ソフトウェア
-    // フォールバックを避けて Windows での encode を速くする狙い。
-    hardwareAcceleration: "prefer-hardware",
+    // 注: hardwareAcceleration:"prefer-hardware" は付けない。Windows の一部環境で
+    //     isConfigSupported=true でも configure 時に "Encoder creation error" になり
+    //     書き出しが即失敗した (2026-06-02)。既定 ("no-preference") に任せ、ブラウザに
+    //     HW/SW を選ばせる (1080p は通常 HW が選ばれる)。
     bitrateMode: "variable",
   });
 
