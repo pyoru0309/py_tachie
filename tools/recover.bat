@@ -1,45 +1,47 @@
 @echo off
-chcp 65001 >nul
 REM ============================================================================
-REM 立ち絵システム 復旧スクリプト (Windows)
+REM Tachie System - Recovery script (Windows)
 REM
-REM アップデートに失敗してサーバが起動しなくなった / ファイルが壊れた / 欠落した
-REM ときに、ダブルクリックで実行してください。リモート (GitHub) の最新状態へ強制
-REM 的に一致させて復旧します。
+REM Run this (double-click) when the server fails to start, or files got broken
+REM or missing after a failed update. It force-syncs the code to the latest
+REM state on the remote (GitHub).
 REM
-REM あなたのデータは消えません:
+REM Your data is NOT touched:
 REM   projects\  app_state\  cache\  outputs\  assets\fonts\  assets\sound_effects\
-REM   などは git 管理外なので、この復旧では一切触りません。
-REM   消えるのは「あなたが手で書き換えたコード」だけです (通常はありません)。
+REM   are not tracked by Git, so this recovery never deletes them.
+REM   Only manual edits to the source code are discarded (usually none).
+REM
+REM NOTE: messages are intentionally ASCII-only (.bat runs under Shift_JIS on
+REM       Japanese Windows; non-ASCII would be garbled). See .gitattributes.
 REM ============================================================================
 setlocal
 cd /d "%~dp0\.."
 
 echo ============================================================
-echo   立ち絵システム 復旧
+echo   Tachie System - Recovery
 echo ============================================================
-echo フォルダ: %CD%
+echo Folder: %CD%
 
 where git >nul 2>nul
 if errorlevel 1 (
   echo.
-  echo [エラー] git が見つかりません。git をインストールしてから再実行してください。
-  echo          https://git-scm.com/download/win
+  echo [ERROR] git not found. Install git and run again:
+  echo         https://git-scm.com/download/win
   pause
   exit /b 1
 )
 
-REM 現在のブランチ (受信チャネル) を取得。取れなければ main。
+REM Detect current branch (update channel). Fall back to main.
 set "BRANCH="
 for /f "delims=" %%b in ('git rev-parse --abbrev-ref HEAD 2^>nul') do set "BRANCH=%%b"
 if "%BRANCH%"=="" set "BRANCH=main"
 if "%BRANCH%"=="HEAD" set "BRANCH=main"
 
-echo 対象ブランチ: %BRANCH%
+echo Target branch: %BRANCH%
 echo.
-echo リモートから取得し、%BRANCH% を origin/%BRANCH% に完全一致させます。
-echo  - コミットしていないコードの変更は破棄されます
-echo  - プロジェクト/素材/出力などのデータは消えません
+echo This will fetch from the remote and force %BRANCH% to match origin/%BRANCH%.
+echo  - Uncommitted code changes will be discarded
+echo  - Your projects / assets / outputs are NOT deleted
 echo.
 pause
 
@@ -53,15 +55,15 @@ git reset --hard "origin/%BRANCH%"
 
 if errorlevel 1 (
   echo.
-  echo [エラー] 復旧に失敗しました。ネット接続を確認のうえ再実行するか、
-  echo          GitHub から ZIP を再ダウンロードして入れ直してください。
+  echo [ERROR] Recovery failed. Check your internet connection and retry,
+  echo         or re-download the ZIP from GitHub and reinstall.
   pause
   exit /b 1
 )
 
 echo.
 echo ============================================================
-echo   復旧が完了しました。サーバを起動し直してください。
+echo   Recovery complete. Restart the server:
 echo     python -m app
 echo ============================================================
 pause
