@@ -21,6 +21,33 @@ import {
 } from "./export-ui.js";
 import { fetchGlobalConfig } from "./global-settings.js";
 import { updateSelectedCutFromCurrent, saveScenario } from "./scenario-actions.js";
+import { isWebcodecsH264Supported } from "./export/webcodecs-encoder.js";
+
+// WebCodecs 高速経路を使う transport を決める。H.264 mp4 preset かつ「高速書き出し」
+// ON かつブラウザが H.264 エンコード対応のときだけ "webcodecs-h264"。それ以外
+// (透過/ProRes/PNG, H.265, 非対応ブラウザ, トグル OFF) は従来の "rawrgba"。
+// フォールバック理由は onLog に出して切り分けやすくする。
+async function _decideTransport(formValues, width, height, onLog) {
+  if (formValues.fastWebcodecs === false) {
+    onLog("高速書き出し OFF: 従来方式 (生 RGBA) で書き出します");
+    return "rawrgba";
+  }
+  const preset = formValues.preset || {};
+  const isH264Mp4 =
+    String(preset.videoCodec || "") === "libx264"
+    && !preset.alpha
+    && String(preset.extension || ".mp4").toLowerCase() === ".mp4";
+  if (!isH264Mp4) {
+    onLog("このプリセットは高速書き出し非対応 (H.264 mp4 以外): 従来方式で書き出します");
+    return "rawrgba";
+  }
+  const supported = await isWebcodecsH264Supported(width, height);
+  if (!supported) {
+    onLog("このブラウザは WebCodecs H.264 エンコード非対応: 従来方式で書き出します");
+    return "rawrgba";
+  }
+  return "webcodecs-h264";
+}
 
 async function ensureGlobalConfigLoaded() {
   if (state.globalConfig) return state.globalConfig;
@@ -117,6 +144,8 @@ async function runV2Export(formValues) {
     presetOptions: formValues.presetOptions,
   };
   const onLog = (line, kind = "info") => appendExportLog(line, kind);
+  // フレーム転送方式の決定 (出力は常に 1920x1080)。
+  const transport = await _decideTransport(formValues, 1920, 1080, onLog);
   const t0 = performance.now();
   // phase が "finalizing" 以降になったら、onProgress (frame counter 更新) で
   // ラベルを上書きしないようにする。GL 側のフレーム送信は既に完了しているので
@@ -169,6 +198,9 @@ async function runV2Export(formValues) {
     // encoder は preset 経路でサーバ側に無視されるが、Pydantic Literal を通すため
     // デフォルト値を一応載せる (handshake validation を通す)。
     encoder: "h264_videotoolbox",
+    // フレーム転送方式 ("rawrgba" or "webcodecs-h264")。webcodecs はサーバで
+    // ffmpeg copy になり preset codec は無視される。
+    transport,
     // 本線 UI では bg / videoTrack は常に描く (v1 互換)。alpha プリセットで GL 透過
     // を抜きたい場合はカット側の背景を外す。export-session 内の transparent フラグは
     // false 固定 (= layerData.background を消さない、hasVideoTrack を残す)。
@@ -317,10 +349,17 @@ function emitExportSummary({ formValues, baseExportConfig, result, done, muxResu
     : `target=cut cut=${formValues.selectedCutId}`;
   const totalFramesForStats = (result.plan?.grandTotalFrames) ?? result.framesSent;
 
+  const transport = baseExportConfig.transport || "rawrgba";
   const lines = [];
   lines.push(`## 設定`);
   lines.push(`project=${projectId} ${targetLabel} ${W}x${H}@${fps}`);
-  lines.push(`${encoderLabel} readback=${readbackMode} vflip=${vflipMode} bp=${bpThresholdMB}MB`);
+  if (transport === "webcodecs-h264") {
+    // WebCodecs 経路はブラウザで H.264 圧縮 → サーバ ffmpeg copy。preset codec /
+    // readback / vflip は使わないので転送方式を明示する。
+    lines.push(`transport=webcodecs-h264 (browser H.264 → ffmpeg copy) bp=${bpThresholdMB}MB`);
+  } else {
+    lines.push(`${encoderLabel} readback=${readbackMode} vflip=${vflipMode} bp=${bpThresholdMB}MB`);
+  }
   lines.push(``);
   lines.push(`## ブラウザ側`);
   lines.push(`framesSent = ${result.framesSent}/${totalFramesForStats}`);

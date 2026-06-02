@@ -156,6 +156,19 @@ export class FrameSender {
     this.framesSent += 1;
   }
 
+  // backpressure 無しで即送信する。WebCodecs の圧縮チャンク (数百KB) は
+  // VideoEncoder の output コールバック (同期) から送るため await できず、また
+  // 生 RGBA の 8MB/frame と違い WS バッファを溢れさせにくいので drain 待ちは不要。
+  // ws.send は同期 enqueue なので、コールバック発火順 = 送信順が保たれる。
+  sendBytesNow(bytes) {
+    const ws = this.ws;
+    if (!ws) throw new Error("FrameSender not opened");
+    if (this.lastError) throw this.lastError;
+    ws.send(bytes);
+    this.sentBytes += bytes.byteLength;
+    this.framesSent += 1;
+  }
+
   // finish を送って done を待つ。最大 timeoutMs 待つ (既定 60秒)。
   async finishAndWait(timeoutMs = 60_000) {
     const ws = this.ws;

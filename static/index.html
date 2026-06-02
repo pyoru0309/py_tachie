@@ -2919,6 +2919,11 @@
             </div>
             <div class="settings-checkboxes">
               <label class="checkbox-row">
+                <input id="exportOptionsFastEncodeInput" type="checkbox" checked />
+                高速書き出し（WebCodecs）
+              </label>
+              <p class="asset-hint">ブラウザ内で H.264 に圧縮してから送るため、特に Windows で書き出しが大幅に速くなります。H.264 mp4 プリセットのときだけ有効で、透過 (ProRes/PNG) や非対応ブラウザでは自動的に従来方式に切り替わります。書き出し結果に問題が出る場合は OFF にしてください。</p>
+              <label class="checkbox-row">
                 <input id="exportOptionsIncludeAudioInput" type="checkbox" checked />
                 音声を含める
               </label>

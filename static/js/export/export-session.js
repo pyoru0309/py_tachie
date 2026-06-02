@@ -31,6 +31,7 @@ import {
 import { state } from "/static/js/state.js";
 import { registerProjectFonts } from "/static/js/font.js";
 import { createReadback } from "./pbo-readback.js";
+import { createH264FrameEncoder, computeBitrate } from "./webcodecs-encoder.js";
 import { FrameSender } from "./frame-sender.js";
 
 const FONT_READY_TIMEOUT_MS = 5000;
@@ -456,6 +457,14 @@ function cpuVerticalFlip(bytes, width, height) {
 // ctx.diagAlphaRemaining > 0 のとき、readback 直後の RGBA から alpha 統計を
 // ログに出して残数を 1 減らす (= 透明 codec の切り分け診断用)。
 async function _readbackAndSend(readback, sender, vflipMode, width, height, ctx) {
+  // WebCodecs 高速経路: readback (生 RGBA) せず、canvas を直接 H.264 エンコードして
+  // 圧縮チャンクを送る。VideoFrame は描画直後の同期点で取り込む (encodeCanvas 内で
+  // yield 前にキャプチャ済み)。送信は onChunk → sender.sendFrame を再利用。
+  if (ctx.frameEncoder) {
+    await ctx.frameEncoder.encodeCanvas(ctx.canvas, ctx.globalFrameIdx);
+    ctx.globalFrameIdx += 1;
+    return;
+  }
   const rb = await readback.readback();
   if (rb.stalled) ctx.stallCount += 1;
   let bytesToSend = rb.bytes;
@@ -477,6 +486,28 @@ async function _readbackAndSend(readback, sender, vflipMode, width, height, ctx)
     await sender.sendFrame(bytesToSend);
   }
   if (readback.advance) readback.advance();
+}
+
+// transport=webcodecs-h264 のとき frameEncoder を生成して frameCtx に載せる。
+// rawrgba (= 従来経路) のときは何もせず null を返す。チャンクは output コールバック
+// から sender.sendBytesNow で同期送信する。生成できなかった例外は caller へ伝播。
+function _setupFrameEncoder(exportConfig, dims, sender, canvas, frameCtx, onLog) {
+  if (exportConfig.transport !== "webcodecs-h264") return null;
+  const { width, height, fps } = dims;
+  const bitrate = computeBitrate(width, height, fps, exportConfig.presetOptions?.maxrate);
+  const frameEncoder = createH264FrameEncoder({
+    width, height, fps, bitrate,
+    onChunk: (bytes) => { sender.sendBytesNow(bytes); },
+    onError: (e) => { onLog(`WebCodecs encoder error: ${e?.message || e}`, "err"); },
+  });
+  frameCtx.frameEncoder = frameEncoder;
+  frameCtx.canvas = canvas;
+  frameCtx.globalFrameIdx = 0;
+  onLog(
+    `WebCodecs H.264 エンコード有効: bitrate=${(bitrate / 1e6).toFixed(1)}Mbps`
+    + ` (転送=圧縮チャンク / server=copy)`,
+  );
+  return frameEncoder;
 }
 
 // RGBA bytes (Uint8Array, 長さ=W*H*4) から alpha チャネル統計を返す。
@@ -883,6 +914,7 @@ export async function runExportSession({
       totalFrames, projectId, cutId: cut.id,
       mode: "cut",
       ...(outputPath ? { outputPath } : {}),
+      ...(exportConfig.transport ? { transport: exportConfig.transport } : {}),
       ...(exportConfig.videoPresetId ? { videoPresetId: exportConfig.videoPresetId } : {}),
       ...(exportConfig.presetOptions ? { presetOptions: exportConfig.presetOptions } : {}),
     },
@@ -917,6 +949,9 @@ export async function runExportSession({
       }
     },
   };
+  const frameEncoder = _setupFrameEncoder(
+    exportConfig, { width, height, fps }, sender, canvas, frameCtx, onLog,
+  );
 
   // 1) 先頭プリロール (透過なら alpha=0、不透明なら黒)
   if (leadInFrames > 0) {
@@ -943,8 +978,13 @@ export async function runExportSession({
   // ここから先は browser 側からは「ffmpeg がエンコード/書き込みを仕上げる時間」。
   onPhase("finalizing");
 
-  // PBO 残り flush (session 終端)
-  if (readback.flushRemaining) {
+  if (frameEncoder) {
+    // WebCodecs: 残りフレームを encode しきってから finish。flush で全 output
+    // コールバック (= sendBytesNow) が走り切る。
+    await frameEncoder.flush();
+    frameEncoder.close();
+  } else if (readback.flushRemaining) {
+    // PBO 残り flush (session 終端)
     await readback.flushRemaining(async (bytes) => {
       let b = bytes;
       if (vflipMode === "cpu") cpuVerticalFlip(b, width, height);
@@ -1031,6 +1071,7 @@ export async function runProjectExportSession({
       totalFrames, projectId, cutId: "scenario",
       mode: "project",
       ...(outputPath ? { outputPath } : {}),
+      ...(exportConfig.transport ? { transport: exportConfig.transport } : {}),
       ...(exportConfig.videoPresetId ? { videoPresetId: exportConfig.videoPresetId } : {}),
       ...(exportConfig.presetOptions ? { presetOptions: exportConfig.presetOptions } : {}),
     },
@@ -1070,6 +1111,9 @@ export async function runProjectExportSession({
   const progressState = { currentScene: 0, currentCut: 0, totalCuts: 0 };
   // 全シーンの cut 総数 (進捗 UI 表示用)
   progressState.totalCuts = plan.scenes.reduce((s, sc) => s + sc.cuts.length, 0);
+  const frameEncoder = _setupFrameEncoder(
+    exportConfig, { width, height, fps }, sender, canvas, frameCtx, onLog,
+  );
 
   // 0) 先頭プリロール (透過なら alpha=0、不透明なら黒)。シーン loop 開始前に
   //    1 回だけ走る。映像側はここで leadInFrames 個の blank を出し、音声は mux 段で
@@ -1275,7 +1319,10 @@ export async function runProjectExportSession({
   onPhase("finalizing");
 
   // 全シーン送信後にだけ PBO ring を吐き切る (= warmup 分の残り)
-  if (readback.flushRemaining) {
+  if (frameEncoder) {
+    await frameEncoder.flush();
+    frameEncoder.close();
+  } else if (readback.flushRemaining) {
     await readback.flushRemaining(async (bytes) => {
       let b = bytes;
       if (vflipMode === "cpu") cpuVerticalFlip(b, width, height);

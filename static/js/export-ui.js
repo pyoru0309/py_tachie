@@ -256,6 +256,11 @@ export function readExportFormValues() {
     includeAudio: elements.exportOptionsIncludeAudioInput
       ? elements.exportOptionsIncludeAudioInput.checked !== false
       : true,
+    // 高速書き出し (WebCodecs)。チェック要素が無い経路では既定 true (= 対応形式なら
+    // 高速経路、非対応なら export.js 側で自動フォールバック)。
+    fastWebcodecs: elements.exportOptionsFastEncodeInput
+      ? elements.exportOptionsFastEncodeInput.checked !== false
+      : true,
     selectedCutId: state.selectedCutId || null,
   };
 }

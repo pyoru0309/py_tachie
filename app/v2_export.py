@@ -120,6 +120,14 @@ class ExportHandshake(BaseModel):
     # progress / done のラベルだけ変わる。シーン / カット構造はクライアント側
     # だけが知る (サーバは raw RGBA を ffmpeg に流すだけ)。
     mode: Literal["cut", "project"] = "cut"
+    # フレーム転送方式。"rawrgba" (既定) = 生 RGBA を pipe で受けて ffmpeg が
+    # エンコード (従来経路)。"webcodecs-h264" = ブラウザが WebCodecs で H.264
+    # (annexb elementary stream) にエンコード済みのチャンクを送る → サーバは
+    # ffmpeg `-f h264 -i pipe:0 -c copy` でコンテナ化のみ (再エンコード無し)。
+    # 生 RGBA 8.29MB/frame の転送が律速だった Windows 書き出しの高速化用
+    # (2026-06-02)。webcodecs では preset の codec 設定は無視し copy 固定、
+    # 出力拡張子だけ preset (.mp4) を流用する。
+    transport: Literal["rawrgba", "webcodecs-h264"] = "rawrgba"
     # 明示パス。未指定なら projects/{id}/exports/v2_<cut>_<ts>.mp4 を自動命名。
     # 制約は `_resolve_output_path` で別途検証 (ValidationError ではなく
     # OUTPUT_PATH_REJECTED として返したいため)。
@@ -370,6 +378,35 @@ def _build_ffmpeg_cmd_from_preset(
     cmd.extend(preset_container_args(preset))
     cmd.append(str(output_path))
     return cmd
+
+
+def _build_ffmpeg_cmd_copy_h264(
+    fps: int,
+    output_path: Path,
+) -> list[str]:
+    """WebCodecs 経路用。H.264 annexb elementary stream を pipe:0 から受け、
+    再エンコードせず `-c copy` でコンテナ化するだけのコマンド。
+
+    ブラウザ (WebCodecs VideoEncoder, avc:{format:"annexb"}) が既に H.264 へ
+    圧縮済みなので、サーバ側のエンコード負荷はゼロ。フレームのタイムスタンプは
+    elementary stream に無いため、入力側 `-r fps` で CFR を付与する。
+    vflip は不要 (canvas を VideoFrame でキャプチャするため上下反転しない)。
+    出力は preset の拡張子 (.mp4) に合わせて解決済み。
+    """
+    ffmpeg = ffmpeg_executable()
+    return [
+        ffmpeg,
+        "-hide_banner",
+        "-loglevel", "error",
+        "-progress", "pipe:1",
+        "-y",
+        "-r", str(fps),
+        "-f", "h264",
+        "-i", "pipe:0",
+        "-c", "copy",
+        "-movflags", "+faststart",
+        str(output_path),
+    ]
 
 
 # ---------- capability 検出 -----------------------------------------------
@@ -1280,7 +1317,18 @@ async def v2_export_ws(ws: WebSocket) -> None:
 
         # 4) ffmpeg コマンド組み立て + 起動
         try:
-            if preset_for_export is not None:
+            if cfg.transport == "webcodecs-h264":
+                # WebCodecs 経路: ブラウザが H.264 (annexb) に圧縮済み。preset の
+                # codec 設定は無視し copy でコンテナ化のみ。出力先は preset 拡張子
+                # (.mp4) で解決済み (preset 未指定なら自動命名の .mp4)。
+                if output_path is None:
+                    await _send_error(
+                        ws, ERR_INVALID_CONFIG,
+                        "webcodecs-h264 経路では outputPath が必要です",
+                    )
+                    return
+                cmd = _build_ffmpeg_cmd_copy_h264(cfg.fps, output_path)
+            elif preset_for_export is not None:
                 if output_path is None:
                     # preset 経路では output_path は必須 (encoder=null の null 出力は
                     # bench 専用)。preset 側で encoder=null を選べないので、ここに

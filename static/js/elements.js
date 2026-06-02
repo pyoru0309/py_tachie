@@ -562,6 +562,7 @@ export const elements = {
   exportOptionsEncoderPresetWrap: document.querySelector("#exportOptionsEncoderPresetWrap"),
   exportOptionsMonoToStereoInput: document.querySelector("#exportOptionsMonoToStereoInput"),
   exportOptionsIncludeAudioInput: document.querySelector("#exportOptionsIncludeAudioInput"),
+  exportOptionsFastEncodeInput: document.querySelector("#exportOptionsFastEncodeInput"),
   exportOptionsConfirmButton: document.querySelector("#exportOptionsConfirmButton"),
   exportOptionsCancelButton: document.querySelector("#exportOptionsCancelButton"),
   exportPreviewCanvas: document.querySelector("#exportPreviewCanvas"),
