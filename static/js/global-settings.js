@@ -35,6 +35,10 @@ function activateGlobalTab(tabId) {
   for (const panel of elements.globalSettingsPanels) {
     panel.classList.toggle("hidden", panel.dataset.globalTabPanel !== tabId);
   }
+  // アップデートタブを開いたら実行環境診断を更新する (書き出しが遅い環境の早期発見)。
+  if (tabId === "update") {
+    refreshSystemHealth();
+  }
 }
 
 function buildPresetItem(preset, selectedId, name, onChange) {
@@ -679,6 +683,47 @@ function escapeHtml(s) {
   }[c]));
 }
 
+function renderSystemHealth(data) {
+  const el = elements.systemHealthPanel;
+  if (!el) return;
+  if (!data || typeof data !== "object") {
+    el.innerHTML = "";
+    return;
+  }
+  const py = escapeHtml(data.python || "?");
+  const wsVer = escapeHtml(data.websocketsVersion || "?");
+  const speedups = data.websocketsSpeedups;
+  const degraded = !!data.degraded;
+  const lines = [];
+  lines.push(
+    `<div class="system-health-row"><span class="msym" aria-hidden="true">${
+      degraded ? "warning" : "check_circle"
+    }</span><span>Python ${py} / websockets ${wsVer} / 高速化拡張 ${
+      speedups ? "有効" : "<strong>無効</strong>"
+    }</span></div>`,
+  );
+  for (const w of data.warnings || []) {
+    lines.push(
+      `<div class="system-health-warning"><strong>${escapeHtml(w.title)}</strong>` +
+        `<p>${escapeHtml(w.detail)}</p>` +
+        `<p class="system-health-action">${escapeHtml(w.action)}</p></div>`,
+    );
+  }
+  el.className = `system-health${degraded ? " degraded" : " ok"}`;
+  el.innerHTML = lines.join("");
+}
+
+async function refreshSystemHealth() {
+  if (!elements.systemHealthPanel) return;
+  try {
+    const res = await fetch("/api/system/health");
+    const data = await res.json().catch(() => null);
+    renderSystemHealth(data);
+  } catch (error) {
+    console.warn("system health 取得失敗", error);
+  }
+}
+
 function renderUpdateStatus(data) {
   const status = elements.globalUpdateStatus;
   const applyBtn = elements.applyUpdateButton;
@@ -711,6 +756,15 @@ function renderUpdateStatus(data) {
     '<label class="checkbox-row"><input type="checkbox" id="updateMakeBackup" checked /> ' +
       "アップデート前にバックアップを取る (app_state/backups/)" +
       "</label>"
+  );
+  lines.push(
+    '<label class="checkbox-row"><input type="checkbox" id="updateReinstallDeps" /> ' +
+      "依存パッケージも再インストールする (pip install -r requirements.txt)" +
+      "</label>"
+  );
+  lines.push(
+    '<p class="asset-hint">依存パッケージの構成が変わったアップデートで必要になります。' +
+      "書き出しが遅い環境では、これで高速化拡張が取り込まれる場合があります。</p>"
   );
   if (Array.isArray(data.dirtyModified) && data.dirtyModified.length > 0) {
     lines.push(
@@ -779,11 +833,12 @@ async function applyUpdate() {
     const includeAssets = document.getElementById("updateIncludeAssets")?.checked || false;
     const backup = document.getElementById("updateMakeBackup")?.checked !== false;
     const discardLocal = document.getElementById("updateDiscardLocal")?.checked || false;
+    const reinstallDeps = document.getElementById("updateReinstallDeps")?.checked || false;
     const channel = _currentChannelValue();
     const res = await fetch("/api/update/apply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel, includeAssets, backup, discardLocalChanges: discardLocal }),
+      body: JSON.stringify({ channel, includeAssets, backup, discardLocalChanges: discardLocal, reinstallDeps }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) {

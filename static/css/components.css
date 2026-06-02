@@ -1186,6 +1186,57 @@ dialog::backdrop {
   color: var(--color-text-secondary, #667085);
 }
 
+.system-health {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle, #d0d5dd);
+  border-radius: 8px;
+  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.02));
+  font-size: 13px;
+}
+
+.system-health:empty {
+  display: none;
+}
+
+.system-health.degraded {
+  border-color: var(--color-warning, #d97706);
+  background: var(--color-warning-bg, rgba(217, 119, 6, 0.08));
+}
+
+.system-health-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.system-health-row .msym {
+  font-size: 18px;
+}
+
+.system-health.ok .system-health-row .msym {
+  color: var(--color-success, #16a34a);
+}
+
+.system-health.degraded .system-health-row .msym {
+  color: var(--color-warning, #d97706);
+}
+
+.system-health-warning {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border-subtle, #d0d5dd);
+}
+
+.system-health-warning p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary, #667085);
+}
+
+.system-health-warning .system-health-action {
+  color: var(--color-text-primary, #1d2939);
+}
+
 .shortcut-list {
   display: grid;
   gap: 14px;

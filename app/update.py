@@ -29,12 +29,15 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from .log_setup import app_logger
 from .paths import ASSETS_DIR, PROJECT_ROOT, STATE_DIR
+
+_REQUIREMENTS_PATH = PROJECT_ROOT / "requirements.txt"
 
 _log = app_logger("update")
 
@@ -203,6 +206,38 @@ def check_for_updates(channel: str | None = None) -> dict[str, Any]:
     }
 
 
+def _reinstall_dependencies() -> tuple[int, str, str]:
+    """``pip install -r requirements.txt`` を現在の Python で実行する。
+
+    requirements.txt がアップデートで増減・更新されたときに依存を追従させるための
+    任意ステップ。``websockets`` 等の C 拡張付きパッケージで、実行中の Python 用の
+    新しい wheel が公開されていれば、これで高速版 (speedups) を取り込める可能性が
+    ある。ただし Python のバージョン自体は変えられないので、3.14 で wheel が無い等の
+    ケースは解消しない (その場合は Python 3.12/3.13 への切替を案内する)。
+
+    ``sys.executable -m pip`` を使い、アプリを起動しているのと同一の Python /
+    venv に対してインストールする。git の subprocess と同じく UTF-8 固定で decode
+    する (Windows の cp932 環境で UnicodeDecodeError を避けるため)。
+    """
+    if not _REQUIREMENTS_PATH.exists():
+        return 1, "", f"requirements.txt が見つかりません: {_REQUIREMENTS_PATH}"
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-r", str(_REQUIREMENTS_PATH)],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=600,
+        )
+        return proc.returncode, proc.stdout, proc.stderr
+    except FileNotFoundError:
+        return 127, "", "pip not found"
+    except subprocess.TimeoutExpired:
+        return 124, "", "pip install がタイムアウトしました (600 秒)"
+
+
 def _make_backup(label: str = "update") -> Path:
     """配布アセット領域とローカル状態をバックアップする。
 
@@ -247,6 +282,7 @@ def apply_update(
     include_assets: bool = False,
     backup: bool = True,
     discard_local_changes: bool = False,
+    reinstall_deps: bool = False,
 ) -> dict[str, Any]:
     """git pull を実行してアップデートを適用する。
 
@@ -262,6 +298,10 @@ def apply_update(
         discard_local_changes: True なら git pull 前に modified/staged な
             tracked file を ``git checkout -- .`` で破棄する。False で dirty
             だと git pull が失敗するので、GUI 側で事前に確認する想定。
+        reinstall_deps: True なら適用後に ``pip install -r requirements.txt`` を
+            実行して依存パッケージを追従させる。requirements.txt が更新された
+            アップデートで必要になる。失敗してもコード更新自体は成功扱いにし、
+            ``depsReinstalled`` / ``depsMessage`` で結果を返す。
 
     Returns:
         ``{"ok": bool, "message": str, "backupPath": str | None, "log": str}``
@@ -389,18 +429,41 @@ def apply_update(
             "log": "\n".join(log_lines),
         }
 
-    # 7. 適用後の状態
+    # 7. 依存パッケージの再インストール (任意)。コード適用後に requirements.txt が
+    #    変わっているケースに追従する。失敗してもコード更新自体は成功扱いにする
+    #    (起動はできるため)。
+    deps_reinstalled = False
+    deps_message = ""
+    if reinstall_deps:
+        dep_code, dep_out, dep_err = _reinstall_dependencies()
+        _log_step("pip install -r requirements.txt", (dep_code, dep_out, dep_err))
+        if dep_code == 0:
+            deps_reinstalled = True
+            deps_message = "依存パッケージを再インストールしました。"
+        else:
+            deps_message = (
+                "依存パッケージの再インストールに失敗しました "
+                f"(exit {dep_code})。手動で `pip install -r requirements.txt` を"
+                "実行してください。コードの更新自体は完了しています。"
+            )
+
+    # 8. 適用後の状態
     info = check_for_updates(channel=channel)
     new_sha = info.get("currentSha") if info.get("ok") else None
 
+    base_message = "アップデートが完了しました。アプリを再起動してください。"
+    message = f"{base_message} {deps_message}".strip() if deps_message else base_message
+
     return {
         "ok": True,
-        "message": "アップデートが完了しました。アプリを再起動してください。",
+        "message": message,
         "newSha": new_sha,
         "newTag": info.get("currentTag") if info.get("ok") else None,
         "backupPath": str(backup_dir) if backup_dir else None,
         "channel": "dev" if target_branch == "dev" else "stable",
         "branch": target_branch,
         "includeAssets": include_assets,
+        "depsReinstalled": deps_reinstalled,
+        "depsMessage": deps_message,
         "log": "\n".join(log_lines),
     }

@@ -252,6 +252,9 @@ from . import vendor as vendor_mod  # noqa: E402
 # アプリ内アップデータ (git pull ラッパ)。詳細は app/update.py。
 from . import update as update_mod  # noqa: E402
 
+# 実行環境診断 (websockets.speedups 等)。詳細は app/runtime_health.py。
+from . import runtime_health  # noqa: E402
+
 # デフォルトフォント (Noto Sans JP) のインストール。詳細は app/fonts.py。
 from . import fonts as fonts_mod  # noqa: E402
 
@@ -461,6 +464,9 @@ def startup() -> None:
         # quietMode は WARNING 化なので info は出ない。startup 完了の合図として
         # 1 行だけ stderr に直接出す (永続)。
         print("[startup] quiet mode: app/uvicorn loggers -> WARNING", flush=True)
+    # 実行環境診断 (websockets.speedups の有無等)。degraded なら WARNING を出す
+    # ので quietMode でも残る。書き出しが遅い環境の早期発見が目的。
+    runtime_health.log_startup_diagnostics(app_logger("startup"))
     if active_project_id():
         ctx = current_project()
         ensure_manifest(ctx)
@@ -4415,6 +4421,17 @@ def _resolve_update_channel(override: str | None = None) -> str:
         return "stable"
 
 
+@app.get("/api/system/health")
+def system_health_endpoint() -> dict[str, Any]:
+    """実行環境の書き出し性能に関わる診断結果を返す。
+
+    websockets.speedups (C 拡張) の有無 / Python バージョン / プラットフォームを
+    返し、degraded (= 書き出しが遅くなる構成) なら warnings に対処案内を載せる。
+    環境タブの診断パネルで表示する。
+    """
+    return runtime_health.diagnose()
+
+
 @app.get("/api/update/check")
 def update_check_endpoint(channel: str | None = None) -> dict[str, Any]:
     """origin/<channel に対応する branch> を fetch して HEAD との差分を返す。
@@ -4435,18 +4452,21 @@ def update_apply_endpoint(payload: dict[str, Any] | None = None) -> dict[str, An
       - includeAssets: bool (default False) — assets/ も最新版に上書きするか
       - backup:        bool (default True)  — 適用前にバックアップを取るか
       - discardLocalChanges: bool (default False) — modified file を破棄して進めるか
+      - reinstallDeps: bool (default False) — 適用後に pip install -r requirements.txt するか
     """
     payload = payload or {}
     channel = _resolve_update_channel(payload.get("channel"))
     include_assets = bool(payload.get("includeAssets", False))
     backup = bool(payload.get("backup", True))
     discard = bool(payload.get("discardLocalChanges", False))
+    reinstall_deps = bool(payload.get("reinstallDeps", False))
     try:
         return update_mod.apply_update(
             channel=channel,
             include_assets=include_assets,
             backup=backup,
             discard_local_changes=discard,
+            reinstall_deps=reinstall_deps,
         )
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"アップデートの実行に失敗しました: {exc}") from exc

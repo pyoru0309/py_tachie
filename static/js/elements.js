@@ -539,6 +539,7 @@ export const elements = {
   checkForUpdatesButton: document.querySelector("#checkForUpdatesButton"),
   applyUpdateButton: document.querySelector("#applyUpdateButton"),
   globalUpdateDetails: document.querySelector("#globalUpdateDetails"),
+  systemHealthPanel: document.querySelector("#systemHealthPanel"),
   ttsVoicevoxAppPathInput: document.querySelector("#ttsVoicevoxAppPathInput"),
   ttsVoicevoxBaseUrlInput: document.querySelector("#ttsVoicevoxBaseUrlInput"),
   ttsVoicevoxStatus: document.querySelector("#ttsVoicevoxStatus"),

@@ -3,7 +3,15 @@ uvicorn
 # WebSocket 経路 (v2 export 本実装) で必須。
 # `uvicorn[standard]` を使えば一緒に入るが、Windows + 一部 pip 環境で extras が
 # 解決されず websockets 抜けが起きるため、ここで明示する。
-websockets
+#
+# 重要 (書き出し速度): websockets は受信フレームのアンマスク等を C 拡張
+# `websockets.speedups` で高速化する。これが wheel に同梱されていないと
+# pure-Python にフォールバックし、Windows で動画書き出しが本来の 1/4〜1/6 まで
+# 遅くなる (2026-06-02 調査)。speedups 入りの wheel は Python 3.12 / 3.13 で広く
+# 提供されているため、書き出し速度が問題になる環境では Python 3.12 / 3.13 を推奨。
+# 現在の構成が degraded かどうかは全体設定→アップデートタブの「実行環境診断」で
+# 確認できる (websockets.speedups の有無を表示)。
+websockets>=12
 python-multipart
 pillow
 psd-tools
