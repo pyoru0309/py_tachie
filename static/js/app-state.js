@@ -22,6 +22,7 @@ import {
 } from "./project.js";
 import { fillExpressionPresets } from "./character-manager.js";
 import { fillConfigForm } from "./settings-form.js";
+import { registerProjectFonts } from "./font.js";
 import { ensureSelectValue, loadCut, renderCutList } from "./scenario-actions.js";
 import { drawTimeline, autoScrollTimelineToCursor } from "./timeline.js";
 
@@ -215,6 +216,15 @@ export async function reloadProjectData(options = {}) {
   state.activeProjectId = manifest?.projectId || projectId || state.activeProjectId;
   state.scenario = attachScenarioCutsAlias(scenario);
   state.loadedProjectId = state.activeProjectId || projectId || "";
+  // プロジェクト固有フォントの FontFace 登録。起動時 (init) しか登録していないと、
+  // 切替先プロジェクト専用のフォントが未登録のまま canvas がフォールバック書体で
+  // 焼かれ、リロードするまで直らない (GL プロジェクトのこうさぎフォントPro2.0 で
+  // 顕在化, 2026-06-12)。projectFontsReady を差し替えることで renderPreviewV2 /
+  // playLiveCutV2 のフォント待ちが「新プロジェクトの登録完了」を待つようになる。
+  // 登録済み (name::weight::url) は registerProjectFonts 内の Set でスキップされる。
+  state.projectFontsReady = registerProjectFonts().catch((err) =>
+    console.warn("registerProjectFonts failed", err),
+  );
   fillProjectSelect();
   renderProjectDashboard();
   fillAssetControls();

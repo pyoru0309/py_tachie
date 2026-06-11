@@ -5,6 +5,7 @@ import { drawTimeline, autoScrollTimelineToCursor, autoScrollCutListToActive } f
 import { PROJECT_FPS, clampCharacterAnimationFps } from "./timecode.js";
 import { cutStartFrame, cutDurationFrame, cutStartSec, cutDurationSec } from "./scenario.js";
 import { captureAndUploadThumbnail } from "./thumbnail.js";
+import { createPreviewScheduler, PRIORITY } from "./preview-scheduler.js";
 
 // =============================================================================
 // v2 (WebGL + three.js) renderer
@@ -563,7 +564,7 @@ function _logVlPerfSample() {
     + ` vlProv=${provs.size}(uniq=${provsUniq})`
     + ` vlAud=${auds.size}(uniq=${audsUniq})`
     + ` audioPrefetch=${audioPrefetchCache.size}`
-    + ` sceneBundlePrefetch=${sceneBundlePrefetchCache.size}`
+    + ` sceneBundlePrefetch=${bundleScheduler.size}`
     + ` scenePrefetch=${sceneInstancePrefetchCache.size}`
     + ` vlGroups=${groupCount}`
     + ` sceneVlLen=${sceneVlLen}`,
@@ -2295,9 +2296,14 @@ async function fetchSceneBundleV2(cut, options = {}) {
 }
 
 // =============================================================================
-// scene-bundle prefetch (v2) — 次カットの POST /api/v2/scene-bundle を裏で発火し、
-// 結果を Promise でキャッシュ。次カットの playLiveCutV2 が consume すれば、
-// HTTP RTT + サーバの visualizer/dialogue/telop 焼き込みが await の外に追い出される。
+// scene-bundle prefetch (v2) — PreviewScheduler (preview-scheduler.js) に集約。
+// 次カットの POST /api/v2/scene-bundle を裏で発火し、結果を Promise でキャッシュ。
+// 次カットの playLiveCutV2 が consume すれば、HTTP RTT + サーバの visualizer/
+// dialogue/telop 焼き込みが await の外に追い出される。
+//
+// scheduler は優先度 (current > next > lookahead) + 同時実行枠 2 で fetch を
+// 直列度高く流す。旧実装は lookahead 範囲を全部同時 fire していたため、重カット
+// が並ぶと現カットの処理とサーバ側 (threadpool + GIL) で競合していた。
 //
 // scene-bundle は stable_token=True なので、同じ cut.state なら同じ token / 同じ
 // ファイル名 = サーバ側ディスクキャッシュも有効。prefetch 投機実行は安全。
@@ -2306,28 +2312,22 @@ async function fetchSceneBundleV2(cut, options = {}) {
 // 編集された場合に備えて)。再生中の cut.state 編集は UI 上できない設計なので、
 // それ以外の経路は気にしなくてよい。
 // =============================================================================
-const sceneBundlePrefetchCache = new Map();
+const bundleScheduler = createPreviewScheduler({
+  fetchBundle: (cut) => fetchSceneBundleV2(cut),
+  prefetchAudio: (cut) => prefetchAudioForCut(cut),
+});
 
-function prefetchSceneBundleV2(cut) {
-  if (!cut?.id) return;
-  if (sceneBundlePrefetchCache.has(cut.id)) return;
-  const promise = fetchSceneBundleV2(cut).catch((err) => {
-    console.warn("[scene-bundle] prefetch failed", err);
-    sceneBundlePrefetchCache.delete(cut.id);
-    return null;
-  });
-  sceneBundlePrefetchCache.set(cut.id, promise);
+// 旧 API 互換の薄いラッパ (呼び出し箇所のセマンティクスを変えないため)。
+function prefetchSceneBundleV2(cut, priority = PRIORITY.LOOKAHEAD) {
+  return bundleScheduler.request(cut, priority);
 }
 
 function consumeSceneBundlePrefetch(cut) {
-  if (!cut?.id) return null;
-  const cached = sceneBundlePrefetchCache.get(cut.id);
-  if (cached) sceneBundlePrefetchCache.delete(cut.id);
-  return cached || null;
+  return bundleScheduler.consume(cut);
 }
 
 function clearSceneBundlePrefetchCache() {
-  sceneBundlePrefetchCache.clear();
+  bundleScheduler.clear();
 }
 
 // =============================================================================
@@ -2453,9 +2453,8 @@ function prefetchSceneInstance(cut) {
   const cutStartFrameVal = cutStartFrame(cut);
   const cutDurationFrameVal = cutDurationFrame(cut);
 
-  // scene-bundle の prefetch が無ければ並行で発火させる (= bundle Promise を取る)
-  prefetchSceneBundleV2(cut);
-  const bundlePromise = sceneBundlePrefetchCache.get(cut.id);
+  // scene-bundle の prefetch が無ければ並行で発火させる (= bundle Promise を共有)
+  const bundlePromise = prefetchSceneBundleV2(cut);
   if (!bundlePromise) return;
   const promise = bundlePromise.then(async (layerData) => {
     if (!layerData) return null;
@@ -2570,23 +2569,27 @@ function clearAudioPrefetchCache() {
   audioPrefetchCache.clear();
 }
 
-// スライディング・ウィンドウ prefetch (2026-05-20):
-// - 再生開始時は warmupInitialBundles で先頭 N 件のみ await (体感「再生開始まで
-//   N カット分の bake 時間」)
+// スライディング・ウィンドウ prefetch (2026-05-20, 2026-06-11 改訂):
+// - 再生開始時は warmupInitialBundles が「現カットのみ完全 await、2 件目以降は
+//   短い予算 (WARMUP_NEXT_BUDGET_MS) だけ待って見切り発車」する。長尺 BGM の
+//   ビジュアライザー解析が次カットに乗っていても再生開始をブロックしない。
+//   (サーバ側は viz 専用トークンの解析キャッシュを持つので、2 回目以降は予算内に
+//   即解決して従来同様「温まった状態」で開始できる。)
 // - 再生中は playLiveCutV2 が ensureLookahead で「現カット + LOOKAHEAD」までを
 //   常時温める (= シーン途中の重カットも、その手前で焼き終わっている状態にする)
 //
-// 旧実装は再生開始時に全カットを await していた。ダイアログ数が多いシナリオで
-// 開始遅延が線形に増える問題があり、現在の方式に置き換えた。
+// 旧実装 (1): 再生開始時に全カットを await → ダイアログ数で開始遅延が線形増加。
+// 旧実装 (2): 先頭 2 カットを完全 await → 長尺ビジュアライザーで開始が数十秒
+// 塞がる。いずれも現在の方式に置き換えた。
 //
 // 制限値の根拠:
-// - INITIAL_WARMUP_CUTS=2: 現カット + 1 件先の bundle と texture が温まっていれば、
-//   現カット再生中 (= 数秒) に次カットの GL build が完了する。visualizer 重カットで
-//   足りない場合のみ調整 (現状は固定値)。
-// - prefetchLookahead (config 経由): 連続する重カットが並んだときの buffer。サーバ
-//   単一スレッド (FastAPI sync route + GIL) で逐次処理されるので、先回りで queue に
-//   積む発想。全体設定 → 編集タブから 0〜20 で調整可能。
+// - INITIAL_WARMUP_CUTS=2: 現カット + 1 件先の prefetch を発火する範囲。
+// - WARMUP_NEXT_BUDGET_MS: 次カットがキャッシュ済みなら即解決し、重い解析が
+//   走っている場合はこの予算で打ち切る (prefetch 自体は裏で継続する)。
+// - prefetchLookahead (config 経由): 連続する重カットが並んだときの buffer。
+//   先回りで queue に積む発想。全体設定 → 編集タブから 0〜20 で調整可能。
 const INITIAL_WARMUP_CUTS = 2;
+const WARMUP_NEXT_BUDGET_MS = 400;
 const DEFAULT_PREFETCH_LOOKAHEAD = 3;
 
 function getPrefetchLookahead() {
@@ -2596,45 +2599,24 @@ function getPrefetchLookahead() {
   return Math.max(0, Math.min(20, Math.floor(n)));
 }
 
-// 再生開始時に先頭 N 件 (= warmupCount) の prefetch を発火し await する。
+// 再生開始時に先頭 N 件 (= warmupCount) の prefetch を発火する。
+// await するのは現カット (startIndex) のみ。2 件目以降は WARMUP_NEXT_BUDGET_MS
+// だけ待ち、間に合わなければ裏の prefetch に任せて再生を開始する。
+// 実体は PreviewScheduler.warmup (音声 prefetch も scheduler が同時に発火する)。
 // onProgress: (done, total) => void  プログレス表示用 (任意)。
 async function warmupInitialBundles(cuts, startIndex, warmupCount, onProgress) {
-  const endIndex = Math.min(cuts.length, startIndex + Math.max(1, warmupCount));
-  const promises = [];
-  for (let i = startIndex; i < endIndex; i += 1) {
-    const cut = cuts[i];
-    if (!cut?.id) continue;
-    prefetchSceneBundleV2(cut);
-    // 同時に音声 wav も先読み (HTMLAudioElement.preload="auto") しておく。
-    // 軽量なので await はしない。
-    prefetchAudioForCut(cut);
-    const promise = sceneBundlePrefetchCache.get(cut.id);
-    if (promise) promises.push(promise);
-  }
-  if (promises.length === 0) return;
-  let done = 0;
-  if (onProgress) onProgress(done, promises.length);
-  await Promise.all(
-    promises.map((p) => p.finally(() => {
-      done += 1;
-      if (onProgress) onProgress(done, promises.length);
-    })),
-  );
+  await bundleScheduler.warmup(cuts, startIndex, warmupCount, {
+    budgetMs: WARMUP_NEXT_BUDGET_MS,
+    onProgress,
+  });
 }
 
 // 現カット index から見て [currentIndex+1, currentIndex+1+lookahead) の範囲を
-// バックグラウンドで温める。既に prefetch 済みのカットは skip。await しないので
-// 呼び出し側の再生フローはブロックしない。
+// バックグラウンドで温める。直後 1 件は NEXT、それ以降は LOOKAHEAD 優先度で
+// scheduler に積む (同時実行枠内で順に流れる)。await しないので呼び出し側の
+// 再生フローはブロックしない。
 function ensureLookahead(cuts, currentIndex, lookahead) {
-  const start = currentIndex + 1;
-  const end = Math.min(cuts.length, start + Math.max(0, lookahead));
-  for (let i = start; i < end; i += 1) {
-    const cut = cuts[i];
-    if (!cut?.id) continue;
-    if (sceneBundlePrefetchCache.has(cut.id)) continue;
-    prefetchSceneBundleV2(cut);
-    prefetchAudioForCut(cut);
-  }
+  bundleScheduler.ensureLookahead(cuts, currentIndex, lookahead);
 }
 
 // Phase 3: 次カットの SceneInstance を裏で build する。serial queue 経由で
@@ -3136,12 +3118,11 @@ export async function playPreviewPlayback() {
       startTimelineSec = cuts[0] ? cutStartSec(cuts[0]) : 0;
     }
 
-    // v2 シーンバンドル prefetch: 先頭 INITIAL_WARMUP_CUTS 件のみ await する。
-    // 残りは再生中に playLiveCutV2 → ensureLookahead がスライドさせながら裏で温める。
-    // (二回目以降はサーバ側ディスクキャッシュで即 return)
+    // v2 シーンバンドル prefetch: 完全に await するのは現カットのみ。次カットは
+    // 短い予算内だけ待ち、残りは再生中に playLiveCutV2 → ensureLookahead が
+    // スライドさせながら裏で温める。(二回目以降はサーバ側ディスクキャッシュで即 return)
     if (cuts.length > startIndex) {
-      const warmupTotal = Math.min(INITIAL_WARMUP_CUTS, cuts.length - startIndex);
-      elements.playbackStatus.textContent = `プリロード中... (0/${warmupTotal})`;
+      elements.playbackStatus.textContent = "プリロード中...";
       await warmupInitialBundles(cuts, startIndex, INITIAL_WARMUP_CUTS, (done, total) => {
         if (state.isPlaying) {
           elements.playbackStatus.textContent = `プリロード中... (${done}/${total})`;

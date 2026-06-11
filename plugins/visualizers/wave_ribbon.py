@@ -10,6 +10,9 @@ GL_MODULE = "/static/js/visualizers/wave_ribbon.js"
 GL_VERSION = 1
 GL_FRAME_RATE = 24
 
+# gl_data_streams の出力に影響するパラメータのみ (残りは描画専用)。
+ANALYSIS_KEYS = ["fmin", "fmax", "windowMs", "dbFloor", "dbCeil"]
+
 PARAMS = [
     {"key": "color", "type": "color", "default": "#8ffcff", "label": "色"},
     {"key": "accentColor", "type": "color", "default": "#a970ff", "label": "アクセント色"},
@@ -65,16 +68,15 @@ def gl_data_streams(params, audio, time_grid_sec, fps):
     window_sec = max(0.010, _num(p.get("windowMs"), 70.0) / 1000.0)
     db_floor = _num(p.get("dbFloor"), -82.0)
     db_ceil = _num(p.get("dbCeil"), -19.0)
-    for i, t in enumerate(grid):
-        energy[i] = audio.energy_bands(
-            float(t),
-            n_subbands=4,
-            analysis_bands=32,
-            window_sec=window_sec,
-            fmin=fmin,
-            fmax=fmax,
-            db_floor=db_floor,
-            db_ceil=db_ceil,
-        )
+    energy = audio.batch_energy_bands(
+        grid,
+        n_subbands=4,
+        analysis_bands=32,
+        window_sec=window_sec,
+        fmin=fmin,
+        fmax=fmax,
+        db_floor=db_floor,
+        db_ceil=db_ceil,
+    )
     onset = audio.onset_envelope(grid, window_sec=window_sec, fmin=fmin, fmax=fmax)
     return {"energy": _quantize_int8(energy), "onset": _quantize_int8(onset)}

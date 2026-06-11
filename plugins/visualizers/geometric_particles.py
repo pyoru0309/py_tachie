@@ -10,6 +10,10 @@ GL_MODULE = "/static/js/visualizers/geometric_particles.js"
 GL_VERSION = 1
 GL_FRAME_RATE = 24
 
+# gl_data_streams の出力に影響するパラメータのみ。色・座標・粒子数などは
+# ブラウザ側描画パラメータなので解析キャッシュを無効化しない。
+ANALYSIS_KEYS = ["bands", "fmin", "fmax", "windowMs", "dbFloor", "dbCeil"]
+
 PARAMS = [
     {"key": "color", "type": "color", "default": "#7cf7ff", "label": "色"},
     {"key": "accentColor", "type": "color", "default": "#ffe66d", "label": "アクセント色"},
@@ -70,26 +74,25 @@ def gl_data_streams(params, audio, time_grid_sec, fps):
     window_sec = max(0.010, _num(p.get("windowMs"), 60.0) / 1000.0)
     db_floor = _num(p.get("dbFloor"), -80.0)
     db_ceil = _num(p.get("dbCeil"), -20.0)
-    for i, t in enumerate(grid):
-        spectrum[i] = audio.normalized_spectrum(
-            float(t),
-            n_bands=bands,
-            window_sec=window_sec,
-            fmin=fmin,
-            fmax=fmax,
-            db_floor=db_floor,
-            db_ceil=db_ceil,
-        )
-        energy[i] = audio.energy_bands(
-            float(t),
-            n_subbands=4,
-            analysis_bands=32,
-            window_sec=window_sec,
-            fmin=fmin,
-            fmax=fmax,
-            db_floor=db_floor,
-            db_ceil=db_ceil,
-        )
+    spectrum = audio.batch_normalized_spectrum(
+        grid,
+        n_bands=bands,
+        window_sec=window_sec,
+        fmin=fmin,
+        fmax=fmax,
+        db_floor=db_floor,
+        db_ceil=db_ceil,
+    )
+    energy = audio.batch_energy_bands(
+        grid,
+        n_subbands=4,
+        analysis_bands=32,
+        window_sec=window_sec,
+        fmin=fmin,
+        fmax=fmax,
+        db_floor=db_floor,
+        db_ceil=db_ceil,
+    )
     onset = audio.onset_envelope(grid, window_sec=window_sec, fmin=fmin, fmax=fmax)
     return {
         "spectrum": _quantize_int8(spectrum),

@@ -20,6 +20,10 @@ GL_VERSION = 1
 # で許容範囲。ブラウザ側の折れ線 1 pixel 精度を保ちたいため等倍を採用。
 GL_OUTPUT_WIDTH = 1920
 
+# 解析 (PCM 窓 + スムージング + リサンプル) に影響するのはこの 2 つだけ。
+# 色・線幅・振幅などはブラウザ側描画パラメータ。
+ANALYSIS_KEYS = ["windowMs", "smoothing"]
+
 PARAMS = [
     {"key": "color", "type": "color", "default": "#ffffff", "label": "色"},
     {"key": "lineWidth", "type": "number", "min": 1, "max": 32, "step": 1, "default": 4, "label": "線の太さ (px)"},

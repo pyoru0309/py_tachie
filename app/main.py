@@ -2125,7 +2125,6 @@ def _build_preview_visualizer(
     cut_duration: float,
     preview_root: Path,
     cache_url: Callable[[str], str],
-    token: str,
     override_scene: dict[str, Any] | None = None,
     override_cut: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
@@ -2136,6 +2135,10 @@ def _build_preview_visualizer(
 
     override_scene / override_cut が指定された場合は disk 読み込みを skip し、
     指定された値で visualizer payload を組む (sceneOverride 経路用)。
+
+    解析ストリームは scene token ではなく viz 専用トークン (音源 + 解析パラメータ +
+    time grid) でキャッシュされる。キャッシュヒット時は FFT どころか ffmpeg decode
+    すら走らない。テロップ・キャラ配置などシーン内の無関係な編集でも無効化されない。
     """
     if not cut_id or cut_duration <= 0:
         return None
@@ -2169,9 +2172,8 @@ def _build_preview_visualizer(
     audio_track = visualizer_plugins.find_visualizer_audio_track(
         target_scene, str(viz_spec.get("audioTrackId") or "")
     )
-    audio_ctx = visualizer_plugins.build_audio_context_for_track(
-        audio_track, PROJECT_ROOT
-    )
+    # AudioContext (ffmpeg decode) はここでは作らない。ensure_visualizer_streams が
+    # キャッシュミス時にだけ lazy に decode する。
 
     cfg = manifest.get("config") or {}
     animation_fps = _clamp_animation_fps(cfg.get("characterAnimationFps"))
@@ -2193,14 +2195,14 @@ def _build_preview_visualizer(
     layer = str(viz_spec.get("layer") or "above_bg")
 
     time_grid = [cut_start_sec + i / float(animation_fps) for i in range(n_frames)]
-    streams = visualizer_plugins.render_visualizer_data_streams(
+    streams = visualizer_plugins.ensure_visualizer_streams(
         plugin_key=plugin_key,
         user_params=user_params,
-        audio=audio_ctx,
+        audio_track=audio_track,
+        project_root=PROJECT_ROOT,
         time_grid_sec=time_grid,
         fps=animation_fps,
         cache_dir=ctx.cache_dir,
-        file_token=token,
     )
     streams_url: dict[str, Any] = {}
     for name, meta in streams.items():
@@ -2695,7 +2697,6 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
         cut_duration=cut_duration,
         preview_root=preview_root,
         cache_url=cache_url,
-        token=token,
         override_scene=target_scene_for_lookup if scene_override is not None else None,
         override_cut=target_cut_for_lookup if scene_override is not None else None,
     )

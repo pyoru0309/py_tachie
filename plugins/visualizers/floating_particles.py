@@ -28,6 +28,10 @@ GL_VERSION = 1
 # 滑らかさよりキビキビ感のほうが合う。
 GL_FRAME_RATE = 12
 
+# energy / onset とも既定パラメータで解析するため、PARAMS のどれを変えても
+# 解析結果は変わらない (全部ブラウザ側描画パラメータ)。空リストで宣言する。
+ANALYSIS_KEYS: list[str] = []
+
 PARAMS = [
     {"key": "color", "type": "color", "default": "#9be7ff", "label": "色"},
     {"key": "accentColor", "type": "color", "default": "#ffd166", "label": "アクセント色"},
@@ -76,9 +80,7 @@ def gl_data_streams(params, audio, time_grid_sec, fps):
         }
 
     # 共通ヘルパでエネルギーとオンセットを取る。
-    energy = np.empty((n, 4), dtype=np.float32)
-    for i, t in enumerate(grid):
-        energy[i] = audio.energy_bands(float(t), n_subbands=4)
+    energy = audio.batch_energy_bands(grid, n_subbands=4)
     onset = audio.onset_envelope(grid)
     return {
         "energy": _quantize_int8(energy),

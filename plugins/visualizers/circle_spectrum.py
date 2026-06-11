@@ -16,6 +16,9 @@ NAME = "サークルスペクトログラム"
 GL_MODULE = "/static/js/visualizers/circle_spectrum.js"
 GL_VERSION = 1
 
+# 解析に影響するのは FFT 系のみ。dbFloor/dbCeil はブラウザ側正規化なので含めない。
+ANALYSIS_KEYS = ["bands", "fmin", "fmax", "windowMs"]
+
 PARAMS = [
     {"key": "color", "type": "color", "default": "#ffffff", "label": "色"},
     {"key": "centerX", "type": "number", "min": 0, "max": 1920, "step": 10, "default": 960, "label": "中心 X"},
@@ -68,15 +71,11 @@ def gl_data_streams(params, audio, time_grid_sec, fps):
     except (TypeError, ValueError):
         fmin, fmax = 60.0, 12000.0
 
-    out = np.full((n_frames, bands), -120.0, dtype=np.float32)
-    for i, t in enumerate(grid):
-        spec = audio.spectrum_db(
-            float(t),
-            n_bands=bands,
-            window_sec=window_sec,
-            fmin=fmin,
-            fmax=fmax,
-        )
-        if spec.size == bands:
-            out[i] = spec.astype(np.float32, copy=False)
+    out = audio.batch_spectrum_db(
+        grid,
+        n_bands=bands,
+        window_sec=window_sec,
+        fmin=fmin,
+        fmax=fmax,
+    )
     return {"spectrum": out}

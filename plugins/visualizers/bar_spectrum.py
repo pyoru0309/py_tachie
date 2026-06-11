@@ -10,6 +10,10 @@ GL_MODULE = "/static/js/visualizers/bar_spectrum.js"
 GL_VERSION = 1
 GL_FRAME_RATE = 24
 
+# gl_data_streams の出力に影響するパラメータ。色・座標などの描画専用パラメータを
+# 変えても解析キャッシュ (viz トークン) が無効化されないようにする宣言。
+ANALYSIS_KEYS = ["barCount", "fmin", "fmax", "windowMs", "dbFloor", "dbCeil"]
+
 PARAMS = [
     {"key": "color", "type": "color", "default": "#ffffff", "label": "色"},
     {"key": "barCount", "type": "number", "min": 16, "max": 240, "step": 1, "default": 96, "label": "バー数"},
@@ -65,14 +69,13 @@ def gl_data_streams(params, audio, time_grid_sec, fps):
     window_sec = max(0.010, _num(p.get("windowMs"), 55.0) / 1000.0)
     db_floor = _num(p.get("dbFloor"), -78.0)
     db_ceil = _num(p.get("dbCeil"), -18.0)
-    for i, t in enumerate(grid):
-        out[i] = audio.normalized_spectrum(
-            float(t),
-            n_bands=bars,
-            window_sec=window_sec,
-            fmin=fmin,
-            fmax=fmax,
-            db_floor=db_floor,
-            db_ceil=db_ceil,
-        )
+    out = audio.batch_normalized_spectrum(
+        grid,
+        n_bands=bars,
+        window_sec=window_sec,
+        fmin=fmin,
+        fmax=fmax,
+        db_floor=db_floor,
+        db_ceil=db_ceil,
+    )
     return {"spectrum": _quantize_int8(out)}
