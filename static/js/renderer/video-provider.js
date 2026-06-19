@@ -511,94 +511,92 @@ export class WebCodecsVideoProvider {
     const _checkDeadline = () => {
       if (performance.now() > tDeadline) throw _diag("timeout");
     };
-    // queue の末尾 (CTS 最大) が target を超えるまで chunk を流す
-    let lastSeenEnd = this._lastQueueEndUs();
-    while (lastSeenEnd < targetUs && this.nextSampleIdx < this.samples.length) {
-      // backpressure: decodeQueueSize が大きいと wait
-      while (this.decoder.decodeQueueSize > 16) {
-        await new Promise((r) => setTimeout(r, 0));
-        if (this.decoderError) throw this.decoderError;
-        _checkDeadline();
-      }
-      _checkDeadline();
-      const s = this.samples[this.nextSampleIdx++];
-      // CTS で timestamp。is_sync で key/delta (B-frame 安全)
-      const chunk = new EncodedVideoChunk({
-        type: s.is_sync ? "key" : "delta",
-        timestamp: Math.round((s.cts / this.timescale) * 1_000_000),
-        duration: Math.round((s.duration / this.timescale) * 1_000_000),
-        data: s.data,
-      });
-      this.decoder.decode(chunk);
-      pushed += 1;
-      if (this.decodedQueue.length > maxOutput) maxOutput = this.decodedQueue.length;
-      lastSeenEnd = this._lastQueueEndUs();
-
-      // ★ プール枯渇対策 (Windows D3D11VA で output=8 程度で停止する症状の真因)。
-      //   前方 seek 中はデコード済み VideoFrame が decodedQueue に溜まり続け、HW
-      //   デコーダの出力サーフェスプール (≈8) を抱え込んだままにすると、デコーダが
-      //   それ以上 output できず停止する (= decodeQueueSize が下がらず deadline)。
-      //   target にまだ到達していない区間のフレームは「target より前」なので、
-      //   末尾数枚だけ残して古いフレームを close → サーフェスを返却し、流し続ける。
-      const KEEP_AHEAD = 3;
-      while (this.decodedQueue.length > KEEP_AHEAD) {
+    // target をカバーするフレーム (= decodedQueue 末尾 CTS ≥ target) が出るまで、
+    // 毎周回で次を行う:
+    //   (a) target より前の不要フレームを close して HW 出力サーフェス (~8) を返却
+    //   (b) 投入する chunk が残り decodeQueueSize に余裕があれば 1 つ push
+    //   (c) backpressure / async 出力待ちは 1 tick yield
+    //
+    // ★ (a) を毎周回やるのが肝。push が decode より速いと、全 sample 投入後に出力が
+    //   遅れて surface pool が 8 枚で埋まり、close しない限り decoder が残り chunk を
+    //   decode できず target フレームが永遠に出力されない (Windows D3D11VA で
+    //   output=8 / decodeQueueSize>0 のまま停止する症状の真因。2026-06-20 再発)。
+    //   旧実装は drain を push ループ内にしか持たず、ループ後の flush / 100ms wait は
+    //   フレームを close しなかったため枯渇が解けず、flush() はむしろ全フレームを
+    //   抱え込んで枯渇を悪化させ自身が resolve しなくなっていた。
+    const _drainBeforeTarget = () => {
+      while (this.decodedQueue.length > 0) {
         const f0 = this.decodedQueue[0];
         if ((f0.timestamp + f0.duration) <= targetUs) {
           try { this.decodedQueue.shift().close(); } catch (_) {}
         } else {
-          break;
+          break;  // 末尾 = target を含む / target 以降 → 残す
         }
       }
-    }
-    // 末尾 GOP / B-frame reorder の drain: 全 sample を投入し終えてもまだ target に
-    // 届かない場合、デコーダ内にバッファされたフレームが flush 待ちで残っている。
-    // WebCodecs は end-of-stream で明示 flush しないと末尾フレームを output しない
-    // ことがあり、これが「nextIdx=N/N, pushed>0, output=0」の no-output の主因
-    // (.mov の末尾を指すカット / ループ bg の末尾境界。Mac/Win 双方で発生, 2026-06)。
-    // flush して残りを吐かせる。flush 後も decoder は configured のままで、ループの
-    // rewind では _resetDecoder が別途 reconfigure するので副作用はない。
-    //
-    // ★ deadline 必須: Windows D3D11VA 等で HW デコーダが停止していると flush() が
-    //   resolve しないことがある。await をむき出しにすると updateForFrame が返らず、
-    //   書き出しがフレーム途中でフリーズ + キャンセル不能になる (= no-output を直そう
-    //   とした B-1 修正が招いた回帰, 2026-06-20)。残り deadline で race して打ち切り、
-    //   停止時は throw → 呼出側で _decodeFailed=true → 以降は decode を再試行せず
-    //   degraded で完走 + 各フレーム冒頭の shouldAbort 判定に戻れるためキャンセル可能。
-    if (pushed > 0
-        && this.nextSampleIdx >= this.samples.length
-        && this._lastQueueEndUs() < targetUs
-        && this.decoder
-        && this.decoder.state === "configured") {
-      // 正常なデコーダなら末尾 GOP 数枚の drain は 1 秒未満で終わる。停止デコーダの
-      // ペナルティを抑えるため上限は短め (= 失敗カットあたり最大 FLUSH_DEADLINE_MS)。
-      const FLUSH_DEADLINE_MS = 1500;
-      let flushTimer = null;
-      try {
-        const flushPromise = this.decoder.flush();
-        // timeout 勝ち時に flush の遅延 reject を unhandled にしないための保険。
-        flushPromise.catch(() => {});
-        const flushDeadline = new Promise((_, reject) => {
-          const remain = Math.min(FLUSH_DEADLINE_MS, Math.max(250, tDeadline - performance.now()));
-          flushTimer = setTimeout(() => reject(_diag("flush-timeout")), remain);
-        });
-        await Promise.race([flushPromise, flushDeadline]);
-      } finally {
-        if (flushTimer != null) clearTimeout(flushTimer);
-      }
+    };
+    let flushed = false;
+    while (this._lastQueueEndUs() < targetUs) {
+      _checkDeadline();
       if (this.decoderError) throw this.decoderError;
       if (this.decodedQueue.length > maxOutput) maxOutput = this.decodedQueue.length;
-    }
-    // 出力が反映されるのを最大 100ms wait (decoder は async output)
-    let waited = 0;
-    while (this._lastQueueEndUs() < targetUs && waited < 100) {
-      await new Promise((r) => setTimeout(r, 1));
-      waited += 1;
-      if (this.decoderError) throw this.decoderError;
+      // (a) サーフェス解放
+      _drainBeforeTarget();
+
+      if (this.nextSampleIdx < this.samples.length) {
+        // (b) backpressure 超過なら push せず待つ (drain は上で実施済 = surface は解放)
+        if (this.decoder.decodeQueueSize > 16) {
+          await new Promise((r) => setTimeout(r, 0));
+          continue;
+        }
+        const s = this.samples[this.nextSampleIdx++];
+        // CTS で timestamp。is_sync で key/delta (B-frame 安全)
+        this.decoder.decode(new EncodedVideoChunk({
+          type: s.is_sync ? "key" : "delta",
+          timestamp: Math.round((s.cts / this.timescale) * 1_000_000),
+          duration: Math.round((s.duration / this.timescale) * 1_000_000),
+          data: s.data,
+        }));
+        pushed += 1;
+        continue;
+      }
+
+      // --- 全 sample 投入済 + target 未到達 ---
+      if (this.decoder.decodeQueueSize > 0) {
+        // まだ decode 待ちの chunk がある → 出力を待つ (surface は drain で解放済)
+        await new Promise((r) => setTimeout(r, 1));
+        continue;
+      }
+      // decodeQueueSize === 0 = 投入 chunk を全消化したのに target 未到達 =
+      // 末尾 GOP / B-frame reorder buffer に残存 (= EOS の数枚)。flush で 1 回だけ
+      // 吐かせる。ここまで drain 済 = surface に余裕があるので flush は枯渇で stall
+      // しない。それでも resolve しない停止デコーダ向けに deadline 付き race で打ち
+      // 切り、停止時は throw → 呼出側 _decodeFailed → degraded 完走 + キャンセル可。
+      if (!flushed && this.decoder && this.decoder.state === "configured") {
+        flushed = true;
+        const FLUSH_DEADLINE_MS = 1500;
+        let flushTimer = null;
+        try {
+          const flushPromise = this.decoder.flush();
+          flushPromise.catch(() => {});  // timeout 勝ち時の遅延 reject を unhandled にしない
+          const flushDeadline = new Promise((_, reject) => {
+            const remain = Math.min(FLUSH_DEADLINE_MS, Math.max(250, tDeadline - performance.now()));
+            flushTimer = setTimeout(() => reject(_diag("flush-timeout")), remain);
+          });
+          await Promise.race([flushPromise, flushDeadline]);
+        } finally {
+          if (flushTimer != null) clearTimeout(flushTimer);
+        }
+        if (this.decoderError) throw this.decoderError;
+        continue;  // flush 後の出力を drain + 判定へ
+      }
+      // flush 済でも target に届かない = 末尾フレームが本当に存在しない (= 動画末尾)。
+      // 最後に出力できたフレームを hold する (_popFrameAt が末尾を返す)。
+      break;
     }
     if (this.decodedQueue.length > maxOutput) maxOutput = this.decodedQueue.length;
-    // 診断: chunk を投入したのに 1 frame も出力されなかった = デコーダが入力を
-    // 受けても出力しない (環境側の WebCodecs 故障の可能性)。明示エラーで上流に伝える。
-    if (pushed > 0 && maxOutput === 0) {
+    // chunk を投入したのに 1 frame も出力されなかった = デコーダが入力を受けても
+    // 出力しない (環境側の WebCodecs 故障)。明示エラーで上流に伝える (= _decodeFailed)。
+    if (pushed > 0 && maxOutput === 0 && this.decodedQueue.length === 0) {
       throw _diag("no-output");
     }
   }
