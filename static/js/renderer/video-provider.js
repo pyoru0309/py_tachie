@@ -555,18 +555,35 @@ export class WebCodecsVideoProvider {
     // WebCodecs は end-of-stream で明示 flush しないと末尾フレームを output しない
     // ことがあり、これが「nextIdx=N/N, pushed>0, output=0」の no-output の主因
     // (.mov の末尾を指すカット / ループ bg の末尾境界。Mac/Win 双方で発生, 2026-06)。
-    // 一度だけ flush して残りを吐かせる。flush 後も decoder は configured のままで、
-    // ループの rewind では _resetDecoder が別途 reconfigure するので副作用はない。
+    // flush して残りを吐かせる。flush 後も decoder は configured のままで、ループの
+    // rewind では _resetDecoder が別途 reconfigure するので副作用はない。
+    //
+    // ★ deadline 必須: Windows D3D11VA 等で HW デコーダが停止していると flush() が
+    //   resolve しないことがある。await をむき出しにすると updateForFrame が返らず、
+    //   書き出しがフレーム途中でフリーズ + キャンセル不能になる (= no-output を直そう
+    //   とした B-1 修正が招いた回帰, 2026-06-20)。残り deadline で race して打ち切り、
+    //   停止時は throw → 呼出側で _decodeFailed=true → 以降は decode を再試行せず
+    //   degraded で完走 + 各フレーム冒頭の shouldAbort 判定に戻れるためキャンセル可能。
     if (pushed > 0
         && this.nextSampleIdx >= this.samples.length
         && this._lastQueueEndUs() < targetUs
         && this.decoder
         && this.decoder.state === "configured") {
+      // 正常なデコーダなら末尾 GOP 数枚の drain は 1 秒未満で終わる。停止デコーダの
+      // ペナルティを抑えるため上限は短め (= 失敗カットあたり最大 FLUSH_DEADLINE_MS)。
+      const FLUSH_DEADLINE_MS = 1500;
+      let flushTimer = null;
       try {
-        await this.decoder.flush();
-      } catch (_e) {
-        // flush 失敗 (decoder error 等) は下の no-output 判定 / 次フレームの
-        // decoderError 処理に委ねる。
+        const flushPromise = this.decoder.flush();
+        // timeout 勝ち時に flush の遅延 reject を unhandled にしないための保険。
+        flushPromise.catch(() => {});
+        const flushDeadline = new Promise((_, reject) => {
+          const remain = Math.min(FLUSH_DEADLINE_MS, Math.max(250, tDeadline - performance.now()));
+          flushTimer = setTimeout(() => reject(_diag("flush-timeout")), remain);
+        });
+        await Promise.race([flushPromise, flushDeadline]);
+      } finally {
+        if (flushTimer != null) clearTimeout(flushTimer);
       }
       if (this.decoderError) throw this.decoderError;
       if (this.decodedQueue.length > maxOutput) maxOutput = this.decodedQueue.length;
