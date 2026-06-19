@@ -268,6 +268,8 @@ export const elements = {
   timelineZoomOutButton: document.querySelector("#timelineZoomOutButton"),
   timelineZoomLabel: document.querySelector("#timelineZoomLabel"),
   timelinePlayheadInfo: document.querySelector("#timelinePlayheadInfo"),
+  prerenderButton: document.querySelector("#prerenderButton"),
+  prerenderButtonLabel: document.querySelector("#prerenderButtonLabel"),
   splitCutAtPlayheadButton: document.querySelector("#splitCutAtPlayheadButton"),
   addItemDropdown: document.querySelector("#addItemDropdown"),
   addItemDropdownTrigger: document.querySelector("#addItemDropdownTrigger"),

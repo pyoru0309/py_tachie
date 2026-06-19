@@ -6,6 +6,7 @@ import { PROJECT_FPS, clampCharacterAnimationFps } from "./timecode.js";
 import { cutStartFrame, cutDurationFrame, cutStartSec, cutDurationSec } from "./scenario.js";
 import { captureAndUploadThumbnail } from "./thumbnail.js";
 import { createPreviewScheduler, PRIORITY } from "./preview-scheduler.js";
+import { setCutPrerenderStatus } from "./prerender.js";
 
 // =============================================================================
 // v2 (WebGL + three.js) renderer
@@ -2224,8 +2225,10 @@ async function fetchSceneBundleV2(cut, options = {}) {
   // のときだけ true にして裏で音源全長キャッシュを温め、現カット (CURRENT) や対話
   // fetch (priority 未指定) では false にして「3 分 BGM の最初の 1 カットで音源全長
   // 解析を待たされる」初動レイテンシ回帰を避ける。未生成なら per-cut 即返しになる。
-  const vizSourceBuild = (options.priority === PRIORITY.NEXT
-    || options.priority === PRIORITY.LOOKAHEAD);
+  // 明示指定 (事前解析の warm) があれば優先、無ければ priority から決める。
+  const vizSourceBuild = (options.vizSourceBuild != null)
+    ? !!options.vizSourceBuild
+    : (options.priority === PRIORITY.NEXT || options.priority === PRIORITY.LOOKAHEAD);
   const body = {
     ...cutState,
     cutId: cut.id,
@@ -2299,7 +2302,20 @@ async function fetchSceneBundleV2(cut, options = {}) {
       }
     }
   }
+  // vizSourceBuild=true の warm 成功 = このカットのサーバ側キャッシュ (viz 音源解析 +
+  // bundle 焼き) が温まった。事前解析ストリップを ready (緑) にする。先読み
+  // (NEXT/LOOKAHEAD) と明示プリレンダーの両方がここを通る (= 受動 + 能動の可視化)。
+  if (vizSourceBuild && cut?.id) {
+    try { setCutPrerenderStatus(cut.id, "ready"); } catch (_) { /* ignore */ }
+  }
   return data;
+}
+
+// 事前解析 (プリレンダー) 用に 1 カットを warm する。scene-bundle を vizSourceBuild=true
+// で fetch し、サーバに viz 音源解析 + bundle 焼きを生成させる。prerender.js から
+// bindPrerender 経由で注入されて使われる (循環 import 回避)。
+export function warmSceneBundleForPrerender(cut) {
+  return fetchSceneBundleV2(cut, { vizSourceBuild: true });
 }
 
 // =============================================================================

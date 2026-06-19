@@ -781,11 +781,23 @@ export async function applyEffectSceneToAllCuts() {
   const bgColorText = source.backgroundColorOpacity > 0
     ? `${source.backgroundColor} (${Math.round(source.backgroundColorOpacity * 100)}%)`
     : "なし（透過）";
+  // 前景は反映時にアセットと表示位置 (X/Y) をセットで適用する (dialog 下部参照)。
+  // 値テキストにも X/Y を出して「位置も一緒に反映される」ことが分かるようにする。
+  // null = 中央寄せ (= 座標未指定)。
+  const fgPosText = (source.foregroundX == null && source.foregroundY == null)
+    ? "中央"
+    : `X ${source.foregroundX == null ? "中央" : Math.round(source.foregroundX)} / Y ${source.foregroundY == null ? "中央" : Math.round(source.foregroundY)}`;
   const items = [
     { key: "background", label: "背景", valueText: source.background ? (bgItem?.name || source.background) : "なし（透過）" },
     { key: "backgroundBlurPx", label: "背景ぼかし", valueText: `${source.backgroundBlurPx}px` },
     { key: "backgroundColorPair", label: "背景色 / 不透明度", valueText: bgColorText },
-    { key: "foreground", label: "前景", valueText: source.foreground ? (fgItem?.name || source.foreground) : "なし" },
+    {
+      key: "foreground",
+      label: "前景 + 表示位置",
+      valueText: source.foreground
+        ? `${fgItem?.name || source.foreground}（位置: ${fgPosText}）`
+        : "なし",
+    },
   ];
   const result = await promptBulkApply({
     title: "背景・場面を一括適用",

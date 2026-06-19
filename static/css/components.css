@@ -3683,3 +3683,13 @@ dialog::backdrop {
   padding: 16px;
   text-align: center;
 }
+
+/* 事前解析 (プリレンダー) ボタンの実行中状態。もう一度押すと中止できることを
+   赤系アクセントで示す (ラベルも「解析中 N/M（中止）」に変わる)。additive。 */
+#prerenderButton.is-running {
+  color: #ef4444;
+  border-color: color-mix(in srgb, #ef4444 55%, transparent);
+}
+#prerenderButton.is-running .button-icon {
+  color: #ef4444;
+}

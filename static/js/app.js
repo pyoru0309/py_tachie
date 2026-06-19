@@ -86,7 +86,14 @@ import {
   stopPreviewPlayback,
   playPreviewPlayback,
   setTogglePlayUi,
+  warmSceneBundleForPrerender,
 } from "./playback.js";
+import {
+  bindPrerender,
+  runPrerenderAll,
+  cancelPrerender,
+  isPrerendering,
+} from "./prerender.js";
 import {
   bindProject,
   fillProjectSelect,
@@ -905,6 +912,33 @@ function bindControls() {
     } else {
       deleteSelectedCuts();
     }
+  });
+  // 事前解析 (プリレンダー): 全カットのサーバ側キャッシュを温めて書き出しを高速化。
+  // 実行中はボタンが進捗表示 + 中止ボタンに変わる。warm 実体は playback の
+  // warmSceneBundleForPrerender を bindPrerender で注入済み。
+  bindPrerender({ warmCut: warmSceneBundleForPrerender });
+  const _setPrerenderButtonUi = ({ done, total, running, cancelled } = {}) => {
+    const btn = elements.prerenderButton;
+    const label = elements.prerenderButtonLabel;
+    if (!btn) return;
+    if (running) {
+      btn.classList.add("is-running");
+      btn.title = "事前解析を中止";
+      if (label) label.textContent = `解析中 ${done}/${total}（中止）`;
+    } else {
+      btn.classList.remove("is-running");
+      btn.title = "全カットの解析キャッシュを事前生成して書き出しを高速化します。タイムライン最上部の帯が 緑=解析済 / 赤=解析中 / 灰=未解析。";
+      if (label) label.textContent = "事前解析";
+      if (cancelled) showToast("事前解析を中止しました");
+      else if (total > 0) showToast(`事前解析が完了しました（${total} カット）`);
+    }
+  };
+  elements.prerenderButton?.addEventListener("click", () => {
+    if (isPrerendering()) {
+      cancelPrerender();
+      return;
+    }
+    runPrerenderAll({ onProgress: _setPrerenderButtonUi });
   });
   elements.splitCutAtPlayheadButton?.addEventListener("click", () => {
     // editorTarget に応じて分割対象を切替: 効果音 / 動画レイヤー / (それ以外) カット

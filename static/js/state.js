@@ -69,6 +69,12 @@ export const state = {
   loopMode: "off",
   lastPath: null,
   previewRequestId: 0,
+  // 事前解析 (プリレンダー) のカット単位ステータス Map<cutId, "analyzing"|"ready">。
+  // タイムライン最上部の赤(解析中)/緑(解析済)ストリップ表示に使う。値が無いカットは
+  // idle (= 未解析、薄グレー)。warm fetch (vizSourceBuild=true) 成功で ready になる。
+  // プロジェクト跨ぎのカット ID は重複しない (cut_<ts>) ので明示クリア不要 (= 旧 ID は
+  // 現カットに一致せず無視される)。同一プロジェクト内のカット編集後は再実行で更新。
+  cutPrerenderStatus: new Map(),
   autoSaveTimer: null,
   isLoadingCut: false,
   projects: [],

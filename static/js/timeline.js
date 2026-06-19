@@ -89,6 +89,9 @@ const TIMELINE_LAYOUT = {
   vlTop: 140, vlHeight: 36,
   cutTop: 176, cutHeight: 10,
   totalHeight: 186,
+  // 最上部に重ねる事前解析 (プリレンダー) ストリップの高さ。ruler 背景の上に
+  // y=0 から描くオーバーレイなので帯オフセットには影響しない (= 既存レイアウト不変)。
+  prerenderStripHeight: 3,
 };
 const SOUND_EFFECT_CHIP_PX = 22;
 const TIMELINE_ZOOM_STEPS = [25, 50, 100, 200, 400];
@@ -202,6 +205,7 @@ export function drawTimeline() {
   ctx.translate(-scrollLeft, 0);
   drawTimelineBackground(ctx, view);
   drawTimelineRuler(ctx, view);
+  drawTimelinePrerenderStrip(ctx, view);
   drawTimelineWaveform(ctx, view);
   drawTimelineTelops(ctx, view);
   drawTimelineSoundEffects(ctx, view);
@@ -277,7 +281,9 @@ function drawTimelineRuler(ctx, view) {
   for (let t = majorBegin; t <= tEnd + 1e-6; t += majorStep) {
     if (t < 0) continue;
     const x = Math.round(t * pxPerSec);
-    ctx.fillText(formatTimecodeSec(t), x + 3, 2);
+    // 最上部 (y=0..prerenderStripHeight) は事前解析ストリップが重なるので、ラベルは
+    // その下に逃がす。
+    ctx.fillText(formatTimecodeSec(t), x + 3, (layout.prerenderStripHeight || 3) + 1);
   }
   // 拍 (BPM)
   const bpm = Number(state.scenario?.scenes?.[0]?.bpm) || 0;
@@ -297,6 +303,32 @@ function drawTimelineRuler(ctx, view) {
     ctx.globalAlpha = 1;
   }
   ctx.restore();
+}
+
+// タイムライン最上部の事前解析 (プリレンダー) ステータスストリップ。
+// per-cut に「解析済=緑 / 解析中=赤 / 未解析=薄グレー」を細いバンドで描く。
+// drawTimeline 内で ruler の直後に呼び、ruler 背景の上 (y=0) に重ねる。状態は
+// state.cutPrerenderStatus (prerender.js / playback.js が更新) を読む。
+function drawTimelinePrerenderStrip(ctx, view) {
+  const { layout, pxPerSec, palette } = view;
+  const cuts = state.scenario?.cuts || [];
+  if (cuts.length === 0) return;
+  const map = state.cutPrerenderStatus instanceof Map ? state.cutPrerenderStatus : null;
+  const h = layout.prerenderStripHeight || 3;
+  for (const cut of cuts) {
+    const dur = cutDurationSec(cut);
+    if (!(dur > 0)) continue;
+    const x = cutStartSec(cut) * pxPerSec;
+    const w = Math.max(1, dur * pxPerSec);
+    const status = map ? map.get(cut.id) : null;
+    ctx.fillStyle = status === "ready" ? "#22c55e"
+      : status === "analyzing" ? "#ef4444"
+      : "rgba(148,163,184,0.45)";
+    ctx.fillRect(x, 0, w, h);
+    // カット境界に 1px の区切り (背景色) を入れて per-cut の粒度を見せる。
+    ctx.fillStyle = palette.surface2;
+    ctx.fillRect(x, 0, 1, h);
+  }
 }
 
 function drawTimelineWaveform(ctx, view) {
