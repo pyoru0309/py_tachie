@@ -723,6 +723,27 @@ def duplicate_project(project_id: str, payload: dict[str, Any]) -> dict[str, Any
     # ディスク上をまるごとコピー（cache/output/export 含む。重い場合は将来 ignore_patterns 検討）
     shutil.copytree(src_ctx.root, dst_root, ignore=shutil.ignore_patterns("cache", "outputs"))
     new_ctx = project_context(new_project_id)
+    # 複製元 ID を埋め込んだ project-scoped アセットパス (projects/<old_id>/assets/...)
+    # を複製先 ID に書き換える。copytree で実体はコピー済みだが、シナリオ等に旧 ID の
+    # パスが残ると複製先が旧プロジェクトのアセットを参照し続け、旧プロジェクトを削除
+    # すると複製が壊れる (= 報告されたバグ)。共通アセット (assets/...) は不変で正しい。
+    # 他プロジェクトを参照する cross-project パス (= 複製元以外の projects/<x>/) は
+    # 実体が複製されないため、意図的に書き換えず元の場所を指したままにする。
+    old_path_prefix = f"projects/{src_ctx.id}/"
+    new_path_prefix = f"projects/{new_ctx.id}/"
+    if old_path_prefix != new_path_prefix:
+        rewrite_targets = list(dst_root.glob("scenarios/*.json"))
+        for name in ("project.json", "config.json", "expression_presets.json"):
+            candidate = dst_root / name
+            if candidate.exists():
+                rewrite_targets.append(candidate)
+        for target in rewrite_targets:
+            try:
+                text = target.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            if old_path_prefix in text:
+                target.write_text(text.replace(old_path_prefix, new_path_prefix), encoding="utf-8")
     # project.json を新 ID／タイトル／タイムスタンプで上書き
     now = datetime.now().isoformat(timespec="seconds")
     project = read_project_file(new_ctx)
@@ -2127,6 +2148,7 @@ def _build_preview_visualizer(
     cache_url: Callable[[str], str],
     override_scene: dict[str, Any] | None = None,
     override_cut: dict[str, Any] | None = None,
+    allow_source_build: bool = True,
 ) -> dict[str, Any] | None:
     """scene-bundle レスポンス用 visualizer payload を返す (GL 経路のみ)。
 
@@ -2203,6 +2225,7 @@ def _build_preview_visualizer(
         time_grid_sec=time_grid,
         fps=animation_fps,
         cache_dir=ctx.cache_dir,
+        allow_source_build=allow_source_build,
     )
     streams_url: dict[str, Any] = {}
     for name, meta in streams.items():
@@ -2287,6 +2310,12 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
     purpose = str(payload.get("purpose") or "").strip()
     if "purpose" in payload:
         payload = {k: v for k, v in payload.items() if k != "purpose"}
+    # vizSourceBuild は「音源単位 viz キャッシュを同期生成してよいか」のヒントで、
+    # 描画結果には影響しない (= 同じ cut.state なら同じ焼き込み PNG)。token に乗せると
+    # CURRENT(false) と先読み(true) で別 PNG になりキャッシュが二重化するため除外する。
+    allow_viz_source_build = bool(payload.get("vizSourceBuild", True))
+    if "vizSourceBuild" in payload:
+        payload = {k: v for k, v in payload.items() if k != "vizSourceBuild"}
     if isinstance(payload.get("motionType"), str) and "motionSettings" not in payload:
         payload = {**payload, "motionSettings": config.get("motion", {})}
     # token は resolve_payload_paths 通過前の入力を基準にハッシュ。
@@ -2689,6 +2718,10 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
     # シーンの visualizer 設定 (GL 経路のみ)。失敗時は None で静的再生。
     # sceneOverride が来ているときは target_scene_for_lookup が override 反映済みの
     # dict になっている。visualizer も同じ live state を見るために渡す。
+    # allow_viz_source_build は token 計算前 (vizSourceBuild の strip 時) に確定済み。
+    # false (対話プレビューの現カット fetch) のときは音源単位キャッシュが未生成でも
+    # 全長解析を同期実行せず per-cut で即返す (初動レイテンシ優先)。未指定 = True で、
+    # 書き出し (export-session の独自 fetch) や先読み warm は従来どおり音源キャッシュを生成。
     visualizer_payload = _build_preview_visualizer(
         ctx=ctx,
         manifest=manifest,
@@ -2699,6 +2732,7 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
         cache_url=cache_url,
         override_scene=target_scene_for_lookup if scene_override is not None else None,
         override_cut=target_cut_for_lookup if scene_override is not None else None,
+        allow_source_build=allow_viz_source_build,
     )
 
     background_payload: dict[str, Any] = {

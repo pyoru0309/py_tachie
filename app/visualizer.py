@@ -732,7 +732,12 @@ def render_visualizer_data_streams(
 # 構成でも同一音源 + 同一グリッドならキャッシュを共有できる。
 # ---------------------------------------------------------------------------
 
-VIZ_STREAM_CACHE_VERSION = 1
+# v2 (2026-06-20): 音源単位キャッシュ導入で onset 系ストリームの自己正規化基準が
+# 「カット内 peak」→「音源全長 peak」に変わった (visualizer.py の Phase 4a コメント
+# 参照)。旧 v1 の per-cut manifest をそのまま再利用すると、同一シーン内で「旧正規化の
+# カット」と「source-slice の新正規化カット」が混在し onset 明滅基準が食い違う。
+# version を上げて旧 cache を一度だけ無効化し、正規化基準を全カットで揃える。
+VIZ_STREAM_CACHE_VERSION = 2
 
 # 同一トークンの解析が並走しないようにする in-flight lock。warmup の先頭 2 カット
 # 同時 fire + renderPreview の並走で同じ 3 分解析が複数本走るのを防ぐ。
@@ -1072,6 +1077,7 @@ def ensure_visualizer_streams(
     time_grid_sec: "np.ndarray | list[float]",
     fps: int,
     cache_dir: Path,
+    allow_source_build: bool = True,
 ) -> dict[str, dict[str, Any]]:
     """scene-bundle 向けの解析ストリーム入口 (キャッシュ管理付き)。
 
@@ -1082,6 +1088,14 @@ def ensure_visualizer_streams(
 
     いずれも per-token lock で重複解析を抑止する。戻り値は
     ``render_visualizer_data_streams`` と同形式の manifest dict。
+
+    ``allow_source_build`` (既定 True):
+      対話プレビューの「現カット」表示など初動レイテンシが効く hot path では False
+      を渡す。False のときは音源単位キャッシュが *既に存在する場合のみ* スライスし、
+      無ければ音源全長解析 (3 分 BGM なら数千フレームの window 解析) を同期実行せず
+      per-cut 直接解析で即返す。音源キャッシュの生成は warm 経路 (先読み =
+      allow_source_build=True) と書き出し (全カット処理で front-load が割に合う) に
+      任せる。これで「最初の 1 カットだけ音源全長ぶんの解析を待たされる」回帰を防ぐ。
     """
     plugins = discover_plugins()
     info = plugins.get(plugin_key)
@@ -1121,16 +1135,21 @@ def ensure_visualizer_streams(
                 trim_start_sec=trim_start,
                 fps=fps,
             )
-            source_manifest = _ensure_source_streams(
-                plugin_key,
-                info,
-                user_params,
-                src_token,
-                audio_track=audio_track,
-                project_root=project_root,
-                fps=fps,
-                cache_dir=cache_dir,
-            )
+            if allow_source_build:
+                source_manifest = _ensure_source_streams(
+                    plugin_key,
+                    info,
+                    user_params,
+                    src_token,
+                    audio_track=audio_track,
+                    project_root=project_root,
+                    fps=fps,
+                    cache_dir=cache_dir,
+                )
+            else:
+                # hot path: 既存の音源単位キャッシュがあるときだけ使う。無ければ
+                # ここでは生成せず (= 音源全長解析を同期実行しない) per-cut に倒す。
+                source_manifest = _load_source_manifest(cache_dir, src_token)
             if source_manifest is not None:
                 grid = np.asarray(time_grid_sec, dtype=np.float64)
                 start_idx = int(round(float(grid[0]) * fps)) if grid.size else 0

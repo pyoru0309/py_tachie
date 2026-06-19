@@ -38,13 +38,17 @@ export function createPreviewScheduler({ fetchBundle, prefetchAudio = null, maxC
   const jobs = new Map(); // cutId -> job
   let inFlight = 0;
   let seq = 0;
+  // clear() で進む世代カウンタ。clear 時に running だった旧世代 job を、新世代の
+  // 同時実行枠 (inFlight) の会計から切り離すために使う (下の clear()/finally 参照)。
+  let generation = 0;
 
   function _startJob(job) {
     if (job.status !== "queued") return;
     job.status = "running";
     inFlight += 1;
+    const jobGen = job.generation;
     Promise.resolve()
-      .then(() => fetchBundle(job.cut))
+      .then(() => fetchBundle(job.cut, job.priority))
       .then(
         (data) => {
           job.settle(data);
@@ -57,9 +61,14 @@ export function createPreviewScheduler({ fetchBundle, prefetchAudio = null, maxC
         },
       )
       .finally(() => {
-        inFlight -= 1;
         job.status = "done";
-        _pump();
+        // clear() で世代が進んでいたら、この job は旧世代。clear() が inFlight を
+        // 0 にリセット済みなので、ここで decrement / _pump すると新世代の枠会計を
+        // 壊す。旧世代の running は完走させるだけで枠管理からは切り離す。
+        if (jobGen === generation) {
+          inFlight -= 1;
+          _pump();
+        }
       });
   }
 
@@ -94,7 +103,7 @@ export function createPreviewScheduler({ fetchBundle, prefetchAudio = null, maxC
       }
       return existing.promise;
     }
-    const job = { cut, priority, status: "queued", seq: seq++ };
+    const job = { cut, priority, status: "queued", seq: seq++, generation };
     job.promise = new Promise((resolve) => {
       job.settle = resolve;
     });
@@ -174,6 +183,12 @@ export function createPreviewScheduler({ fetchBundle, prefetchAudio = null, maxC
       if (job.status === "queued") pending.push(job);
     }
     jobs.clear();
+    // 世代を進めて、現在 running な旧 job を同時実行枠 (inFlight) の会計から切り離す。
+    // これをしないと旧 job の finally まで inFlight が下がらず、clear 直後の新しい
+    // NEXT/LOOKAHEAD が枠 (maxConcurrent) 待ちで開始できず先読みが詰まる
+    // (= 停止直後の再生 / プロジェクト切替後に先読み効果が一時的に消える)。
+    generation += 1;
+    inFlight = 0;
     // queued は開始せずに null 解決して待ち手 (warmup の budget 待ち等) を解放。
     // running は結果が捨てられるだけ (fetch 自体は完走、HTTP キャッシュは温まる)。
     for (const job of pending) {

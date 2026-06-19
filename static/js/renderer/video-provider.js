@@ -550,6 +550,27 @@ export class WebCodecsVideoProvider {
         }
       }
     }
+    // 末尾 GOP / B-frame reorder の drain: 全 sample を投入し終えてもまだ target に
+    // 届かない場合、デコーダ内にバッファされたフレームが flush 待ちで残っている。
+    // WebCodecs は end-of-stream で明示 flush しないと末尾フレームを output しない
+    // ことがあり、これが「nextIdx=N/N, pushed>0, output=0」の no-output の主因
+    // (.mov の末尾を指すカット / ループ bg の末尾境界。Mac/Win 双方で発生, 2026-06)。
+    // 一度だけ flush して残りを吐かせる。flush 後も decoder は configured のままで、
+    // ループの rewind では _resetDecoder が別途 reconfigure するので副作用はない。
+    if (pushed > 0
+        && this.nextSampleIdx >= this.samples.length
+        && this._lastQueueEndUs() < targetUs
+        && this.decoder
+        && this.decoder.state === "configured") {
+      try {
+        await this.decoder.flush();
+      } catch (_e) {
+        // flush 失敗 (decoder error 等) は下の no-output 判定 / 次フレームの
+        // decoderError 処理に委ねる。
+      }
+      if (this.decoderError) throw this.decoderError;
+      if (this.decodedQueue.length > maxOutput) maxOutput = this.decodedQueue.length;
+    }
     // 出力が反映されるのを最大 100ms wait (decoder は async output)
     let waited = 0;
     while (this._lastQueueEndUs() < targetUs && waited < 100) {

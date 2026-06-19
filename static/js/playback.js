@@ -2220,11 +2220,18 @@ async function fetchSceneBundleV2(cut, options = {}) {
     if (!Array.isArray(scenes)) return null;
     return scenes.find((scene) => (scene?.cuts || []).some((c) => c && c.id === cut.id)) || null;
   })();
+  // 音源単位 viz 解析キャッシュの「同期生成」を許すかどうか。先読み (NEXT/LOOKAHEAD)
+  // のときだけ true にして裏で音源全長キャッシュを温め、現カット (CURRENT) や対話
+  // fetch (priority 未指定) では false にして「3 分 BGM の最初の 1 カットで音源全長
+  // 解析を待たされる」初動レイテンシ回帰を避ける。未生成なら per-cut 即返しになる。
+  const vizSourceBuild = (options.priority === PRIORITY.NEXT
+    || options.priority === PRIORITY.LOOKAHEAD);
   const body = {
     ...cutState,
     cutId: cut.id,
     duration: cutDurationSec(cut),
     audio: cut.audio,
+    vizSourceBuild,
     // preview 経路はサーバの compute_cut_lipsync_levels (ffmpeg astats) を skip
     // させる。preview の口パクは AnalyserNode で real-time 駆動するため不要。
     // サーバ側で token には乗らない (preview/export で焼き込み PNG を共有)。
@@ -2313,7 +2320,10 @@ async function fetchSceneBundleV2(cut, options = {}) {
 // それ以外の経路は気にしなくてよい。
 // =============================================================================
 const bundleScheduler = createPreviewScheduler({
-  fetchBundle: (cut) => fetchSceneBundleV2(cut),
+  // priority を fetch に伝搬する: 現カット (CURRENT) と対話 fetch は初動レイテンシ
+  // 優先で音源単位 viz キャッシュの同期生成を抑止 (vizSourceBuild=false)、先読み
+  // (NEXT/LOOKAHEAD) のときだけ裏で音源キャッシュを温める。
+  fetchBundle: (cut, priority) => fetchSceneBundleV2(cut, { priority }),
   prefetchAudio: (cut) => prefetchAudioForCut(cut),
 });
 
