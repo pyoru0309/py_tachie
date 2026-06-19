@@ -496,6 +496,40 @@ def startup() -> None:
                 )
 
 
+@app.on_event("startup")
+async def _install_benign_connection_error_filter() -> None:
+    """Windows ProactorEventLoop が peer 切断時に出す ConnectionResetError ノイズを抑止。
+
+    ``_ProactorBasePipeTransport._call_connection_lost`` の ``socket.shutdown`` が
+    WinError 10054 を投げるのは asyncio の既知問題 (bpo-39010)。実害は無いが、
+    プレビュー中の <video> の range seek / scene-bundle の abort でブラウザが接続を
+    切るたびに多発し、その都度 full traceback を stderr へ整形出力する処理が event
+    loop を圧迫して /assets の range 配信 (= 動画レイヤーの読み込み) を遅らせる副作用が
+    ある。loop の exception handler で peer 切断系 (transport callback で出るもの) だけ
+    黙殺し、それ以外は従来のハンドラ / default にそのまま委譲する。
+    """
+    import asyncio
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    prev = loop.get_exception_handler()
+    _benign = (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)
+
+    def _handler(loop_: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+        exc = context.get("exception")
+        if isinstance(exc, _benign):
+            # transport の connection_lost で出る peer 切断。application 影響なし。
+            return
+        if prev is not None:
+            prev(loop_, context)
+        else:
+            loop_.default_exception_handler(context)
+
+    loop.set_exception_handler(_handler)
+
+
 @app.get("/api/projects")
 def list_projects() -> dict[str, Any]:
     projects = []
