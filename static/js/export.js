@@ -396,6 +396,25 @@ function emitExportSummary({ formValues, baseExportConfig, result, done, muxResu
     );
     lines.push(`  ↑ % が高い=per-frame JS(scene.update: telop/キャラ/motion) 律速 / 低いのに遅い=GPU描画 or readback or encode 律速`);
   }
+  // カット境界コスト: scene-bundle fetch (HTTP + サーバ bundle 焼き) + buildScene
+  // (キャラ PNG decode + GPU texture upload + scene 構築)。これが大半なら「カット切替の
+  // 立ち上げ」が律速 = cut 数 × build コスト (per-frame render ではない)。export は preview と
+  // 違い次カットの先行 build が無く各カット境界で直列ブロックするため、cut 数が多いと効く。
+  if (typeof result.buildSceneMs === "number" && result.elapsedSec > 0
+      && ((result.fetchBundleMs || 0) + (result.buildSceneMs || 0)) > 0) {
+    const fetchSec = (result.fetchBundleMs || 0) / 1000;
+    const buildSec = (result.buildSceneMs || 0) / 1000;
+    const cutBoundarySec = fetchSec + buildSec;
+    const pct = cutBoundarySec / result.elapsedSec * 100;
+    const nCuts = result.cutBuildCount || 0;
+    const perCutMs = nCuts > 0 ? ((result.fetchBundleMs + result.buildSceneMs) / nCuts) : 0;
+    lines.push(
+      `cut境界 (fetch+build) = ${cutBoundarySec.toFixed(1)}s / ${result.elapsedSec.toFixed(1)}s `
+      + `(${pct.toFixed(0)}%) — fetch=${fetchSec.toFixed(1)}s build=${buildSec.toFixed(1)}s `
+      + `× ${nCuts}cuts = ${perCutMs.toFixed(0)}ms/cut`,
+    );
+    lines.push(`  ↑ % が高い=カット切替の立ち上げ(bundle fetch + キャラtexture upload)が律速 → 次カット先行buildで隠せる`);
+  }
   lines.push(``);
   lines.push(`## サーバ側`);
   if (done && done.fps !== undefined) {

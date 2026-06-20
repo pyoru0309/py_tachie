@@ -557,7 +557,12 @@ async function renderCutFrames({
   videoLayerDurations = null,
   projectId = "",
 }) {
+  // ★ カット境界コスト計測 (律速診断): fetchSceneBundle (HTTP + サーバ bundle 焼き) と
+  //   buildSceneFromLayerData (キャラ PNG decode + GPU texture upload + scene 構築) を
+  //   分離累積する。per-frame render ではなく「カット切替コスト × cut 数」が律速かを見る。
+  const _tFetch = performance.now();
   const layerData = await fetchSceneBundle(cut, projectId);
+  if (ctx) ctx.fetchBundleMs = (ctx.fetchBundleMs || 0) + (performance.now() - _tFetch);
   if (!includeVisualizer) layerData.visualizer = null;
 
   // 透過 export: bg plane を描かない (画像 / videoTrack いずれも)。alpha=0 が
@@ -655,10 +660,15 @@ async function renderCutFrames({
   // videoProvider.getTexture() (= VideoFrameTexture or CanvasTexture) を貼る。
   layerData.hasVideoTrack = !!videoProvider;
 
+  const _tBuild = performance.now();
   const sceneInstance = await buildSceneFromLayerData(
     layerData, videoProvider,
     videoLayerProvidersById, videoLayerDurations,
   );
+  if (ctx) {
+    ctx.buildSceneMs = (ctx.buildSceneMs || 0) + (performance.now() - _tBuild);
+    ctx.cutBuildCount = (ctx.cutBuildCount || 0) + 1;
+  }
   setActiveScene(sceneInstance);
 
   if (includeVisualizer && sceneInstance.meshes?.visualizer) {
@@ -943,6 +953,9 @@ export async function runExportSession({
   const frameCtx = {
     stallCount: 0,
     glRenderMs: 0,  // GL render (per-frame JS update + draw call 発行) の累積壁時計 ms。律速診断用。
+    fetchBundleMs: 0,  // カット境界の scene-bundle fetch 累積 ms (律速診断)。
+    buildSceneMs: 0,   // カット境界の buildSceneFromLayerData (PNG decode + texture upload) 累積 ms。
+    cutBuildCount: 0,  // build したカット数 (per-cut 平均算出用)。
     // 透明 codec のときだけ最初の 3 frame で alpha 統計をログに出す。
     // min=0 なら readPixels に透明 pixel が乗っている (= GL 側 OK)、
     // min=255 なら GL 側で alpha=255 になっており codec ではなく上流が原因。
@@ -1030,6 +1043,9 @@ export async function runExportSession({
     elapsedSec,
     stallCount: frameCtx.stallCount,
     glRenderMs: frameCtx.glRenderMs,
+    fetchBundleMs: frameCtx.fetchBundleMs,
+    buildSceneMs: frameCtx.buildSceneMs,
+    cutBuildCount: frameCtx.cutBuildCount,
     encodeStats,
     negotiatedExtensions: sender.negotiatedExtensions || "",
   };
@@ -1104,6 +1120,9 @@ export async function runProjectExportSession({
   const frameCtx = {
     stallCount: 0,
     glRenderMs: 0,  // GL render (per-frame JS update + draw call 発行) の累積壁時計 ms。律速診断用。
+    fetchBundleMs: 0,  // カット境界の scene-bundle fetch 累積 ms (律速診断)。
+    buildSceneMs: 0,   // カット境界の buildSceneFromLayerData (PNG decode + texture upload) 累積 ms。
+    cutBuildCount: 0,  // build したカット数 (per-cut 平均算出用)。
     // 透明 codec のときだけ最初の 3 frame で alpha 統計をログに出す。
     // min=0 なら readPixels に透明 pixel が乗っている (= GL 側 OK)、
     // min=255 なら GL 側で alpha=255 になっており codec ではなく上流が原因。
@@ -1374,6 +1393,9 @@ export async function runProjectExportSession({
     elapsedSec,
     stallCount: frameCtx.stallCount,
     glRenderMs: frameCtx.glRenderMs,
+    fetchBundleMs: frameCtx.fetchBundleMs,
+    buildSceneMs: frameCtx.buildSceneMs,
+    cutBuildCount: frameCtx.cutBuildCount,
     encodeStats,
     negotiatedExtensions: sender.negotiatedExtensions || "",
     plan,
