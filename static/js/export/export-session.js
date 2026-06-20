@@ -31,7 +31,7 @@ import {
 import { state } from "/static/js/state.js";
 import { registerProjectFonts } from "/static/js/font.js";
 import { createReadback } from "./pbo-readback.js";
-import { createH264FrameEncoder, computeBitrate } from "./webcodecs-encoder.js";
+import { createH264FrameEncoder, computeBitrate, selectH264Config } from "./webcodecs-encoder.js";
 import { FrameSender } from "./frame-sender.js";
 
 const FONT_READY_TIMEOUT_MS = 5000;
@@ -493,12 +493,17 @@ async function _readbackAndSend(readback, sender, vflipMode, width, height, ctx)
 // transport=webcodecs-h264 のとき frameEncoder を生成して frameCtx に載せる。
 // rawrgba (= 従来経路) のときは何もせず null を返す。チャンクは output コールバック
 // から sender.sendBytesNow で同期送信する。生成できなかった例外は caller へ伝播。
-function _setupFrameEncoder(exportConfig, dims, sender, canvas, frameCtx, onLog) {
+async function _setupFrameEncoder(exportConfig, dims, sender, canvas, frameCtx, onLog) {
   if (exportConfig.transport !== "webcodecs-h264") return null;
   const { width, height, fps } = dims;
   const bitrate = computeBitrate(width, height, fps, exportConfig.presetOptions?.maxrate);
+  // HW/SW を probe して最適な codec/profile を選ぶ (HW あれば High、無ければ SW 最速の
+  // Baseline)。Windows (HW H.264 無し) の SW encode 律速をプロファイル面で緩和する。
+  const sel = await selectH264Config(width, height);
   const frameEncoder = createH264FrameEncoder({
     width, height, fps, bitrate,
+    codec: sel.codec,
+    hardwareAcceleration: sel.hardwareAcceleration,
     onChunk: (bytes) => { sender.sendBytesNow(bytes); },
     onError: (e) => { onLog(`WebCodecs encoder error: ${e?.message || e}`, "err"); },
   });
@@ -507,7 +512,7 @@ function _setupFrameEncoder(exportConfig, dims, sender, canvas, frameCtx, onLog)
   frameCtx.globalFrameIdx = 0;
   onLog(
     `WebCodecs H.264 エンコード有効: bitrate=${(bitrate / 1e6).toFixed(1)}Mbps`
-    + ` (転送=圧縮チャンク / server=copy)`,
+    + ` encode=${sel.label} (転送=圧縮チャンク / server=copy)`,
   );
   return frameEncoder;
 }
@@ -991,7 +996,7 @@ export async function runExportSession({
       }
     },
   };
-  const frameEncoder = _setupFrameEncoder(
+  const frameEncoder = await _setupFrameEncoder(
     exportConfig, { width, height, fps }, sender, canvas, frameCtx, onLog,
   );
 
@@ -1176,7 +1181,7 @@ export async function runProjectExportSession({
   const progressState = { currentScene: 0, currentCut: 0, totalCuts: 0 };
   // 全シーンの cut 総数 (進捗 UI 表示用)
   progressState.totalCuts = plan.scenes.reduce((s, sc) => s + sc.cuts.length, 0);
-  const frameEncoder = _setupFrameEncoder(
+  const frameEncoder = await _setupFrameEncoder(
     exportConfig, { width, height, fps }, sender, canvas, frameCtx, onLog,
   );
 

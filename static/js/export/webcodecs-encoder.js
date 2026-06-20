@@ -23,6 +23,53 @@ function _codecForSize(width, height) {
   return isLarge ? "avc1.640033" : "avc1.640028";
 }
 
+function _profileName(codec) {
+  if (codec.startsWith("avc1.64")) return "High";
+  if (codec.startsWith("avc1.4D")) return "Main";
+  if (codec.startsWith("avc1.42")) return "Baseline";
+  return codec;
+}
+
+// 実際に使うエンコーダ構成を probe して選ぶ。方針:
+//   1) HW H.264 encoder があれば High profile を HW で使う (品質優先 / HW は profile に
+//      よらず高速)。
+//   2) HW が無い (Intel Iris Xe で Chrome が QSV を露出しない等) ときは、SW encode が
+//      最も軽い Baseline (CAVLC, CABAC/B-frame 無し) を使う。OpenH264 (Chrome の SW
+//      H.264) は High より Baseline の方が encode が速く、Windows の SW encode 律速
+//      (backpressure wait 76%) を多少緩和できる。
+//   3) どちらも probe 失敗時は従来の High (no-preference)。
+// 返り値: { codec, hardwareAcceleration | undefined, label }
+export async function selectH264Config(width, height) {
+  const fallback = { codec: _codecForSize(width, height), hardwareAcceleration: undefined, label: "SW High(fallback)" };
+  if (typeof window === "undefined" || !("VideoEncoder" in window)) return fallback;
+  const level = (width > 1920 || height > 1088) ? "33" : "28";
+  const high = `avc1.6400${level}`;
+  const main = `avc1.4D00${level}`;
+  const baseline = `avc1.4200${level}`;
+  const base = {
+    width, height, bitrate: 16_000_000, framerate: 30,
+    latencyMode: "realtime", avc: { format: "annexb" },
+  };
+  const ok = async (codec, accel) => {
+    try {
+      const r = await window.VideoEncoder.isConfigSupported({ ...base, codec, hardwareAcceleration: accel });
+      return !!(r && r.supported);
+    } catch { return false; }
+  };
+  // 1) HW があれば High を HW で
+  for (const codec of [high, main, baseline]) {
+    // eslint-disable-next-line no-await-in-loop
+    if (await ok(codec, "prefer-hardware")) {
+      return { codec, hardwareAcceleration: "prefer-hardware", label: `HW ${_profileName(codec)}` };
+    }
+  }
+  // 2) HW 無し → SW で最速の Baseline
+  if (await ok(baseline, "no-preference")) {
+    return { codec: baseline, hardwareAcceleration: undefined, label: "SW Baseline" };
+  }
+  return fallback;
+}
+
 // このブラウザで H.264 (annexb) エンコードが使えるか。VideoEncoder 非対応や
 // isConfigSupported=false なら false を返し、呼び出し側は従来の生 RGBA 経路へ
 // フォールバックする。
@@ -114,7 +161,7 @@ export function computeBitrate(width, height, fps, maxrateOverride) {
 //   onChunk(Uint8Array): エンコード済みチャンクが出るたびに呼ばれる (送信経路へ)。
 //   onError(Error): エンコーダのエラー (caller は中断判断に使う)。
 // 返り値: { encodeCanvas, flush, close, chunkCount }
-export function createH264FrameEncoder({ width, height, fps, bitrate, onChunk, onError }) {
+export function createH264FrameEncoder({ width, height, fps, bitrate, onChunk, onError, codec, hardwareAcceleration }) {
   let firstError = null;
   let chunkCount = 0;
   // 律速診断: encodeQueueSize backpressure で待った合計時間と最大キュー深さ。
@@ -141,24 +188,33 @@ export function createH264FrameEncoder({ width, height, fps, bitrate, onChunk, o
     },
   });
 
-  encoder.configure({
-    codec: _codecForSize(width, height),
+  const _cfg = {
+    codec: codec || _codecForSize(width, height),
     width,
     height,
     bitrate,
     framerate: fps,
     avc: { format: "annexb" },
     // latencyMode:"realtime" = スループット優先。"quality" は品質優先で lookahead /
-    // B-frame を使い得るため遅く (Windows ブラウザ実装で encode が律速 = 2026-06-02
-    // 実測 wait 44〜66%)、かつ B-frame は `-c copy` で PTS 並べ替えリスクがある。
-    // バッチ書き出しは速度優先 + ビットレートで画質担保が正解なので realtime にする。
+    // B-frame を使い得るため遅く、かつ B-frame は `-c copy` で PTS 並べ替えリスクがある。
     latencyMode: "realtime",
-    // 注: hardwareAcceleration:"prefer-hardware" は付けない。Windows の一部環境で
-    //     isConfigSupported=true でも configure 時に "Encoder creation error" になり
-    //     書き出しが即失敗した (2026-06-02)。既定 ("no-preference") に任せ、ブラウザに
-    //     HW/SW を選ばせる (1080p は通常 HW が選ばれる)。
     bitrateMode: "variable",
-  });
+  };
+  // hardwareAcceleration は selectH264Config が probe で決めた値だけ付ける
+  // (prefer-hardware は HW が isConfigSupported=true のときのみ選ばれる)。Windows の
+  // 一部環境では isConfigSupported=true でも configure が同期 throw する事例があったので
+  // (2026-06-02)、その場合は hardwareAcceleration を外して再 configure する。
+  if (hardwareAcceleration) _cfg.hardwareAcceleration = hardwareAcceleration;
+  try {
+    encoder.configure(_cfg);
+  } catch (e) {
+    if (_cfg.hardwareAcceleration) {
+      delete _cfg.hardwareAcceleration;
+      encoder.configure(_cfg);
+    } else {
+      throw e;
+    }
+  }
 
   const keyEvery = Math.max(1, Math.round(fps * 2)); // 2 秒ごとに IDR
 
