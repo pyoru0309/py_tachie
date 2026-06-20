@@ -383,6 +383,19 @@ function emitExportSummary({ formValues, baseExportConfig, result, done, muxResu
     );
     lines.push(`  ↑ wait% が高い=エンコーダ律速 / 低いのに遅い=render or videoLayer decode 律速`);
   }
+  // GL render (per-frame の scene.update JS = telop refresh / per-char texture / motion
+  // 計算 + draw call 発行) の累積時間。これが elapsed の大半なら「キャラアニメ等の
+  // per-frame JS が律速」、小さいのに fps が低いなら GPU draw / readback / encode が律速。
+  if (typeof result.glRenderMs === "number" && result.glRenderMs > 0 && result.elapsedSec > 0) {
+    const glSec = result.glRenderMs / 1000;
+    const glPct = glSec / result.elapsedSec * 100;
+    const glPerFrameMs = result.framesRendered > 0 ? (result.glRenderMs / result.framesRendered) : 0;
+    lines.push(
+      `render(GL JS) = ${glSec.toFixed(1)}s / ${result.elapsedSec.toFixed(1)}s `
+      + `(${glPct.toFixed(0)}%) = ${glPerFrameMs.toFixed(2)}ms/frame`,
+    );
+    lines.push(`  ↑ % が高い=per-frame JS(scene.update: telop/キャラ/motion) 律速 / 低いのに遅い=GPU描画 or readback or encode 律速`);
+  }
   lines.push(``);
   lines.push(`## サーバ側`);
   if (done && done.fps !== undefined) {

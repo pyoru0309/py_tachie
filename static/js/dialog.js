@@ -793,7 +793,7 @@ export async function applyEffectSceneToAllCuts() {
     { key: "backgroundColorPair", label: "背景色 / 不透明度", valueText: bgColorText },
     {
       key: "foreground",
-      label: "前景 + 表示位置",
+      label: "前景 / 表示位置",
       valueText: source.foreground
         ? `${fgItem?.name || source.foreground}（位置: ${fgPosText}）`
         : "なし",

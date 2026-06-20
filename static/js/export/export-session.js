@@ -430,7 +430,9 @@ async function renderLeadInFrames({
       onLog("aborted by user (leadIn loop)", "warn");
       break;
     }
+    const _tGl = performance.now();
     renderScene(emptyScene);
+    if (ctx) ctx.glRenderMs = (ctx.glRenderMs || 0) + (performance.now() - _tGl);
     await _readbackAndSend(readback, sender, vflipMode, width, height, ctx);
   }
   // 通常 cut の clear は (0,0,0,0) に統一。透明 codec なら bg plane 抑止で
@@ -777,6 +779,11 @@ async function renderCutFrames({
       ? computeIdleMotionOffset(idleMotion, sceneSec)
       : { dx: 0, dy: 0 };
 
+    // GL render (= scene.update の per-frame JS: telop refresh / per-char texture /
+    // motion 計算 + draw call 発行) の壁時計時間を累積する。律速診断用。WebGL は
+    // deferred なので実 GPU 実行は encode (VideoFrame 化の同期点) に乗る = glRenderMs が
+    // 大なら per-frame JS 律速、小さいのに fps 低なら GPU/encode 律速、と読める。
+    const _tGl = performance.now();
     renderActiveScene({
       eyeKey: "open",
       eyeKeyByChar,
@@ -791,6 +798,7 @@ async function renderCutFrames({
       animationFps: 12,
       frameIdx: f,
     });
+    if (ctx) ctx.glRenderMs = (ctx.glRenderMs || 0) + (performance.now() - _tGl);
     await _readbackAndSend(readback, sender, vflipMode, width, height, ctx);
     rendered += 1;
     ctx.onCutFrameSent?.();
@@ -855,7 +863,9 @@ async function renderGapFrames({
       }
     }
     gapInstance.update({ sceneSec });
+    const _tGl = performance.now();
     renderScene(gapInstance.scene);
+    if (ctx) ctx.glRenderMs = (ctx.glRenderMs || 0) + (performance.now() - _tGl);
     await _readbackAndSend(readback, sender, vflipMode, width, height, ctx);
     rendered += 1;
     ctx.onCutFrameSent?.();
@@ -932,6 +942,7 @@ export async function runExportSession({
   const tStart = performance.now();
   const frameCtx = {
     stallCount: 0,
+    glRenderMs: 0,  // GL render (per-frame JS update + draw call 発行) の累積壁時計 ms。律速診断用。
     // 透明 codec のときだけ最初の 3 frame で alpha 統計をログに出す。
     // min=0 なら readPixels に透明 pixel が乗っている (= GL 側 OK)、
     // min=255 なら GL 側で alpha=255 になっており codec ではなく上流が原因。
@@ -1018,6 +1029,7 @@ export async function runExportSession({
     framesRendered: producedFrames,
     elapsedSec,
     stallCount: frameCtx.stallCount,
+    glRenderMs: frameCtx.glRenderMs,
     encodeStats,
     negotiatedExtensions: sender.negotiatedExtensions || "",
   };
@@ -1091,6 +1103,7 @@ export async function runProjectExportSession({
   const tStart = performance.now();
   const frameCtx = {
     stallCount: 0,
+    glRenderMs: 0,  // GL render (per-frame JS update + draw call 発行) の累積壁時計 ms。律速診断用。
     // 透明 codec のときだけ最初の 3 frame で alpha 統計をログに出す。
     // min=0 なら readPixels に透明 pixel が乗っている (= GL 側 OK)、
     // min=255 なら GL 側で alpha=255 になっており codec ではなく上流が原因。
@@ -1360,6 +1373,7 @@ export async function runProjectExportSession({
     framesRendered: producedFrames,
     elapsedSec,
     stallCount: frameCtx.stallCount,
+    glRenderMs: frameCtx.glRenderMs,
     encodeStats,
     negotiatedExtensions: sender.negotiatedExtensions || "",
     plan,
