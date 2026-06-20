@@ -23,6 +23,33 @@ import { fetchGlobalConfig } from "./global-settings.js";
 import { updateSelectedCutFromCurrent, saveScenario } from "./scenario-actions.js";
 import { isWebcodecsH264Supported } from "./export/webcodecs-encoder.js";
 
+// プラットフォーム情報を 1 行に要約する (ログのプラットフォーム行用)。Mac/Win や
+// GPU の違いが書き出しログだけで切り分けられるよう、OS 推定 + ブラウザ + 論理コア数 +
+// WebGL の UNMASKED_RENDERER (= GPU 名) + WebCodecs H.264 HW 対応の概況を出す。
+function _describePlatform() {
+  const parts = [];
+  try {
+    const uaData = navigator.userAgentData;
+    const plat = uaData?.platform || navigator.platform || "";
+    if (plat) parts.push(plat);
+    const ua = navigator.userAgent || "";
+    const m = ua.match(/(Chrome|Firefox|Safari|Edg)\/([0-9.]+)/);
+    if (m) parts.push(`${m[1]} ${m[2]}`);
+    if (navigator.hardwareConcurrency) parts.push(`${navigator.hardwareConcurrency}core`);
+  } catch (_) { /* ignore */ }
+  // GPU 名 (WebGL UNMASKED_RENDERER)。失敗時は省略。
+  try {
+    const cv = document.createElement("canvas");
+    const gl = cv.getContext("webgl2") || cv.getContext("webgl");
+    if (gl) {
+      const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+      const renderer = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : "";
+      if (renderer) parts.push(String(renderer).trim());
+    }
+  } catch (_) { /* ignore */ }
+  return parts.length ? parts.join(" / ") : "(unknown)";
+}
+
 // WebCodecs 高速経路を使う transport を決める。H.264 mp4 preset かつ「高速書き出し」
 // ON かつブラウザが H.264 エンコード対応のときだけ "webcodecs-h264"。それ以外
 // (透過/ProRes/PNG, H.265, 非対応ブラウザ, トグル OFF) は従来の "rawrgba"。
@@ -353,6 +380,8 @@ function emitExportSummary({ formValues, baseExportConfig, result, done, muxResu
   const lines = [];
   lines.push(`## 設定`);
   lines.push(`project=${projectId} ${targetLabel} ${W}x${H}@${fps}`);
+  // プラットフォーム情報 (= Mac/Win や GPU の切り分けがログだけで分かるように)。
+  lines.push(`platform = ${_describePlatform()}`);
   if (transport === "webcodecs-h264") {
     // WebCodecs 経路はブラウザで H.264 圧縮 → サーバ ffmpeg copy。preset codec /
     // readback / vflip は使わないので転送方式を明示する。
@@ -434,9 +463,15 @@ function emitExportSummary({ formValues, baseExportConfig, result, done, muxResu
         const scn = (result.srvScenarioMs || 0) / 1000;
         const lay = (result.srvLayoutMs || 0) / 1000;
         const rest = Math.max(0, srvOther - bake - scn - lay);
+        const tok = (result.srvTokenMs || 0) / 1000;
+        const chars = (result.srvCharsMs || 0) / 1000;
+        // chars は bake を含むので、純キャラ組み立て = chars - bake。
+        const charsAssemble = Math.max(0, chars - bake);
+        const rest2 = Math.max(0, srvOther - bake - scn - lay - tok - charsAssemble);
         lines.push(
           `     └ その他分解: bake=${bake.toFixed(1)}s scenario=${scn.toFixed(1)}s `
-          + `layout=${lay.toFixed(1)}s 残り(char/fg/bg)=${rest.toFixed(1)}s`,
+          + `layout=${lay.toFixed(1)}s token=${tok.toFixed(1)}s char組立=${charsAssemble.toFixed(1)}s `
+          + `残り=${rest2.toFixed(1)}s`,
         );
       }
     }

@@ -2487,12 +2487,14 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
             "mouth_open": layers_for_token.get("mouth_open"),
             "mtimes": layer_mtimes,
         })
+    _t_tok0 = _perf()
     token = _stable_payload_token(
         token_input_payload,
         visualizer_spec=visualizer_spec_for_token,
         telops_spec=scene_telops_raw,
         character_layers=char_layers_for_token,
     )
+    _timing_ms["token"] = (_perf() - _t_tok0) * 1000.0
 
     def cache_url(rel: str) -> str:
         return f"/project-cache/{ctx.id}/{rel}"
@@ -2521,6 +2523,7 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
 
     speaker_id = request.speaker_character_id
     characters_payload = []
+    _t_chars0 = _perf()
     for character_request in request.characters:
         if not character_request.show_character:
             continue
@@ -2770,6 +2773,9 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
     # false (対話プレビューの現カット fetch) のときは音源単位キャッシュが未生成でも
     # 全長解析を同期実行せず per-cut で即返す (初動レイテンシ優先)。未指定 = True で、
     # 書き出し (export-session の独自 fetch) や先読み warm は従来どおり音源キャッシュを生成。
+    # キャラ payload 組み立てループ全体 (bake 含む)。bake 自体は別計上なので
+    # chars - bake = url_or_none(stat) + dict 構築 + 座標/scale 計算等の純オーバーヘッド。
+    _timing_ms["chars"] = (_perf() - _t_chars0) * 1000.0
     _t_viz0 = _perf()
     visualizer_payload = _build_preview_visualizer(
         ctx=ctx,

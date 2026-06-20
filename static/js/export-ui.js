@@ -292,18 +292,19 @@ export function clearExportProgress() {
 export function appendExportLog(line, kind = "info") {
   const root = elements.exportDialogLogContent;
   if (!root) return;
-  const div = document.createElement("div");
-  div.className = "export-dialog-log-line";
-  if (kind === "warn") div.classList.add("warn");
-  else if (kind === "err") div.classList.add("err");
   const ts = new Date().toLocaleTimeString();
-  div.textContent = `[${ts}] ${line}`;
-  root.append(div);
-  root.scrollTop = root.scrollHeight;
+  // textarea: 全選択コピーしやすいよう 1 行ずつ value に追記する。kind (warn/err) は
+  // 色分けできない代わりに ⚠/✕ プレフィックスで識別できるようにする。
+  const mark = kind === "warn" ? "⚠ " : kind === "err" ? "✕ " : "";
+  const text = `[${ts}] ${mark}${line}`;
+  // 末尾追従スクロールは「ユーザが上にスクロールして読んでいないとき」だけ行う。
+  const atBottom = (root.scrollTop + root.clientHeight) >= (root.scrollHeight - 4);
+  root.value = root.value ? `${root.value}\n${text}` : text;
+  if (atBottom) root.scrollTop = root.scrollHeight;
 }
 
 export function clearExportLog() {
-  if (elements.exportDialogLogContent) elements.exportDialogLogContent.textContent = "";
+  if (elements.exportDialogLogContent) elements.exportDialogLogContent.value = "";
 }
 
 // 書き出し中はフォームを操作不可にし、ボタンも書き換える。

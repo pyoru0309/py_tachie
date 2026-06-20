@@ -2381,9 +2381,17 @@ dialog::backdrop {
   transform: rotate(90deg);
 }
 
+/* textarea 化 (= 全選択してコピペしやすくするため、2026-06-20)。
+   wrap="off" + 横スクロールでログの整形を崩さない。縦リサイズ可。 */
 .export-dialog-log-content {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
   margin-top: 6px;
-  max-height: 180px;
+  height: 200px;
+  min-height: 80px;
+  max-height: 50vh;
+  resize: vertical;
   overflow: auto;
   background: var(--surface-2, rgba(0, 0, 0, 0.3));
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
@@ -2393,16 +2401,8 @@ dialog::backdrop {
   font-size: 11px;
   line-height: 1.5;
   color: var(--fg-muted, rgba(255, 255, 255, 0.78));
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: pre;
 }
-
-.export-dialog-log-line {
-  display: block;
-}
-
-.export-dialog-log-line.warn { color: #e0c150; }
-.export-dialog-log-line.err { color: #ff7b7b; }
 
 @media (max-width: 880px) {
   .export-dialog-body {
