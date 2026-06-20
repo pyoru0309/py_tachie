@@ -1030,19 +1030,27 @@ def _slice_source_streams(
         if np_dtype is None:
             return None
         shape = [int(v) for v in meta["shape"]]
+        # 必要な行だけ読み出す (A-4): np.fromfile は stream 全体 (wave は frames×1920
+        # float32 で数十MB) を毎カット読み込むが、np.memmap なら OS page cache 経由で
+        # 対象行のバイト範囲だけがフォルトインされる。カット数が多い長尺ほど効く。
         try:
-            arr = np.fromfile(cache_dir / str(meta["path"]), dtype=np_dtype)
-            arr = arr.reshape(shape)
+            mm = np.memmap(cache_dir / str(meta["path"]), dtype=np_dtype, mode="r", shape=tuple(shape))
         except (OSError, ValueError):
             return None
-        rows = arr[min(start_idx, n_src) : min(start_idx + n_frames, n_src)]
-        if rows.shape[0] < n_frames:
-            pad = np.repeat(
-                arr[-1:],  # 最終行
-                n_frames - rows.shape[0],
-                axis=0,
-            )
-            rows = np.concatenate([rows, pad], axis=0) if rows.shape[0] else pad
+        try:
+            lo = min(start_idx, n_src)
+            hi = min(start_idx + n_frames, n_src)
+            rows = np.array(mm[lo:hi])  # 必要行だけ RAM へコピー
+            if rows.shape[0] < n_frames:
+                pad = np.repeat(
+                    np.array(mm[-1:]),  # 最終行 (= 終端 clamp の繰り返し)
+                    n_frames - rows.shape[0],
+                    axis=0,
+                )
+                rows = np.concatenate([rows, pad], axis=0) if rows.shape[0] else pad
+        finally:
+            # memmap を確実に解放 (Windows のファイルロック / キャッシュ間引き対策)。
+            del mm
         rows = np.ascontiguousarray(rows)
         # ファイル命名は render_visualizer_data_streams と同一規則 (= ブラウザ契約維持)
         if dtype_name == "float32":

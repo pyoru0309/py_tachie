@@ -30,6 +30,8 @@ export const TELOP_DEFAULT_LABELS = {
   outlineColor: "アウトライン色",
   letterSpacing: "文字間",
   lineSpacing: "行間",
+  // 仮想キー: enable + highQuality をペアで反映する (dialog.js 側で特別扱い)。
+  opticalKerning: "オプティカルカーニング",
   glow: "光彩",
   dropShadow: "ドロップシャドウ",
   // ★ Phase 3 で追加 (TextClip 拡張)。これらは telop の top-level に乗るキー。

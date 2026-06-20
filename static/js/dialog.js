@@ -980,6 +980,15 @@ export async function applyTelopDefaultsToAllTelops(diff) {
           : value;
       } else if (key === "glow" || key === "dropShadow") {
         telop.style[key] = { ...(telop.style[key] || {}), ...(value || {}) };
+      } else if (key === "opticalKerning") {
+        // 仮想キー: enable + highQuality をペアで反映。"inherit"/null は両キー削除 (= 全体設定に従う)。
+        if (!value || value === "inherit") {
+          delete telop.style.enableOpticalKerning;
+          delete telop.style.opticalKerningHighQuality;
+        } else {
+          telop.style.enableOpticalKerning = !!value.enable;
+          telop.style.opticalKerningHighQuality = !!value.highQuality;
+        }
       } else {
         telop.style[key] = value;
       }

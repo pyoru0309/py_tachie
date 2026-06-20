@@ -30,6 +30,21 @@ import { renderTelopTrack, findTelopById } from "./timeline.js";
 import { drawTextClipsOnCanvas } from "./renderer/text-clip-draw.js";
 import { appendTextMotionSections } from "./text-motion.js";
 
+// per-telop オプティカルカーニング: style の enableOpticalKerning(null=継承) +
+// opticalKerningHighQuality を 4 値モードに橋渡しする。全体設定 (telopDefaults) の
+// 3 値 (off/standard/high) に「継承」を足したもの。
+const TELOP_OPTICAL_KERNING_LABELS = {
+  inherit: "継承（全体設定）",
+  off: "OFF",
+  standard: "標準",
+  high: "高品質",
+};
+function telopOpticalKerningMode(style) {
+  const en = style?.enableOpticalKerning;
+  if (en == null) return "inherit";
+  return en ? (style.opticalKerningHighQuality ? "high" : "standard") : "off";
+}
+
 let deps = {
   activeScene: () => null,
   scheduleScenarioSave: () => {},
@@ -448,6 +463,10 @@ export function renderTelopEditor() {
       outlineColor: style.outlineColor,
       letterSpacing: style.letterSpacing ?? 0,
       lineSpacing: style.lineSpacing ?? 0,
+      // 仮想キー: "inherit" or { enable, highQuality }。dialog.js が両 style キーへ展開。
+      opticalKerning: (style.enableOpticalKerning == null)
+        ? "inherit"
+        : { enable: !!style.enableOpticalKerning, highQuality: !!style.opticalKerningHighQuality },
       glow: { ...TELOP_GLOW_DEFAULT, ...(style.glow || {}) },
       dropShadow: { ...TELOP_DROP_SHADOW_DEFAULT, ...(style.dropShadow || {}) },
       // ★ Phase 3 で追加: TextClip 拡張キーも反映対象に。これらは telop の top-level 値
@@ -483,6 +502,15 @@ export function renderTelopEditor() {
       { key: "outlineColor", label: "アウトライン色", valueText: fullDiff.outlineColor },
       { key: "letterSpacing", label: "文字間", valueText: `${fullDiff.letterSpacing} (1/1000em)` },
       { key: "lineSpacing", label: "行間", valueText: `${fullDiff.lineSpacing}px` },
+      {
+        key: "opticalKerning",
+        label: "オプティカルカーニング",
+        valueText: TELOP_OPTICAL_KERNING_LABELS[
+          fullDiff.opticalKerning === "inherit"
+            ? "inherit"
+            : (fullDiff.opticalKerning.enable ? (fullDiff.opticalKerning.highQuality ? "high" : "standard") : "off")
+        ],
+      },
       { key: "glow", label: "光彩", valueText: fullDiff.glow.enabled ? "ON" : "OFF" },
       { key: "dropShadow", label: "ドロップシャドウ", valueText: fullDiff.dropShadow.enabled ? "ON" : "OFF" },
       { key: "renderLayer", label: "描画レイヤー", valueText: fullDiff.renderLayer },
@@ -822,6 +850,35 @@ export function renderTelopEditor() {
     deps.renderPreview();
   });
   rowSpacing.append(spLabel);
+
+  // オプティカルカーニング (per-telop override)。「継承」= style にキーを持たず
+  // 全体設定 (telopDefaults) に従う。明示すると style.enableOpticalKerning /
+  // opticalKerningHighQuality を書き、caption / MV / アニメの全描画経路で確実に反映される。
+  const kernSelect = document.createElement("select");
+  for (const [value, label] of Object.entries(TELOP_OPTICAL_KERNING_LABELS)) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    kernSelect.append(opt);
+  }
+  kernSelect.value = telopOpticalKerningMode(telop.style);
+  const kernLabel = document.createElement("label");
+  kernLabel.append("カーニング", kernSelect);
+  kernSelect.addEventListener("change", () => {
+    editTelopStyle((style) => {
+      const v = kernSelect.value;
+      if (v === "inherit") {
+        delete style.enableOpticalKerning;
+        delete style.opticalKerningHighQuality;
+      } else {
+        style.enableOpticalKerning = (v !== "off");
+        style.opticalKerningHighQuality = (v === "high");
+      }
+    });
+    deps.scheduleScenarioSave();
+    deps.renderPreview();
+  });
+  rowSpacing.append(kernLabel);
   body.append(rowSpacing);
 
   body.append(buildTelopGlowSection(telop, editTelopStyle));
