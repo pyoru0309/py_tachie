@@ -414,6 +414,20 @@ function emitExportSummary({ formValues, baseExportConfig, result, done, muxResu
       + `× ${nCuts}cuts = ${perCutMs.toFixed(0)}ms/cut`,
     );
     lines.push(`  ↑ % が高い=カット切替の立ち上げ(bundle fetch + キャラtexture upload)が律速 → 次カット先行buildで隠せる`);
+    // fetch (= サーバ bundle 生成) の内訳。lipsync (ffmpeg astats, export 専用) / viz /
+    // その他 (bake + dialogue layout + scenario 読み) に分解して 849ms/cut の正体を特定する。
+    if (typeof result.srvTotalMs === "number" && result.srvTotalMs > 0) {
+      const srvLip = (result.srvLipsyncMs || 0) / 1000;
+      const srvViz = (result.srvVizMs || 0) / 1000;
+      const srvTotal = result.srvTotalMs / 1000;
+      const srvOther = Math.max(0, srvTotal - srvLip - srvViz);
+      const lipPerCut = nCuts > 0 ? (result.srvLipsyncMs / nCuts) : 0;
+      lines.push(
+        `  └ サーバ内訳: lipsync(ffmpeg)=${srvLip.toFixed(1)}s viz=${srvViz.toFixed(1)}s `
+        + `その他(bake/layout)=${srvOther.toFixed(1)}s — サーバ合計=${srvTotal.toFixed(1)}s `
+        + `(lipsync ${lipPerCut.toFixed(0)}ms/cut)`,
+      );
+    }
   }
   lines.push(``);
   lines.push(`## サーバ側`);

@@ -562,7 +562,17 @@ async function renderCutFrames({
   //   分離累積する。per-frame render ではなく「カット切替コスト × cut 数」が律速かを見る。
   const _tFetch = performance.now();
   const layerData = await fetchSceneBundle(cut, projectId);
-  if (ctx) ctx.fetchBundleMs = (ctx.fetchBundleMs || 0) + (performance.now() - _tFetch);
+  if (ctx) {
+    ctx.fetchBundleMs = (ctx.fetchBundleMs || 0) + (performance.now() - _tFetch);
+    // サーバが返す bundle 生成コスト内訳 (_timing) を累積 → fetch の 849ms/cut の正体
+    // (lipsync ffmpeg / viz / その他) を export サマリで分解する。
+    const _t = layerData && layerData._timing;
+    if (_t) {
+      ctx.srvTotalMs = (ctx.srvTotalMs || 0) + (Number(_t.total) || 0);
+      ctx.srvLipsyncMs = (ctx.srvLipsyncMs || 0) + (Number(_t.lipsync) || 0);
+      ctx.srvVizMs = (ctx.srvVizMs || 0) + (Number(_t.viz) || 0);
+    }
+  }
   if (!includeVisualizer) layerData.visualizer = null;
 
   // 透過 export: bg plane を描かない (画像 / videoTrack いずれも)。alpha=0 が
@@ -956,6 +966,7 @@ export async function runExportSession({
     fetchBundleMs: 0,  // カット境界の scene-bundle fetch 累積 ms (律速診断)。
     buildSceneMs: 0,   // カット境界の buildSceneFromLayerData (PNG decode + texture upload) 累積 ms。
     cutBuildCount: 0,  // build したカット数 (per-cut 平均算出用)。
+    srvTotalMs: 0, srvLipsyncMs: 0, srvVizMs: 0,  // サーバ bundle 生成コストの内訳 (_timing 集計)。
     // 透明 codec のときだけ最初の 3 frame で alpha 統計をログに出す。
     // min=0 なら readPixels に透明 pixel が乗っている (= GL 側 OK)、
     // min=255 なら GL 側で alpha=255 になっており codec ではなく上流が原因。
@@ -1046,6 +1057,9 @@ export async function runExportSession({
     fetchBundleMs: frameCtx.fetchBundleMs,
     buildSceneMs: frameCtx.buildSceneMs,
     cutBuildCount: frameCtx.cutBuildCount,
+    srvTotalMs: frameCtx.srvTotalMs,
+    srvLipsyncMs: frameCtx.srvLipsyncMs,
+    srvVizMs: frameCtx.srvVizMs,
     encodeStats,
     negotiatedExtensions: sender.negotiatedExtensions || "",
   };
@@ -1123,6 +1137,7 @@ export async function runProjectExportSession({
     fetchBundleMs: 0,  // カット境界の scene-bundle fetch 累積 ms (律速診断)。
     buildSceneMs: 0,   // カット境界の buildSceneFromLayerData (PNG decode + texture upload) 累積 ms。
     cutBuildCount: 0,  // build したカット数 (per-cut 平均算出用)。
+    srvTotalMs: 0, srvLipsyncMs: 0, srvVizMs: 0,  // サーバ bundle 生成コストの内訳 (_timing 集計)。
     // 透明 codec のときだけ最初の 3 frame で alpha 統計をログに出す。
     // min=0 なら readPixels に透明 pixel が乗っている (= GL 側 OK)、
     // min=255 なら GL 側で alpha=255 になっており codec ではなく上流が原因。
@@ -1396,6 +1411,9 @@ export async function runProjectExportSession({
     fetchBundleMs: frameCtx.fetchBundleMs,
     buildSceneMs: frameCtx.buildSceneMs,
     cutBuildCount: frameCtx.cutBuildCount,
+    srvTotalMs: frameCtx.srvTotalMs,
+    srvLipsyncMs: frameCtx.srvLipsyncMs,
+    srvVizMs: frameCtx.srvVizMs,
     encodeStats,
     negotiatedExtensions: sender.negotiatedExtensions || "",
     plan,

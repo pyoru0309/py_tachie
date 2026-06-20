@@ -2348,6 +2348,10 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
     # 描画結果には影響しない (= 同じ cut.state なら同じ焼き込み PNG)。token に乗せると
     # CURRENT(false) と先読み(true) で別 PNG になりキャッシュが二重化するため除外する。
     allow_viz_source_build = bool(payload.get("vizSourceBuild", True))
+    # サーバ側の bundle 生成コスト内訳 (律速診断)。export の書き出しサマリに集計される。
+    from time import perf_counter as _perf
+    _t_total0 = _perf()
+    _timing_ms: dict[str, float] = {}
     if "vizSourceBuild" in payload:
         payload = {k: v for k, v in payload.items() if k != "vizSourceBuild"}
     if isinstance(payload.get("motionType"), str) and "motionSettings" not in payload:
@@ -2756,6 +2760,7 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
     # false (対話プレビューの現カット fetch) のときは音源単位キャッシュが未生成でも
     # 全長解析を同期実行せず per-cut で即返す (初動レイテンシ優先)。未指定 = True で、
     # 書き出し (export-session の独自 fetch) や先読み warm は従来どおり音源キャッシュを生成。
+    _t_viz0 = _perf()
     visualizer_payload = _build_preview_visualizer(
         ctx=ctx,
         manifest=manifest,
@@ -2768,6 +2773,7 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
         override_cut=target_cut_for_lookup if scene_override is not None else None,
         allow_source_build=allow_viz_source_build,
     )
+    _timing_ms["viz"] = (_perf() - _t_viz0) * 1000.0
 
     background_payload: dict[str, Any] = {
         "transparent": transparent_bg,
@@ -2841,6 +2847,7 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
                 char_ids=[str(c.get("id") or "") for c in characters_payload if c.get("id")],
             )
             if animation_defaults.get("lipSync", True) and purpose != "preview":
+                _t_lip0 = _perf()
                 animation_timeline_payload["lipSyncLevels"] = compute_cut_lipsync_levels(
                     cut=target_cut_for_lookup,
                     scene=target_scene_for_lookup or {},
@@ -2850,13 +2857,17 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
                     fps=int(_PROJECT_FPS),
                     lip_sync_config=config.get("lipSync") or {},
                 )
+                _timing_ms["lipsync"] = (_perf() - _t_lip0) * 1000.0
         except Exception:
             # 失敗は致命的でない (preview は real-time AnalyserNode で動く)
             pass
 
+    _timing_ms["total"] = (_perf() - _t_total0) * 1000.0
     return {
         "projectId": ctx.id,
         "token": token,
+        # サーバ bundle 生成コストの内訳 (ms)。export サマリの「cut境界」分解に使う。
+        "_timing": _timing_ms,
         "canvasSize": [1920, 1080],
         "duration": cut_duration,
         "audio": cut_audio,
