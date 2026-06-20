@@ -647,6 +647,11 @@ def compute_cut_lipsync_levels(
     # 効く)。ここでは「カット 1 つ分」を直接計算するのでも結果は同じ。
     audio_path: Optional[Path] = None
     audio_start_sec = 0.0
+    # 音源全長キャッシュ+スライスを使うのは「複数カットが同じ音源を共有」するケース
+    # (= useForLipSync BGM) だけ。cut.audio (= カットごとに異なる話者音声) は共有されず、
+    # 全長キャッシュ化すると ffprobe + 余計な bin I/O のオーバーヘッドだけ増える
+    # (口パク中心プロジェクトの回帰)。その場合は従来の per-cut 直接解析を使う。
+    use_source_cache = False
     cut_audio = cut.get("audio")
     if cut_audio:
         try:
@@ -673,6 +678,7 @@ def compute_cut_lipsync_levels(
                     bgm_trim = 0.0
                 # BGM の bgm_trim 後を 0 秒として扱い、シーン上の `cut_start_sec` から開始
                 audio_start_sec = bgm_trim + cut_start_sec
+                use_source_cache = True  # 同一 BGM を全カットが共有 → 全長 1 回解析が効く
                 break
 
     if audio_path is None:
@@ -688,10 +694,11 @@ def compute_cut_lipsync_levels(
         # 音源全長キャッシュからカット範囲をスライスする (= 同一 BGM 共有時に ffmpeg を
         # カット数ぶん起動しない)。フル解析が失敗したときだけ従来の per-cut ffmpeg に倒す。
         levels: Optional[list[float]] = None
-        full = _ensure_full_track_lipsync_levels(audio_path, fps, lip_sync_config or {}, cache_dir)
-        if full is not None:
-            start_frame = max(0, int(round(audio_start_sec * fps)))
-            levels = list(full[start_frame : start_frame + cut_total_frames])
+        if use_source_cache:
+            full = _ensure_full_track_lipsync_levels(audio_path, fps, lip_sync_config or {}, cache_dir)
+            if full is not None:
+                start_frame = max(0, int(round(audio_start_sec * fps)))
+                levels = list(full[start_frame : start_frame + cut_total_frames])
         if not levels:
             levels = audio_volume_by_frame(
                 audio_path,

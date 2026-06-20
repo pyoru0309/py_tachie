@@ -427,6 +427,18 @@ function emitExportSummary({ formValues, baseExportConfig, result, done, muxResu
         + `その他(bake/layout)=${srvOther.toFixed(1)}s — サーバ合計=${srvTotal.toFixed(1)}s `
         + `(lipsync ${lipPerCut.toFixed(0)}ms/cut)`,
       );
+      // その他(bake/layout/scenario) の分解。bake=キャラPNG焼き/読み, scenario=シナリオ
+      // 再読込(カット毎), layout=セリフ組版。残り=char払い出し/fg/bg 等のオーバーヘッド。
+      if (typeof result.srvBakeMs === "number") {
+        const bake = (result.srvBakeMs || 0) / 1000;
+        const scn = (result.srvScenarioMs || 0) / 1000;
+        const lay = (result.srvLayoutMs || 0) / 1000;
+        const rest = Math.max(0, srvOther - bake - scn - lay);
+        lines.push(
+          `     └ その他分解: bake=${bake.toFixed(1)}s scenario=${scn.toFixed(1)}s `
+          + `layout=${lay.toFixed(1)}s 残り(char/fg/bg)=${rest.toFixed(1)}s`,
+        );
+      }
     }
   }
   lines.push(``);

@@ -2352,6 +2352,8 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
     from time import perf_counter as _perf
     _t_total0 = _perf()
     _timing_ms: dict[str, float] = {}
+    _bake_ms_acc = 0.0  # bake_preview_layers (キャラ PNG 焼き) の累積 (char ループ内で加算)
+    _layout_ms_acc = 0.0  # compute_dialogue_layout の累積
     if "vizSourceBuild" in payload:
         payload = {k: v for k, v in payload.items() if k != "vizSourceBuild"}
     if isinstance(payload.get("motionType"), str) and "motionSettings" not in payload:
@@ -2372,7 +2374,9 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
     target_cut_for_lookup: dict[str, Any] | None = None
     if cut_id_for_lookup:
         try:
+            _t_scn0 = _perf()
             scenario_for_lookup = ensure_scenario(manifest, ctx)
+            _timing_ms["scenario"] = _timing_ms.get("scenario", 0.0) + (_perf() - _t_scn0) * 1000.0
             for scene_iter in scenario_for_lookup.get("scenes") or []:
                 cuts_iter = scene_iter.get("cuts") or []
                 for cut_iter in cuts_iter:
@@ -2511,7 +2515,9 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
         # three.js 側は canvas2D でオフスクリーン描画 → CanvasTexture 化する。
         # compute_dialogue_layout で Pillow 経路と同じ wrap_text / dialogue_box_rect /
         # baseline 計算を共有する。
+        _t_lay0 = _perf()
         dialogue_layout = compute_dialogue_layout(request, config)
+        _layout_ms_acc += (_perf() - _t_lay0) * 1000.0
 
     speaker_id = request.speaker_character_id
     characters_payload = []
@@ -2601,10 +2607,13 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
                 "mid": url_or_none("mouth_mid") if layers_meta.get("mouth_mid") else None,
                 "open": url_or_none("mouth_open") if layers_meta.get("mouth_open") else None,
             }
+            _t_bake0 = _perf()
             with Image.open(preview_root / f"{base_prefix}_under.png") as img:
                 layer_w, layer_h = img.size
+            _bake_ms_acc += (_perf() - _t_bake0) * 1000.0
         else:
             # color filter は v2 では shader 側で適用するため、ここでは焼き込まない。
+            _t_bake0 = _perf()
             baked = bake_preview_layers(
                 PROJECT_ROOT,
                 character_request,
@@ -2613,6 +2622,7 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
                 is_speaker,
                 request.inactive_character_opacity,
             )
+            _bake_ms_acc += (_perf() - _t_bake0) * 1000.0
 
             def save_layer(image, suffix: str) -> str | None:
                 if image is None:
@@ -2862,6 +2872,8 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
             # 失敗は致命的でない (preview は real-time AnalyserNode で動く)
             pass
 
+    _timing_ms["bake"] = _bake_ms_acc
+    _timing_ms["layout"] = _layout_ms_acc
     _timing_ms["total"] = (_perf() - _t_total0) * 1000.0
     return {
         "projectId": ctx.id,

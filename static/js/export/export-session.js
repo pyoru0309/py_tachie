@@ -571,6 +571,9 @@ async function renderCutFrames({
       ctx.srvTotalMs = (ctx.srvTotalMs || 0) + (Number(_t.total) || 0);
       ctx.srvLipsyncMs = (ctx.srvLipsyncMs || 0) + (Number(_t.lipsync) || 0);
       ctx.srvVizMs = (ctx.srvVizMs || 0) + (Number(_t.viz) || 0);
+      ctx.srvBakeMs = (ctx.srvBakeMs || 0) + (Number(_t.bake) || 0);
+      ctx.srvScenarioMs = (ctx.srvScenarioMs || 0) + (Number(_t.scenario) || 0);
+      ctx.srvLayoutMs = (ctx.srvLayoutMs || 0) + (Number(_t.layout) || 0);
     }
   }
   if (!includeVisualizer) layerData.visualizer = null;
@@ -967,6 +970,7 @@ export async function runExportSession({
     buildSceneMs: 0,   // カット境界の buildSceneFromLayerData (PNG decode + texture upload) 累積 ms。
     cutBuildCount: 0,  // build したカット数 (per-cut 平均算出用)。
     srvTotalMs: 0, srvLipsyncMs: 0, srvVizMs: 0,  // サーバ bundle 生成コストの内訳 (_timing 集計)。
+    srvBakeMs: 0, srvScenarioMs: 0, srvLayoutMs: 0,  // その他(bake/scenario/layout) の分解。
     // 透明 codec のときだけ最初の 3 frame で alpha 統計をログに出す。
     // min=0 なら readPixels に透明 pixel が乗っている (= GL 側 OK)、
     // min=255 なら GL 側で alpha=255 になっており codec ではなく上流が原因。
@@ -1060,6 +1064,9 @@ export async function runExportSession({
     srvTotalMs: frameCtx.srvTotalMs,
     srvLipsyncMs: frameCtx.srvLipsyncMs,
     srvVizMs: frameCtx.srvVizMs,
+    srvBakeMs: frameCtx.srvBakeMs,
+    srvScenarioMs: frameCtx.srvScenarioMs,
+    srvLayoutMs: frameCtx.srvLayoutMs,
     encodeStats,
     negotiatedExtensions: sender.negotiatedExtensions || "",
   };
@@ -1138,6 +1145,7 @@ export async function runProjectExportSession({
     buildSceneMs: 0,   // カット境界の buildSceneFromLayerData (PNG decode + texture upload) 累積 ms。
     cutBuildCount: 0,  // build したカット数 (per-cut 平均算出用)。
     srvTotalMs: 0, srvLipsyncMs: 0, srvVizMs: 0,  // サーバ bundle 生成コストの内訳 (_timing 集計)。
+    srvBakeMs: 0, srvScenarioMs: 0, srvLayoutMs: 0,  // その他(bake/scenario/layout) の分解。
     // 透明 codec のときだけ最初の 3 frame で alpha 統計をログに出す。
     // min=0 なら readPixels に透明 pixel が乗っている (= GL 側 OK)、
     // min=255 なら GL 側で alpha=255 になっており codec ではなく上流が原因。
@@ -1414,6 +1422,9 @@ export async function runProjectExportSession({
     srvTotalMs: frameCtx.srvTotalMs,
     srvLipsyncMs: frameCtx.srvLipsyncMs,
     srvVizMs: frameCtx.srvVizMs,
+    srvBakeMs: frameCtx.srvBakeMs,
+    srvScenarioMs: frameCtx.srvScenarioMs,
+    srvLayoutMs: frameCtx.srvLayoutMs,
     encodeStats,
     negotiatedExtensions: sender.negotiatedExtensions || "",
     plan,
