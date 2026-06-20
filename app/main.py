@@ -2648,7 +2648,14 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
                     tmp_name = f".{path.name}.{os.getpid()}-{threading.get_ident()}-{uuid.uuid4().hex[:8]}.tmp"
                     tmp_path = path.with_name(tmp_name)
                     try:
-                        image.save(tmp_path, format="PNG")
+                        # ★ 高速 PNG エンコード: これらは localhost で配信し GL texture に
+                        #   1 回 upload するだけの一時キャッシュなので、圧縮率は無関係で
+                        #   エンコード速度が支配的。zlib 既定 (compress_level=6) は重く、
+                        #   キャッシュミス時に 1920×1080 RGBA × レイヤー数 × カット数の
+                        #   PNG encode が書き出しの最大サーバコストになっていた
+                        #   (GL: char組立=20.2s の正体)。level=1 で encode を数倍速くする
+                        #   (ファイルは多少大きいが localhost なので影響なし)。
+                        image.save(tmp_path, format="PNG", compress_level=1)
                         # os.replace は POSIX で atomic。同名 file がもう存在していても
                         # 上書きする。先に同名 final が出来ていれば、自分の tmp は捨てて
                         # 既存を使う (先勝ち)。
