@@ -560,6 +560,68 @@ def compute_cut_blink_frames_by_char(
     return out
 
 
+def _ensure_full_track_lipsync_levels(
+    audio_path: Path,
+    fps: int,
+    lip_sync_config: dict[str, Any],
+    cache_dir: Path,
+) -> Optional[list[float]]:
+    """音源全長の per-frame lipsync levels を 1 回だけ ffmpeg astats で解析しキャッシュ。
+
+    複数カットが同じ useForLipSync BGM を共有するとき、従来はカットごとに ffmpeg を
+    起動して同じ WAV を解析していた (GL プロジェクトで 80 cut = 80 ffmpeg = 32s)。viz の
+    音源単位キャッシュと同じ発想で全長を 1 回解析し、各カットは行スライスで切り出す。
+
+    キャッシュキーは「音源同一性 (path+mtime) + fps + 解析パラメータ」のみで、カット位置
+    や尺を含まない。``lipsync/src_<token>.bin`` に Float32 LE で永続化する。失敗時 None。
+    """
+    import hashlib as _hashlib
+    import math as _math
+    import os as _os
+
+    try:
+        mtime = audio_path.stat().st_mtime_ns
+    except OSError:
+        mtime = 0
+    cfg = lip_sync_config or {}
+    key = json.dumps(
+        {
+            "v": 1,
+            "path": str(audio_path.resolve()),
+            "mtime": mtime,
+            "fps": int(fps),
+            "cfg": {k: cfg.get(k) for k in sorted(cfg)},
+        },
+        sort_keys=True,
+        ensure_ascii=False,
+        default=str,
+    )
+    src_token = _hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
+    out_dir = cache_dir / "lipsync"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    src_path = out_dir / f"src_{src_token}.bin"
+
+    if src_path.exists():
+        try:
+            raw = src_path.read_bytes()
+            n = len(raw) // 4
+            return list(struct.unpack(f"<{n}f", raw))
+        except (OSError, struct.error):
+            pass
+
+    dur = audio_duration_seconds(audio_path)
+    if not dur or dur <= 0:
+        return None
+    n_frames = max(1, int(_math.ceil(float(dur) * fps)))
+    levels = audio_volume_by_frame(audio_path, fps, n_frames, cfg, start_sec=0.0)
+    if not levels:
+        return None
+    tmp = src_path.with_suffix(".bin.tmp")
+    tmp.write_bytes(struct.pack(f"<{len(levels)}f", *levels))
+    _os.replace(tmp, src_path)
+    return levels
+
+
 def compute_cut_lipsync_levels(
     *,
     cut: dict[str, Any],
@@ -623,13 +685,21 @@ def compute_cut_lipsync_levels(
     rel_path = f"lipsync/lvl_{token}.bin"
 
     if not bin_path.exists():
-        levels = audio_volume_by_frame(
-            audio_path,
-            fps,
-            cut_total_frames,
-            lip_sync_config or {},
-            start_sec=audio_start_sec,
-        )
+        # 音源全長キャッシュからカット範囲をスライスする (= 同一 BGM 共有時に ffmpeg を
+        # カット数ぶん起動しない)。フル解析が失敗したときだけ従来の per-cut ffmpeg に倒す。
+        levels: Optional[list[float]] = None
+        full = _ensure_full_track_lipsync_levels(audio_path, fps, lip_sync_config or {}, cache_dir)
+        if full is not None:
+            start_frame = max(0, int(round(audio_start_sec * fps)))
+            levels = list(full[start_frame : start_frame + cut_total_frames])
+        if not levels:
+            levels = audio_volume_by_frame(
+                audio_path,
+                fps,
+                cut_total_frames,
+                lip_sync_config or {},
+                start_sec=audio_start_sec,
+            )
         if not levels:
             # 計算失敗 (ffmpeg エラー等)。None で返す。
             return None
