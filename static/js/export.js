@@ -21,7 +21,7 @@ import {
 } from "./export-ui.js";
 import { fetchGlobalConfig } from "./global-settings.js";
 import { updateSelectedCutFromCurrent, saveScenario } from "./scenario-actions.js";
-import { isWebcodecsH264Supported } from "./export/webcodecs-encoder.js";
+import { isWebcodecsH264Supported, probeH264Accel } from "./export/webcodecs-encoder.js";
 
 // プラットフォーム情報を 1 行に要約する (ログのプラットフォーム行用)。Mac/Win や
 // GPU の違いが書き出しログだけで切り分けられるよう、OS 推定 + ブラウザ + 論理コア数 +
@@ -73,6 +73,11 @@ async function _decideTransport(formValues, width, height, onLog) {
     onLog("このブラウザは WebCodecs H.264 エンコード非対応: 従来方式で書き出します");
     return "rawrgba";
   }
+  // HW/SW 対応状況を診断ログに出す (Windows の encode 律速の原因切り分け用)。
+  try {
+    const accel = await probeH264Accel(width, height);
+    onLog(`WebCodecs H.264 accel 対応: ${accel}`);
+  } catch (_) { /* 診断は best-effort */ }
   return "webcodecs-h264";
 }
 

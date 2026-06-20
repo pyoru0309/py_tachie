@@ -45,6 +45,47 @@ export async function isWebcodecsH264Supported(width, height) {
   }
 }
 
+// H.264 エンコードの HW/SW 対応状況を probe する (Windows の encode 律速診断用)。
+// hardwareAcceleration × profile の組合せで isConfigSupported を呼び、どこで HW が
+// 使えるかをログに出す。hardware が空 = この環境に HW H.264 encoder が無い (= SW 強制
+// で遅い、構造的な壁)。hardware に profile があるのに実際が遅い = no-preference が SW を
+// 選んでいる可能性 → prefer-hardware 明示が効く余地。
+export async function probeH264Accel(width, height) {
+  if (typeof window === "undefined" || !("VideoEncoder" in window)) {
+    return "VideoEncoder 非対応";
+  }
+  const level = (width > 1920 || height > 1088) ? "33" : "28";
+  const profiles = [
+    ["High", `avc1.6400${level}`],
+    ["Main", `avc1.4D00${level}`],
+    ["Baseline", `avc1.4200${level}`],
+  ];
+  const accels = [
+    ["hardware", "prefer-hardware"],
+    ["software", "prefer-software"],
+    ["auto", "no-preference"],
+  ];
+  const base = {
+    width, height, bitrate: 16_000_000, framerate: 30,
+    latencyMode: "realtime", avc: { format: "annexb" },
+  };
+  const parts = [];
+  for (const [label, accel] of accels) {
+    const oks = [];
+    for (const [pName, codec] of profiles) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const res = await window.VideoEncoder.isConfigSupported({
+          ...base, codec, hardwareAcceleration: accel,
+        });
+        if (res && res.supported) oks.push(pName);
+      } catch { /* ignore: 非対応 accel は throw し得る */ }
+    }
+    parts.push(`${label}:[${oks.join(",") || "-"}]`);
+  }
+  return parts.join(" ");
+}
+
 // "8M" / "4000k" / "12000000" のようなビットレート文字列を bps (number) へ。
 // 解釈できなければ null。
 export function parseBitrate(s) {
