@@ -23,7 +23,7 @@
 import * as THREE from "three";
 import { fontFamilyCssStack, resolveFontWeightCss } from "../font.js";
 import { hexToRgba } from "../utils.js";
-import { layoutTextRun } from "./text-layout.js";
+import { layoutTextRun, computeOpticalMedianGapForLines } from "./text-layout.js";
 
 export const DIALOGUE_CANVAS_WIDTH = 1920;
 export const DIALOGUE_CANVAS_HEIGHT = 1080;
@@ -50,6 +50,7 @@ function drawTextAtBaseline(ctx, text, x, baselineY, options) {
     opticalKerningHighQuality = false,
     fontSpec = null,
     fontSize = 0,
+    medianGapOverride = null,
   } = options;
   ctx.textBaseline = "alphabetic";
   const useStroke = outlineWidth > 0 && strokeStyle;
@@ -73,6 +74,7 @@ function drawTextAtBaseline(ctx, text, x, baselineY, options) {
       opticalKerning: true,
       opticalKerningHighQuality,
       outlineWidth,
+      medianGapOverride,
     });
     for (const g of run.glyphs) {
       if (g.drawable === false) continue;  // 空白トークンは描画しない (advance だけ進む)
@@ -110,7 +112,7 @@ function drawTextAtBaseline(ctx, text, x, baselineY, options) {
 // optical kerning ON のとき、Pillow が決めた行内 x を layoutTextRun の新しい
 // 行幅で引き直す。speaker は現状 letter_spacing 適用外で 1 行 1 行も短いので
 // 中央寄せの再計算は不要 (左寄せ固定)。
-function recomputeLineX(ctx, line, layout) {
+function recomputeLineX(ctx, line, layout, medianGapOverride = null) {
   const align = String(layout.textAlign || "left").toLowerCase();
   const fontSize = Number(layout.fontSize) || 0;
   const lsPx = Number(layout.letterSpacing) || 0;
@@ -124,6 +126,7 @@ function recomputeLineX(ctx, line, layout) {
     opticalKerning: true,
     opticalKerningHighQuality: !!layout.opticalKerningHighQuality,
     outlineWidth: Number(layout.outlineWidth) || 0,
+    medianGapOverride,
   }).width;
   if (!inner) return { x: line.x, width: newW };
   const left = Number(inner.left) || 0;
@@ -301,11 +304,19 @@ export function drawDialogueOnCanvas(canvas, layout, overlayImage = null) {
 
   ctx.save();
   ctx.font = bodyFontSpec;
+  // 行均し基準はセリフ本文全体 (全行) で 1 つに統一する (行依存を排除)。
+  const bodyMedianGap = computeOpticalMedianGapForLines(
+    (layout.textLines || []).map((l) => l.text || ""),
+    {
+      fontSpec: bodyFontSpec, fontSize: layout.fontSize || 0,
+      opticalKerning: useOptical, opticalKerningHighQuality: useHQ,
+    },
+  );
   for (const line of layout.textLines || []) {
     let drawX = line.x;
     if (useOptical) {
       // align の引き直し (新しい行幅で center/right を再計算)。
-      const recomputed = recomputeLineX(ctx, line, layout);
+      const recomputed = recomputeLineX(ctx, line, layout, bodyMedianGap);
       drawX = recomputed.x;
     }
     drawTextAtBaseline(ctx, line.text || "", drawX, line.baselineY, {
@@ -317,6 +328,7 @@ export function drawDialogueOnCanvas(canvas, layout, overlayImage = null) {
       opticalKerningHighQuality: useHQ,
       fontSpec: bodyFontSpec,
       fontSize: layout.fontSize || 0,
+      medianGapOverride: bodyMedianGap,
     });
   }
   ctx.restore();
@@ -346,11 +358,19 @@ function _renderDialogueTextSilhouette(W, H, parentCtx, layout, useOptical, useH
   const off = _acquireDialogueScratch("silhouette", W, H);
   const cx = off.getContext("2d");
   cx.font = bodyFontSpec;
+  // 行均し基準は描画経路と同じく本文全体 (全行) で統一する。
+  const bodyMedianGap = computeOpticalMedianGapForLines(
+    (layout.textLines || []).map((l) => l.text || ""),
+    {
+      fontSpec: bodyFontSpec, fontSize: layout.fontSize || 0,
+      opticalKerning: useOptical, opticalKerningHighQuality: useHQ,
+    },
+  );
   // 文字色 = #ffffff で塗り、後で source-in tint する。
   for (const line of layout.textLines || []) {
     let drawX = line.x;
     if (useOptical) {
-      const r = recomputeLineX(cx, line, layout);
+      const r = recomputeLineX(cx, line, layout, bodyMedianGap);
       drawX = r.x;
     }
     drawTextAtBaseline(cx, line.text || "", drawX, line.baselineY, {
@@ -362,6 +382,7 @@ function _renderDialogueTextSilhouette(W, H, parentCtx, layout, useOptical, useH
       opticalKerningHighQuality: useHQ,
       fontSpec: bodyFontSpec,
       fontSize: layout.fontSize || 0,
+      medianGapOverride: bodyMedianGap,
     });
   }
   return off;

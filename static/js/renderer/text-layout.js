@@ -456,6 +456,145 @@ function computePairShift(fontSpec, fontSize, prevCh, curCh, prevClass, curClass
   return shift;
 }
 
+// =============================================================================
+// 素のオプティカル (強めモードの行均し)
+//
+// クラス別係数・固定 em パラメータ (target/maxPull/minGap) を一切介さず、
+// 「行内の本文ペアの実測 gap の中央値」に全ペアを揃える。書体ごとの字面分布の
+// 差を実測値が吸収するので、固定 em と違って書体を変えてもバラつかない。
+//   - 約物 (句読点・括弧・！？) も今は均し対象に含める (素の状態をまず確認する)
+//   - 空白絡みのペアは別軸 (computeSpaceTargetEm) なので対象外
+// （約物の例外緩和・均一強度ノブ等の調整は今後の段階で追加予定）
+// =============================================================================
+
+// ペア (prevCh, curCh) の「詰める前 (shift=0)」の素の字面間白場 (px)。
+//   meanGap : 両者が ink を持つ y 行の平均 gap (= 視覚的な平均アキ)
+//   nearest : 最近接 gap (bbox。詰めても衝突させない上限の算出に使う)
+function rawGapFromProfiles(profA, profB) {
+  const profileH = Math.min(profA.profileH, profB.profileH);
+  const advA = profA.advance;
+  const ar = profA.rightProfile;
+  const bl = profB.leftProfile;
+  let sum = 0;
+  let count = 0;
+  let aRightMax = -Infinity;
+  let bLeftMin = Infinity;
+  for (let y = 0; y < profileH; y += 1) {
+    const arv = ar[y];
+    const blv = bl[y];
+    if (arv > -30000 && blv < 30000) {
+      sum += advA + blv - arv; // shift=0 のときの gap[y]
+      count += 1;
+    }
+    if (arv > -30000 && arv > aRightMax) aRightMax = arv;
+    if (blv < 30000 && blv < bLeftMin) bLeftMin = blv;
+  }
+  const nearest = (aRightMax > -Infinity && bLeftMin < Infinity)
+    ? (advA + bLeftMin - aRightMax)
+    : null;
+  let meanGap;
+  if (count > 0) meanGap = sum / count;
+  else if (nearest != null) meanGap = nearest;
+  else return null;
+  return { meanGap, nearest: nearest != null ? nearest : meanGap };
+}
+
+const _pairRawGapCache = new Map();
+const PAIR_RAW_GAP_CACHE_LIMIT = 8192;
+
+// 行非依存 (fontSpec, fontSize, prevCh, curCh のみ) なので memoize 可。
+function computePairRawGap(fontSpec, fontSize, prevCh, curCh) {
+  const key = `${fontSpec}|${fontSize}|${prevCh}|${curCh}`;
+  const cached = _pairRawGapCache.get(key);
+  if (cached !== undefined) return cached;
+  const profA = getOrBuildProfile(fontSpec, fontSize, prevCh);
+  const profB = getOrBuildProfile(fontSpec, fontSize, curCh);
+  const raw = (profA && profB) ? rawGapFromProfiles(profA, profB) : null;
+  if (_pairRawGapCache.size >= PAIR_RAW_GAP_CACHE_LIMIT) {
+    const firstKey = _pairRawGapCache.keys().next().value;
+    if (firstKey !== undefined) _pairRawGapCache.delete(firstKey);
+  }
+  _pairRawGapCache.set(key, raw);
+  return raw;
+}
+
+// 行内の本文ペア (空白絡みを除く全隣接ペア) の素 gap の中央値。
+// 中央値なので「漢字ペアだけ広い」等の外れ値には引っ張られない。
+function computeLineMedianGap(chars, isSpaceFlags, fontSpec, fontSize) {
+  const gaps = [];
+  for (let i = 1; i < chars.length; i += 1) {
+    if (isSpaceFlags[i] || isSpaceFlags[i - 1]) continue;
+    const ca = classify(chars[i - 1]);
+    const cb = classify(chars[i]);
+    // 約物・欧文絡みのペアは CJK 本文中央値の母集団から外す。約物は字面が片寄り、
+    // 欧文 (Latin/digit) は和文フォント中で字幅が大きく中央値を釣り上げるため、
+    // どちらも CJK 本文の字間基準を歪める (約物=A / 欧文=B 専用ルールで別途扱う)。
+    if (_PUNCT_BRACKET_CLASSES.has(ca) || _PUNCT_BRACKET_CLASSES.has(cb)) continue;
+    if (isAlnumClass(ca) || isAlnumClass(cb)) continue;
+    const raw = computePairRawGap(fontSpec, fontSize, chars[i - 1], chars[i]);
+    // 均し基準は nearest (bbox 実隙間)。meanGap (行平均アキ) はストロークが薄い字で
+    // 釣り上がり、目に見える隙間 (bbox) と相関しないため使わない。
+    if (raw && raw.nearest != null && Number.isFinite(raw.nearest)) gaps.push(raw.nearest);
+  }
+  return _medianOf(gaps);
+}
+
+// 欧文 (Latin/digit) 同士のペアの bbox gap 中央値。和文中央値とは別に持ち、
+// 欧文連続部 (Everyday 等) を欧文自身のリズムで均す (B)。
+function computeLineLatinMedian(chars, fontSpec, fontSize) {
+  const gaps = [];
+  for (let i = 1; i < chars.length; i += 1) {
+    const ca = classify(chars[i - 1]);
+    const cb = classify(chars[i]);
+    if (!isAlnumClass(ca) || !isAlnumClass(cb)) continue;
+    const raw = computePairRawGap(fontSpec, fontSize, chars[i - 1], chars[i]);
+    if (raw && raw.nearest != null && Number.isFinite(raw.nearest)) gaps.push(raw.nearest);
+  }
+  return _medianOf(gaps);
+}
+
+function _medianOf(gaps) {
+  if (gaps.length === 0) return null;
+  gaps.sort((a, b) => a - b);
+  const mid = gaps.length >> 1;
+  return (gaps.length & 1) ? gaps[mid] : (gaps[mid - 1] + gaps[mid]) * 0.5;
+}
+
+// 本文全体 (= テロップ/セリフの全行) の本文ペアの素 gap 中央値。
+// computeLineMedianGap は 1 行内だけで中央値を取るため、行ごとに基準がぶれて
+// 中央寄せ時に行幅の引き直しがガタつく。全行を 1 つの母集団にまとめて中央値を
+// 取り、その値を layoutTextRun の medianGapOverride として全行に渡すことで、
+// 揃え基準を本文単位で 1 つに固定する。強め (HQ optical) モードでのみ意味を
+// 持ち、それ以外は null を返す (= 標準経路は従来どおり無調整)。
+export function computeOpticalMedianGapForLines(lines, options = {}) {
+  const {
+    fontSpec,
+    fontSize,
+    opticalKerning = false,
+    opticalKerningHighQuality = false,
+  } = options;
+  const fSize = Number(fontSize) || 0;
+  if (!opticalKerning || !opticalKerningHighQuality || !fontSpec || fSize <= 0) {
+    return null;
+  }
+  const gaps = [];
+  for (const line of lines || []) {
+    const chars = splitGraphemes(String(line || ""));
+    if (chars.length < 2) continue;
+    const cls = chars.map((c) => classify(c));
+    for (let i = 1; i < chars.length; i += 1) {
+      if (_SPACE_CLASSES.has(cls[i]) || _SPACE_CLASSES.has(cls[i - 1])) continue;
+      // 約物・欧文絡みのペアは CJK 本文中央値の母集団から外す (computeLineMedianGap と同じ)。
+      if (_PUNCT_BRACKET_CLASSES.has(cls[i]) || _PUNCT_BRACKET_CLASSES.has(cls[i - 1])) continue;
+      if (isAlnumClass(cls[i]) || isAlnumClass(cls[i - 1])) continue;
+      const raw = computePairRawGap(fontSpec, fSize, chars[i - 1], chars[i]);
+      // 均し基準は nearest (bbox 実隙間)。computeLineMedianGap と同じ。
+      if (raw && raw.nearest != null && Number.isFinite(raw.nearest)) gaps.push(raw.nearest);
+    }
+  }
+  return _medianOf(gaps);
+}
+
 let _segmenter = null;
 function getSegmenter() {
   if (_segmenter !== null) return _segmenter || null;
@@ -568,6 +707,14 @@ const _SPACE_CLASSES = new Set(["space", "ideographic_space"]);
 // optical 詰めで「字面の余白だけ」削る役割に徹する。
 const _PUNCTS = new Set(["punct", "punct_bang_full", "punct_bang_ascii"]);
 const _BRACKETS = new Set(["bracket_open", "bracket_close"]);
+// 約物 (句読点・全角/ASCII の ！？・括弧) をまとめた集合。
+// 素のオプティカル (強めモード) では:
+//   - 中央値の母集団から外す (本文ペアだけで基準を作る)
+//   - ペアごとに別ルール (平均 gap ではなく bbox gap を中央値に合わせる) で詰める
+// 字面が片寄って ink ボックスが小さい約物を平均 gap で均すと大穴になるため。
+const _PUNCT_BRACKET_CLASSES = new Set([
+  "punct", "punct_bang_full", "punct_bang_ascii", "bracket_open", "bracket_close",
+]);
 
 function pairClassFactor(left, right) {
   // 空白系の詰めは pairClassFactor を介さず layoutTextRun 側で
@@ -612,6 +759,24 @@ function pairClassFactor(left, right) {
 // 平均化する。
 const _LATIN_MIN_TSUME_EM = 0.04;
 
+// 約物アキ詰め (A) の目標アキ (em)。句読点・括弧の bbox gap をこの値まで詰める。
+// 詰めすぎ (穴の逆=窮屈) を避け、本文 CJK の締まった字間と同程度の air を残す。
+const PUNCT_AKI_EM = 0.10;
+
+// 最低 ink gap フロア (C) の基本値 (em)。詰めた結果の bbox gap がこれを下回らない
+// ようにして字面の接触・窮屈を防ぐ。縁取りがある場合は別途 2*outlineWidth と max を取る。
+const MIN_INK_GAP_EM = 0.03;
+
+// 詰め (E)。CJK 本文は「自然な bbox gap の中央値」をそのまま揃え目標にすると緩く、
+// 理想カーニング (締まった均一組み) に届かない。中央値を固定 em 目標 (CJK_TIGHTEN_TARGET_EM)
+// へ CJK_TIGHTEN_STRENGTH だけ寄せて締める:
+//   target = median*(1-strength) + (fSize*targetEm)*strength
+// これで緩い書体ほど絶対量で多く詰まり、各書体が締まった共通リズムへ寄る。
+// 欧文 (Latin/digit) は元々詰まっているので中央値どおり (LATIN_GAP_TIGHTEN)。
+const CJK_TIGHTEN_TARGET_EM = 0.08;
+const CJK_TIGHTEN_STRENGTH = 0.75;
+const LATIN_GAP_TIGHTEN = 1.0;
+
 function isAlnumClass(c) {
   return c === "latin" || c === "digit";
 }
@@ -633,6 +798,10 @@ export function layoutTextRun(ctx, text, options = {}) {
     // outlineWidth * 1.5 を safety として加算する。stroke は両側に伸びるので
     // 片側ぶん (= outlineWidth) + 安全マージン 0.5 で計 1.5 倍。
     outlineWidth = 0,
+    // 行均しの基準 gap を呼び出し側から固定する (= 本文全体で 1 つに統一する)。
+    // 指定があれば行内中央値の計算をスキップしてこの値を使う。
+    // computeOpticalMedianGapForLines の戻り値をそのまま渡す想定。
+    medianGapOverride = null,
   } = options;
   if (!text) return { glyphs: [], width: 0 };
 
@@ -659,6 +828,20 @@ export function layoutTextRun(ctx, text, options = {}) {
   // 各文字の class と空白判定を先に決めておく (ルックアラウンドで再利用)。
   const classes = chars.map((c) => classify(c));
   const isSpaceFlags = classes.map((c) => _SPACE_CLASSES.has(c));
+
+  // 強めモード「素のオプティカル」: 行内の本文ペアを揃える基準 (実測 gap 中央値)。
+  // クラス係数・固定 em を介さず書体非依存に均す。標準モードでは使わない。
+  // medianGapOverride が渡されていれば本文全体で統一された基準を優先する。
+  // 欧文 (Latin/digit) 同士は和文中央値とは別の欧文中央値で均す (B)。欧文中央値は
+  // per-run 計算 (measure/draw とも同じ line から導くので中央寄せは自己整合)。
+  let lineMedianGap = null;
+  let lineLatinMedian = null;
+  if (opticalKerning && opticalKerningHighQuality && fontSpec && fSize > 0) {
+    lineMedianGap = (medianGapOverride != null && Number.isFinite(medianGapOverride))
+      ? medianGapOverride
+      : computeLineMedianGap(chars, isSpaceFlags, fontSpec, fSize);
+    lineLatinMedian = computeLineLatinMedian(chars, fontSpec, fSize);
+  }
 
   const glyphs = [];
   let cursor = 0;
@@ -704,13 +887,64 @@ export function layoutTextRun(ctx, text, options = {}) {
           // run >= 2 のときは native advance のまま (装飾意図保護)。
         } else if (!curIsSpace && !prevIsSpace) {
           if (opticalKerningHighQuality && fontSpec) {
-            // 強め: Y 行の輪郭プロファイルを見て「白場分布が自然」な位置を score 最小化で探す。
-            // outlineWidth が指定されていれば minGap に safety を足して stroke 同士の融合を防ぐ。
+            // 強め (素のオプティカル): 行内の本文ペアを実測 gap の中央値に揃える。
+            // gap が中央値より広いペアは詰め (shift>0)、狭いペアは広げる (shift<0)。
+            // 詰める側だけ最近接 gap が負 (衝突) にならない範囲に制限する。
             const outlineMarginPx = (Number(outlineWidth) || 0) * 1.5;
-            const shift = computePairShift(
-              fontSpec, fSize, chars[i - 1], chars[i], prevClass, curClass, outlineMarginPx,
-            );
-            if (shift > 0) opticalAdjust = -shift;
+            // 最低 ink gap フロア (C): 詰めた結果の bbox gap がこれを下回らないようにする。
+            // 字面が触れて窮屈に見えるのを防ぎ、縁取りがあれば stroke 同士 (両側に
+            // outlineWidth ずつ伸びる) の融合も防ぐ (= 2 * outlineWidth 以上を確保)。
+            const minGapPx = Math.max(fSize * MIN_INK_GAP_EM, (Number(outlineWidth) || 0) * 2);
+            // raw (ペアの素 gap 幾何) は中央値の有無に関係なく常に計算する。
+            // 中央値除外で全欧文行 lineMedianGap=null でもオプティカルを止めない。
+            const raw = computePairRawGap(fontSpec, fSize, chars[i - 1], chars[i]);
+            const involvesPunct = _PUNCT_BRACKET_CLASSES.has(prevClass)
+              || _PUNCT_BRACKET_CLASSES.has(curClass);
+            // 本文同士の揃え目標: 欧文 (Latin/digit) 同士は欧文中央値、それ以外
+            // (CJK 同士・CJK↔欧文境界) は和文中央値。さらに詰め係数 (E) を掛けて
+            // 中央値より詰める (理想カーニングは自然な中央値より締まっているため)。
+            const bothLatin = isAlnumClass(prevClass) && isAlnumClass(curClass);
+            const rawTarget = (bothLatin && lineLatinMedian != null)
+              ? lineLatinMedian
+              : lineMedianGap;
+            let bodyTarget = null;
+            if (rawTarget != null) {
+              if (bothLatin) {
+                bodyTarget = rawTarget * LATIN_GAP_TIGHTEN;
+              } else {
+                // CJK: 中央値を固定 em 目標へ strength だけ寄せて締める (E)。
+                const tEm = fSize * CJK_TIGHTEN_TARGET_EM;
+                bodyTarget = rawTarget * (1 - CJK_TIGHTEN_STRENGTH) + tEm * CJK_TIGHTEN_STRENGTH;
+              }
+            }
+            if (raw && involvesPunct && raw.nearest != null && Number.isFinite(raw.nearest)) {
+              // 約物アキ詰め (A): 句読点・括弧は字面が片寄って ink ボックスが小さく、
+              // 平均 gap を本文中央値に揃えると逆に大穴になる。約物は中央値に依存させず、
+              // bbox gap (nearest) を固定の小さなアキ (約物半角相当) に詰めて隣字を寄せる。
+              const target = Math.max(fSize * PUNCT_AKI_EM, minGapPx);
+              let shift = raw.nearest - target;
+              if (shift > 0) {
+                const safePull = Math.max(0, raw.nearest - minGapPx);
+                if (shift > safePull) shift = safePull;
+              }
+              opticalAdjust = -shift;
+            } else if (raw && raw.nearest != null && Number.isFinite(raw.nearest) && bodyTarget != null) {
+              // 本文同士: bbox gap (nearest) を目標中央値に揃える (D)。欧文/和文は別基準 (B)。
+              // nearest を均すと目に見える隙間が直接そろう (meanGap は字形ノイズで乖離する)。
+              const target = Math.max(bodyTarget, minGapPx);
+              let shift = raw.nearest - target;
+              if (shift > 0) {
+                const safePull = Math.max(0, raw.nearest - minGapPx);
+                if (shift > safePull) shift = safePull;
+              }
+              opticalAdjust = -shift;
+            } else {
+              // 目標中央値が取れない (本文ペアが無い等): 従来の score 最小化にフォールバック。
+              const shift = computePairShift(
+                fontSpec, fSize, chars[i - 1], chars[i], prevClass, curClass, outlineMarginPx,
+              );
+              if (shift > 0) opticalAdjust = -shift;
+            }
           } else {
             // 標準: 左の右ベアリング + 右の左ベアリングを target まで詰める。
             const prev = metrics[i - 1];
@@ -767,9 +1001,11 @@ export function clearTextLayoutCache(fontSpec = null) {
     // pair shift cache は font 単位で間引けないので fontSpec 指定でも全消し
     // (fontSpec 変更時はそもそも cache キーが無効化されるので影響軽微)。
     _pairShiftCache.clear();
+    _pairRawGapCache.clear();
   } else {
     _glyphCacheByFontSpec.clear();
     _profileCacheByFontSpec.clear();
     _pairShiftCache.clear();
+    _pairRawGapCache.clear();
   }
 }

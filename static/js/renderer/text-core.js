@@ -38,7 +38,7 @@ import {
 import { PROJECT_FPS } from "../timecode.js";
 import { telopStartSec } from "../scenario.js";
 import { telopDurationFrame } from "../scenario.js";
-import { layoutTextRun, measureTextRunWidth } from "./text-layout.js";
+import { layoutTextRun, measureTextRunWidth, computeOpticalMedianGapForLines } from "./text-layout.js";
 
 // グリフ列を 1 行ずつ ctx に描画する。
 //
@@ -66,6 +66,7 @@ export function drawTextLines(ctx, params) {
     fillStyle, strokeStyle, useStroke, letterSpacing,
     enableOpticalKerning = false, opticalKerningHighQuality = false, fontSize = 0,
     glyphTransformFn = null,
+    medianGapOverride = null,
   } = params;
   ctx.save();
   ctx.font = fontSpec;
@@ -135,6 +136,7 @@ export function drawTextLines(ctx, params) {
           opticalKerning: true,
           opticalKerningHighQuality,
           outlineWidth,
+          medianGapOverride,
         });
         for (const g of run.glyphs) {
           if (g.drawable === false) {
@@ -387,6 +389,13 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
     } catch (_e) {}
   }
 
+  // 行幅計測も描画と同じ「テロップ全体の中央値」を使う (センタリングがずれないように)。
+  const opticalMedianGap = enableOpticalKerning
+    ? computeOpticalMedianGapForLines(lines, {
+        fontSpec, fontSize, opticalKerning: true, opticalKerningHighQuality,
+      })
+    : null;
+
   let baseW = 0;
   const baseLineWidths = [];
   const baseLineAscents = [];
@@ -402,6 +411,7 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
         opticalKerning: true,
         opticalKerningHighQuality,
         outlineWidth,
+        medianGapOverride: opticalMedianGap,
       });
     } else if (supportsNativeLs || letterSpacing === 0) {
       lineW = ctx.measureText(line || " ").width;
@@ -525,6 +535,8 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
     letterSpacing,
     enableOpticalKerning, opticalKerningHighQuality, fontSize,
     glyphTransformFn,
+    // 行幅計測 (baseLineWidths) と同じ全体中央値を描画にも渡してセンタリングを揃える。
+    medianGapOverride: opticalMedianGap,
   };
 
   const glow = style.glow && typeof style.glow === "object" ? style.glow : null;
