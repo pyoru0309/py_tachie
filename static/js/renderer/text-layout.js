@@ -802,6 +802,9 @@ export function layoutTextRun(ctx, text, options = {}) {
     // 指定があれば行内中央値の計算をスキップしてこの値を使う。
     // computeOpticalMedianGapForLines の戻り値をそのまま渡す想定。
     medianGapOverride = null,
+    // R8: 個別文字間カーニング。この行内の gap index (= glyph i と i+1 の間を i) →
+    // delta(1/1000em)。全体字間・オプティカルとは独立に加算される。
+    charKerning = null,
   } = options;
   if (!text) return { glyphs: [], width: 0 };
 
@@ -974,6 +977,12 @@ export function layoutTextRun(ctx, text, options = {}) {
       if (!curIsSpace && !isSpaceFlags[i - 1]) {
         cursor += letterSpacing;
       }
+      // R8: 個別文字間カーニング (gap i-1 = chars[i-1] と chars[i] の間)。
+      // 全体字間 / オプティカルと独立に、ユーザー指定の delta(1/1000em) を加算。
+      if (charKerning && fSize > 0) {
+        const dk = Number(charKerning[i - 1]);
+        if (dk) cursor += (dk / 1000) * fSize;
+      }
     }
     glyphs.push({
       text: chars[i],
@@ -988,6 +997,82 @@ export function layoutTextRun(ctx, text, options = {}) {
     cursor += renderedAdvance;
   }
   return { glyphs, width: cursor };
+}
+
+// R8: 生テキストの個別文字間マップ ({rawGapIndex: delta}) を、"\n" 分割した
+// 各行ごとの行内マップ ({inLineGapIndex: delta}) に切り分ける。
+// 行は単一 "\n" 区切り (改行は 1 grapheme としてカウント) を前提とする (テロップ用)。
+export function sliceCharKerningByLines(charKerning, lineTexts) {
+  const lines = Array.isArray(lineTexts) ? lineTexts : [];
+  if (!charKerning || typeof charKerning !== "object") return lines.map(() => null);
+  const out = [];
+  let rawOffset = 0; // 生テキスト先頭からの grapheme オフセット
+  for (let li = 0; li < lines.length; li += 1) {
+    const lineLen = splitGraphemes(lines[li] || "").length;
+    let lineMap = null;
+    for (let g = 0; g < lineLen - 1; g += 1) {
+      const dk = Number(charKerning[rawOffset + g]);
+      if (dk) {
+        if (!lineMap) lineMap = {};
+        lineMap[g] = dk;
+      }
+    }
+    out.push(lineMap);
+    rawOffset += lineLen + 1; // +1 = "\n" 区切り
+  }
+  return out;
+}
+
+// R8: サーバ wrap 済みの行 (soft-wrap + 明示 "\n" 混在) に対して、生テキスト基準の
+// charKerning を行ごとに切り分ける。wrap は文字を落とさず、明示改行のみ "\n" を消費する
+// 前提で、各行を生テキストの grapheme 列に対して貪欲に消費し、行末に "\n" が来たら
+// それを 1 grapheme 余分に消費する (= hard break)。
+export function sliceCharKerningByWrappedLines(charKerning, rawText, lineTexts) {
+  const lines = Array.isArray(lineTexts) ? lineTexts : [];
+  if (!charKerning || typeof charKerning !== "object") return lines.map(() => null);
+  const raw = splitGraphemes(String(rawText || ""));
+  const out = [];
+  let rawIdx = 0;
+  for (let li = 0; li < lines.length; li += 1) {
+    const lineLen = splitGraphemes(lines[li] || "").length;
+    const lineStart = rawIdx;
+    let lineMap = null;
+    for (let g = 0; g < lineLen - 1; g += 1) {
+      const dk = Number(charKerning[lineStart + g]);
+      if (dk) {
+        if (!lineMap) lineMap = {};
+        lineMap[g] = dk;
+      }
+    }
+    out.push(lineMap);
+    rawIdx += lineLen;
+    // 行末の次が明示改行なら消費 (hard break)。soft wrap なら何もしない。
+    if (raw[rawIdx] === "\n") rawIdx += 1;
+  }
+  return out;
+}
+
+// R8: テキスト編集 (挿入/削除) に追従して charKerning のキーをシフトする。
+// changeStart = 変更開始 grapheme index, removed = 削除 grapheme 数, inserted = 挿入 grapheme 数。
+// 変更範囲内に掛かっていた gap は破棄し、後続 gap は (inserted - removed) だけずらす。
+export function shiftCharKerningForEdit(charKerning, changeStart, removed, inserted) {
+  if (!charKerning || typeof charKerning !== "object") return {};
+  const delta = (Number(inserted) || 0) - (Number(removed) || 0);
+  const start = Math.max(0, Number(changeStart) || 0);
+  const removedEnd = start + Math.max(0, Number(removed) || 0);
+  const out = {};
+  for (const [k, v] of Object.entries(charKerning)) {
+    const gap = Number(k);
+    if (!Number.isFinite(gap)) continue;
+    if (gap < start) {
+      out[gap] = v;                 // 変更前: 不変
+    } else if (gap >= removedEnd) {
+      const ng = gap + delta;       // 変更後: シフト
+      if (ng >= 0) out[ng] = v;
+    }
+    // 削除範囲内 [start, removedEnd) の gap は破棄。
+  }
+  return out;
 }
 
 export function measureTextRunWidth(ctx, text, options = {}) {

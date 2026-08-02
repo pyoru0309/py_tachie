@@ -93,7 +93,11 @@ export function fillAssetControls() {
   fillBackgroundSelect();
   fillForegroundSelect();
   fillAudioSelect(elements.audio.value);
+  // フォント select は再構築で現在値が飛ぶので保持する (PC フォントスキャン完了後の
+  // manifest 再取得などで、編集中カットのフォント指定が見かけ上消えないように)。
+  const prevFontFamily = elements.fontFamily.value;
   fillSelect(elements.fontFamily, state.manifest.config.fonts, false);
+  if (prevFontFamily) ensureSelectValue(elements.fontFamily, prevFontFamily);
   renderCharacterSelect();
   loadCharacterIntoControls(selectedCharacter());
   fillCharacterDefinitionAddSelect();

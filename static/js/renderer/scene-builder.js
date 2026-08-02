@@ -48,6 +48,7 @@ import {
 } from "./telop.js";
 import { mapVideoLayerSec } from "./video-layer-time.js";
 import { computeVideoFit } from "./effects/video-fit.js";
+import { ensureVerticalGlyphsForTelops } from "./text-vertical.js";
 
 // silhouette / blur のための padding。Pillow の GaussianBlur 同等の広がりを
 // 期待するなら 3σ 分の余裕が必要。本実装は blurPx を 2σ として扱うので、
@@ -149,6 +150,91 @@ function makeColorPlane(width, height, color, opacity, renderOrder, x, y) {
   mesh.frustumCulled = false;
   mesh.visible = (Number(opacity) || 0) > 0;
   return mesh;
+}
+
+// R10: カット入りトランジション用の最前面オーバーレイ material。
+// 「前カットの最終フレーム」(uFromTex) を、現カット(下のシーン)に重ねて合成する。
+//   mode 0 crossfade: from を opacity=1-p でフェードアウト → 下の現カットが現れる
+//   mode 1 wipe:      from を全面表示し、リビール済み領域だけ discard → 現カットが上書き
+//   mode 2 crosszoom: from をズーム + フェードアウト
+//   mode 3/4 white/black: 単色を opacity=1-p (from 不要。先頭カットの白/黒イン)
+const TRANSITION_VERT = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const TRANSITION_FRAG = /* glsl */ `
+  precision highp float;
+  uniform sampler2D uFromTex;
+  uniform float uHasFrom;     // 0/1
+  uniform float uProgress;    // 0..1
+  uniform int uMode;          // 0 cross / 1 wipe / 2 zoom / 3 white / 4 black
+  uniform float uWipeAxis;    // 0 horiz(x) / 1 vert(y)
+  uniform float uWipeInvert;  // 0: coord<p で reveal / 1: coord>1-p で reveal
+  uniform float uFlipY;       // from テクスチャの上下反転 (0/1)
+  uniform vec3 uColor;
+  varying vec2 vUv;
+  void main() {
+    float p = uProgress;
+    vec2 uv = vUv;
+    if (uFlipY > 0.5) uv.y = 1.0 - uv.y;
+    vec4 outc;
+    if (uMode == 1) {
+      float coord = (uWipeAxis < 0.5) ? vUv.x : vUv.y;
+      bool revealed = (uWipeInvert < 0.5) ? (coord < p) : (coord > 1.0 - p);
+      if (revealed) discard;
+      outc = (uHasFrom > 0.5) ? vec4(texture2D(uFromTex, uv).rgb, 1.0) : vec4(uColor, 1.0);
+    } else if (uMode == 3 || uMode == 4) {
+      // ホワイト/ブラック: 前カットがある場合は 2 段階。
+      //   前半 (p<0.5): 前カット A → 単色 (A を色へフェード, B を完全に覆う)
+      //   後半 (p>=0.5): 単色 → 現カット B (色をフェードアウトして B を出す)
+      if (uHasFrom > 0.5) {
+        if (p < 0.5) {
+          float k = p / 0.5;
+          vec3 a = texture2D(uFromTex, uv).rgb;
+          outc = vec4(mix(a, uColor, k), 1.0);
+        } else {
+          float k = (p - 0.5) / 0.5;
+          outc = vec4(uColor, 1.0 - k);
+        }
+      } else {
+        // 先頭カット (前カット無し): 色 → B の単段フェードイン。
+        outc = vec4(uColor, 1.0 - p);
+      }
+    } else {
+      vec2 suv = uv;
+      if (uMode == 2) { float zoom = 1.0 + (1.0 - p) * 0.3; suv = (uv - 0.5) / zoom + 0.5; }
+      if (uHasFrom > 0.5) { vec4 c = texture2D(uFromTex, suv); outc = vec4(c.rgb, c.a * (1.0 - p)); }
+      else outc = vec4(uColor, 1.0 - p);
+    }
+    gl_FragColor = outc;
+    #include <colorspace_fragment>
+  }
+`;
+
+function createTransitionMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uFromTex: { value: null },
+      uHasFrom: { value: 0 },
+      uProgress: { value: 0 },
+      uMode: { value: 0 },
+      uWipeAxis: { value: 0 },
+      uWipeInvert: { value: 0 },
+      uFlipY: { value: 1 },
+      uColor: { value: new THREE.Color(0x000000) },
+    },
+    vertexShader: TRANSITION_VERT,
+    fragmentShader: TRANSITION_FRAG,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    // Y-down カメラの裏面カリング対策 (makeMaterial と同じ)。
+    side: THREE.DoubleSide,
+    forceSinglePass: true,
+  });
 }
 
 function makePlane(width, height, texture, renderOrder, x, y) {
@@ -439,6 +525,9 @@ async function buildTelops(scene, layerData) {
   if (document.fonts?.ready) {
     try { await document.fonts.ready; } catch {}
   }
+  // 縦書きテロップの GSUB vert グリフを先に揃える (書き出し 1 フレーム目から
+  // フォールバック字形でなく本物の縦書き字形で焼くため)。
+  try { await ensureVerticalGlyphsForTelops(telops); } catch {}
   // ★ Phase 3: renderLayer ごとに plane を分ける。
   //   各 clip の renderLayer (overlay / above_bg / above_chars / above_fg) を見て
   //   グループ化、そのキーごとに 1 plane を作成。該当 clip がないキーは plane を
@@ -1183,6 +1272,23 @@ export async function buildScene(
     }
   }
 
+  // R10: カット入りトランジション用の最前面フルスクリーン overlay (単色)。
+  // update() で transitionConfig + 経過秒から色/不透明度/カバー範囲を駆動する。
+  // 既定は invisible。crossfade/whiteout/blackout/crosszoom は色フェード、
+  // wipe は plane の位置/スケールで左→右リビールを表現する。
+  const transitionGeometry = new THREE.PlaneGeometry(CANVAS_WIDTH, CANVAS_HEIGHT);
+  const transitionMaterial = createTransitionMaterial();
+  const transitionMesh = new THREE.Mesh(transitionGeometry, transitionMaterial);
+  transitionMesh.position.set(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 0);
+  transitionMesh.renderOrder = 5000; // セリフ/テロップ (3000) より前面
+  transitionMesh.frustumCulled = false;
+  transitionMesh.visible = false;
+  scene.add(transitionMesh);
+  meshes.transition = transitionMesh;
+  // クライアント (playback / export) から渡されるトランジション設定 + 前カットのフレーム。
+  let transitionConfig = null;   // { type, durationFrame, wipeDirection } | null
+  let transitionFromTex = null;  // 前カット最終フレームの THREE.Texture | null
+
   let disposed = false;
 
   function update({
@@ -1509,6 +1615,68 @@ export async function buildScene(
     // readPixels 全ゼロという退行が出たため除去。silhouette/blur 各 pass は
     // 内部で setRenderTarget(prev) で復帰しており、効かないカット (キャラ無し)
     // でこの行が不要、効くカットでも内部復帰で十分。
+
+    // R10: カット入りトランジションを最前面 overlay で適用する。
+    _applyTransition(rawElapsedSec != null ? Number(rawElapsedSec) : Number(elapsedSec) || 0);
+  }
+
+  // mode 番号: 0 crossfade / 1 wipe / 2 crosszoom / 3 whiteout / 4 blackout。
+  const _TRANSITION_MODE = { crossfade: 0, wipe: 1, crosszoom: 2, whiteout: 3, blackout: 4 };
+
+  // 経過秒 (カット先頭からの秒) を基に overlay shader uniform を駆動する。
+  function _applyTransition(localSec) {
+    const mesh = meshes.transition;
+    if (!mesh) return;
+    const cfg = transitionConfig;
+    const type = cfg && cfg.type ? String(cfg.type) : "none";
+    const durFrame = cfg ? Math.max(0, Math.round(Number(cfg.durationFrame) || 0)) : 0;
+    if (type === "none" || durFrame <= 0 || !(type in _TRANSITION_MODE)) {
+      if (mesh.visible) mesh.visible = false;
+      return;
+    }
+    const durSec = durFrame / projectFps;
+    const p = Math.max(0, Math.min(1, (Number(localSec) || 0) / durSec)); // 0→1
+    if (p >= 1) {
+      if (mesh.visible) mesh.visible = false;
+      mesh.userData.camZoom = 1;
+      return;
+    }
+    const u = mesh.material.uniforms;
+    u.uMode.value = _TRANSITION_MODE[type];
+    u.uProgress.value = p;
+    u.uFromTex.value = transitionFromTex || null;
+    u.uHasFrom.value = transitionFromTex ? 1 : 0;
+    // whiteout は白、その他 (黒フェード / wipe / zoom の from 無し fallback) は黒。
+    u.uColor.value.setHex(type === "whiteout" ? 0xffffff : 0x000000);
+    // crosszoom: 前カット(overlay)はシェーダで拡大フェード、現カット(下のシーン)は
+    // カメラズームで拡大 → settle。これで「両方に」ズームが効く。それ以外は等倍。
+    mesh.userData.camZoom = (type === "crosszoom") ? (1 + (1 - p) * 0.18) : 1;
+    if (type === "wipe") {
+      const dir = cfg.wipeDirection || "right";
+      // axis: 横(left/right)=0, 縦(up/down)=1。
+      // クロスフェードが正立で出る (uFlipY=1) ことから vUv.x=0=画面左 / vUv.y=0=画面上。
+      //   right: 左→右リビール = vUv.x<p で reveal (invert0)
+      //   left:  右→左 = vUv.x>1-p (invert1)
+      //   down:  上→下 = vUv.y<p (画面上=低 vUv.y, invert0)
+      //   up:    下→上 = vUv.y>1-p (invert1)
+      u.uWipeAxis.value = (dir === "up" || dir === "down") ? 1 : 0;
+      u.uWipeInvert.value = (dir === "left" || dir === "up") ? 1 : 0;
+    }
+    mesh.visible = true;
+  }
+
+  function setTransition(cfg, fromTex) {
+    if (cfg && typeof cfg === "object" && cfg.type && cfg.type !== "none") {
+      transitionConfig = {
+        type: String(cfg.type),
+        durationFrame: Math.max(0, Math.round(Number(cfg.durationFrame) || 0)),
+        wipeDirection: cfg.wipeDirection ? String(cfg.wipeDirection) : "right",
+      };
+    } else {
+      transitionConfig = null;
+    }
+    // fromTex は undefined のとき「変更しない」、null のとき「明示クリア」。
+    if (fromTex !== undefined) transitionFromTex = fromTex || null;
   }
 
   function dispose() {
@@ -1581,7 +1749,7 @@ export async function buildScene(
 
   // meshes は本番フローでは外から触らないが、PoC ベンチが visualizer 内部状態へ
   // 介入できるようにここで露出する (v2-export-bench: preloadVisualizerImages)。
-  return { scene, update, dispose, token, meshes };
+  return { scene, update, dispose, setTransition, token, meshes };
 }
 
 // =============================================================================
@@ -1648,6 +1816,8 @@ export async function buildGapScene({
   scene.add(telopMesh);
   const telopState = { lastFingerprint: null };
   const telops = Array.isArray(sceneTelops) ? sceneTelops : [];
+  // gap 区間の縦書きテロップも本物の GSUB vert 字形で焼けるよう事前取得
+  try { await ensureVerticalGlyphsForTelops(telops); } catch {}
 
   // 動画レイヤー (gap 区間でも再生する)。通常 scene と同じ ORDER スロットに plane を追加。
   const vlEntries = [];

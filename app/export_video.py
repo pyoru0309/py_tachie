@@ -1006,9 +1006,19 @@ def _build_audio_amix_segments(
         duration_frame = max(1, int(cut.get("durationFrame") or 0))
         start_sec = start_frame / float(PROJECT_FPS)
         duration = duration_frame / float(PROJECT_FPS)
+        # 発話ディレイ: カット冒頭から audio_delay 秒だけ声を後ろへずらす。
+        # カット尺を超えない範囲でクランプし、ずらした分だけ素材側を短くトリム
+        # して (avail) カット末尾を越えないようにする。
+        try:
+            audio_delay = max(0.0, float(cut.get("audioDelaySec") or 0.0))
+        except (TypeError, ValueError):
+            audio_delay = 0.0
+        audio_delay = min(audio_delay, max(0.0, duration - 1.0 / float(PROJECT_FPS)))
+        avail = max(1.0 / float(PROJECT_FPS), duration - audio_delay)
+        start_sec += audio_delay
         delay_ms = int(round(start_sec * 1000))
         label = f"ca_{input_idx}"
-        parts = [f"atrim=duration={duration:.3f}", "asetpts=PTS-STARTPTS"]
+        parts = [f"atrim=duration={avail:.3f}", "asetpts=PTS-STARTPTS"]
         if delay_ms > 0:
             parts.append(f"adelay={delay_ms}|{delay_ms}")
             parts.append(PTS_RESET_AFTER_DELAY)

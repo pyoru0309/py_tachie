@@ -104,11 +104,20 @@ export function resolveFontWeightCss(familyId, weightId) {
 
 export function fontFamilyCssStack(familyId) {
   const font = (state.manifest?.config?.fonts || []).find((item) => item.id === familyId);
-  const displayName = font?.name || familyId || "";
   // 配列順: 指定フォント → 既知の日本語フォールバック → 汎用
   // 注: LINE Seed JP は CDN で常に読み込まれているため、フォールバックの先頭に置くと
   // 他フォントが未ロードの瞬間に LINE Seed JP に倒れて表示されてしまう。除外する。
   const fallback = [`"Noto Sans JP"`, `"Hiragino Sans"`, `"Yu Gothic"`, "sans-serif"];
+  // PC インストール済みフォント (system): FontFace 登録はせず、OS が解決できる
+  // family 名 (和名/英名の両方) を先頭に積む。ブラウザはインストール済み
+  // フォント (Adobe Fonts のアクティベート含む) をローカル名で直接使える。
+  if (Array.isArray(font?.cssFamilies) && font.cssFamilies.length > 0) {
+    const names = font.cssFamilies.filter((n) => typeof n === "string" && n);
+    if (names.length > 0) {
+      return [...names.map((n) => `"${n}"`), ...fallback].join(", ");
+    }
+  }
+  const displayName = font?.name || familyId || "";
   if (displayName && displayName !== "LINE Seed JP") {
     return [`"${displayName}"`, ...fallback].join(", ");
   }
@@ -123,12 +132,44 @@ export async function registerProjectFonts() {
   const tasks = [];
   for (const font of state.manifest.config.fonts) {
     if (!font?.name || !font?.weights) continue;
+    // PC インストール済みフォントは FontFace 登録不要 (OS がローカル名で解決する)
+    if (font.system) continue;
     for (const [weightId, paths] of Object.entries(font.weights)) {
       const candidates = Array.isArray(paths) ? paths : [paths];
       tasks.push(registerFontFamilyWeight(font.name, weightId, candidates));
     }
   }
   if (tasks.length) await Promise.allSettled(tasks);
+}
+
+// PC インストール済みフォントのスキャンは起動直後サーバ側でバックグラウンドに
+// 走っている。初回 manifest 取得がスキャン完了より早いとフォント一覧に PC
+// フォントが載らないので、ready を検知したら manifest を再取得して選択肢に
+// 反映する (2 回目以降の起動はディスクキャッシュ即読みなので通常 1 周で済む)。
+export function watchSystemFontsReady(refreshManifest) {
+  const hasSystemFonts = () =>
+    (state.manifest?.config?.fonts || []).some((font) => font.system);
+  if (hasSystemFonts()) return;
+  let attempts = 0;
+  const poll = async () => {
+    attempts += 1;
+    try {
+      const res = await fetch("/api/system-fonts");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.enabled || data.status === "failed") return;
+      if (data.status === "ready") {
+        if (data.familyCount > 0 && !hasSystemFonts()) {
+          await refreshManifest();
+        }
+        return;
+      }
+    } catch (_err) {
+      // サーバ再起動中など。次のポーリングで追い付く。
+    }
+    if (attempts < 30) setTimeout(poll, 2000);
+  };
+  setTimeout(poll, 1500);
 }
 
 // (font.name, weightId) ごとに candidates を順番に試し、最初に load() に

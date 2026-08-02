@@ -1068,6 +1068,17 @@ def normalize_cut_state(state: dict[str, Any], manifest: dict[str, Any]) -> dict
     foreground_x = _coord_or_none(state.get("foregroundX"))
     foreground_y = _coord_or_none(state.get("foregroundY"))
 
+    # textStyle は基本的に pass-through だが、個別文字間カーニング (R8) だけは
+    # スキーマ (gap index -> 1/1000em 整数, 0 は省く) を強制する。空なら出力しない。
+    text_style = state.get("textStyle", defaults.get("textStyle", {}))
+    if isinstance(text_style, dict) and "charKerning" in text_style:
+        text_style = dict(text_style)
+        ck = _normalize_char_kerning(text_style.get("charKerning"))
+        if ck:
+            text_style["charKerning"] = ck
+        else:
+            text_style.pop("charKerning", None)
+
     normalized = {
         "background": _nfc(
             state["background"]
@@ -1083,7 +1094,7 @@ def normalize_cut_state(state: dict[str, Any], manifest: dict[str, Any]) -> dict
         "foregroundY": foreground_y,
         "showSpeechBox": state.get("showSpeechBox", True),
         "text": state.get("text", ""),
-        "textStyle": state.get("textStyle", defaults.get("textStyle", {})),
+        "textStyle": text_style,
         "speakerCharacterId": speaker_id,
         "characters": normalized_characters,
         "motionType": motion_type,
@@ -1132,17 +1143,90 @@ def _coerce_frame_field(raw_frame: Any, raw_seconds: Any) -> int | None:
     return max(0, sec_to_frames(raw_seconds))
 
 
+# --- v0.3 追加スキーマのヘルパ -------------------------------------------------
+
+def _normalize_lane(value: Any) -> int:
+    """タイムラインのレーン番号 (0 起点)。複数レーン化 (R2/R3) で各アイテムが持つ。"""
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, n)
+
+
+def _normalize_char_kerning(raw: Any) -> dict[str, int]:
+    """個別文字間カーニング (R8)。
+
+    キー = 生テキスト上の gap index (文字 i と i+1 の間を "i" で表す, 0 起点)。
+    値 = delta (1/1000em, 整数, 符号付き)。delta=0 は省く。全体字間とは独立に加算される。
+    """
+    out: dict[str, int] = {}
+    if not isinstance(raw, dict):
+        return out
+    for key, value in raw.items():
+        try:
+            idx = int(key)
+        except (TypeError, ValueError):
+            continue
+        if idx < 0:
+            continue
+        try:
+            delta = int(round(float(value)))
+        except (TypeError, ValueError):
+            continue
+        if delta == 0:
+            continue
+        out[str(idx)] = delta
+    return out
+
+
+_TRANSITION_TYPES = ("none", "crossfade", "wipe", "whiteout", "blackout", "crosszoom")
+
+
+def _normalize_transition(raw: Any) -> dict[str, Any]:
+    """カット入りトランジション (R10)。直前カット末尾→現カット先頭をブレンドする演出。
+
+    先頭カットでも whiteout=ホワイトイン / blackout=ブラックイン等として適用できる
+    (「前」が無い分は単色を擬似前フレームとして合成する。描画側で解釈)。
+    """
+    if not isinstance(raw, dict):
+        return {"type": "none", "durationFrame": 0}
+    t = str(raw.get("type") or "none").strip().lower()
+    if t not in _TRANSITION_TYPES:
+        t = "none"
+    if t == "none":
+        return {"type": "none", "durationFrame": 0}
+    dur = _coerce_frame_field(raw.get("durationFrame"), raw.get("durationSec"))
+    if dur is None or dur <= 0:
+        dur = max(1, round(PROJECT_FPS * 0.5))  # 既定 0.5 秒
+    out = {"type": t, "durationFrame": int(max(1, dur))}
+    if t == "wipe":
+        # ワイプの方向 (リビールが進む向き)。right=左→右 / left=右→左 / down=上→下 / up=下→上。
+        d = str(raw.get("wipeDirection") or "right").strip().lower()
+        out["wipeDirection"] = d if d in ("right", "left", "up", "down") else "right"
+    return out
+
+
 def _normalize_cut(cut: dict[str, Any], index: int, manifest: dict[str, Any]) -> dict[str, Any]:
     duration_frame = _coerce_frame_field(cut.get("durationFrame"), cut.get("duration"))
     if duration_frame is None or duration_frame <= 0:
         duration_frame = PROJECT_FPS * 3  # 既定 3 秒
     duration_frame = max(1, duration_frame)
     start_frame = _coerce_frame_field(cut.get("startFrame"), cut.get("startSec"))
+    # 発話ディレイ (秒): カットの話者音声 (audio) を冒頭からこの秒数だけ遅らせて
+    # 鳴らす。カット入りトランジションの間に声が出始める不自然さを避けるための
+    # パラメータ (preview / export 共通)。カット尺を超える値はクランプ。
+    try:
+        audio_delay_sec = max(0.0, float(cut.get("audioDelaySec") or 0.0))
+    except (TypeError, ValueError):
+        audio_delay_sec = 0.0
     return {
         "id": str(cut.get("id") or f"cut_{index:03d}"),
         "startFrame": start_frame,  # None なら _fill_cut_start_frame で連番補完
         "durationFrame": duration_frame,
         "audio": _nfc(cut.get("audio")),
+        "audioDelaySec": round(audio_delay_sec, 3),
+        "transition": _normalize_transition(cut.get("transition")),
         "state": normalize_cut_state(cut.get("state") or {}, manifest),
     }
 
@@ -1532,6 +1616,8 @@ def _normalize_telop(telop: dict[str, Any], index: int) -> dict[str, Any]:
             "lineSpacing",
             "enableOpticalKerning",
             "opticalKerningHighQuality",
+            # ★ R8: 個別文字間カーニング (gap index -> 1/1000em)。下で schema 強制する。
+            "charKerning",
             # ★ Phase 0 追加: mv_text 用 (caption の見た目には影響しない)。
             #   blendMode  : "normal" | "screen" | "multiply"
             #   bodyOpacity: 本体不透明度 (glow / shadow と独立)
@@ -1541,6 +1627,10 @@ def _normalize_telop(telop: dict[str, Any], index: int) -> dict[str, Any]:
             #   の diagonal_phrase が必須で要求するが、caption 側でも個別に使える。
             #   既定 0 として normalize した場合は省略 (= dict に出さない) でも互換。
             "rotation",
+            # ★ 縦書き対応: "horizontal" (既定, 省略可) | "vertical"。
+            #   縦書き時は行 = カラム (右→左)、句読点/括弧類は GSUB vert 字形
+            #   (取得不可時は Unicode 分類の回転/シフト) で描画する。
+            "writingMode",
         ):
             if key in style_raw:
                 style[key] = style_raw[key]
@@ -1550,6 +1640,13 @@ def _normalize_telop(telop: dict[str, Any], index: int) -> dict[str, Any]:
         shadow_raw = style_raw.get("dropShadow")
         if isinstance(shadow_raw, dict):
             style["dropShadow"] = _normalize_drop_shadow_style(shadow_raw)
+    # R8: 個別文字間カーニングは schema 強制 (空なら出力しない)。
+    if "charKerning" in style:
+        ck = _normalize_char_kerning(style.get("charKerning"))
+        if ck:
+            style["charKerning"] = ck
+        else:
+            style.pop("charKerning", None)
     x_value = telop.get("x")
     y_value = telop.get("y")
     try:
@@ -1633,6 +1730,7 @@ def _normalize_telop(telop: dict[str, Any], index: int) -> dict[str, Any]:
     return {
         "id": str(telop.get("id") or f"telop_{index:03d}"),
         "kind": kind,
+        "lane": _normalize_lane(telop.get("lane")),
         "startFrame": int(start_frame),
         "durationFrame": int(duration_frame),
         "text": str(telop.get("text") or ""),
@@ -1792,6 +1890,7 @@ def _normalize_video_layer(vl: dict[str, Any], index: int) -> dict[str, Any] | N
     return {
         "id": str(vl.get("id") or f"vl_{index:03d}"),
         "src": src,
+        "lane": _normalize_lane(vl.get("lane")),
         "startFrame": int(start_frame),
         "trimStartSec": round(trim_start, 3),
         "trimEndSec": round(trim_end, 3) if trim_end is not None else None,
@@ -1851,6 +1950,7 @@ def _normalize_sound_effect(se: dict[str, Any], index: int) -> dict[str, Any] | 
     return {
         "id": str(se.get("id") or f"se_{index:03d}"),
         "src": src,
+        "lane": _normalize_lane(se.get("lane")),
         "startFrame": int(start_frame),
         "durationFrame": int(duration_frame),
         "loop": bool(se.get("loop") or False),
@@ -1996,6 +2096,29 @@ def _normalize_scene(
             if item.get("linkedCutId") and item["linkedCutId"] not in valid_cut_ids:
                 item["linkedCutId"] = None
 
+    # R2: 種別ごとのレーン数。要求値 (laneCounts) とアイテムが乗っている最大レーンの
+    # 両方を満たすよう max を取り、最低 1。アイテムがあるレーンが消えないようにする。
+    raw_lane_counts = scene.get("laneCounts") if isinstance(scene.get("laneCounts"), dict) else {}
+
+    def _lane_count(key: str, items: list[dict[str, Any]]) -> int:
+        try:
+            requested = int(raw_lane_counts.get(key))
+        except (TypeError, ValueError):
+            requested = 1
+        max_lane = 0
+        for it in items:
+            try:
+                max_lane = max(max_lane, int(it.get("lane") or 0))
+            except (TypeError, ValueError):
+                pass
+        return max(1, requested, max_lane + 1)
+
+    lane_counts = {
+        "telop": _lane_count("telop", telops),
+        "soundEffect": _lane_count("soundEffect", sound_effects),
+        "videoLayer": _lane_count("videoLayer", video_layers),
+    }
+
     return {
         "id": str(scene.get("id") or f"scene_{scene_index:03d}"),
         "title": str(scene.get("title") or f"シーン{scene_index}"),
@@ -2004,6 +2127,7 @@ def _normalize_scene(
         "bgmTracks": bgm_tracks,
         "soundEffects": sound_effects,
         "videoLayers": video_layers,
+        "laneCounts": lane_counts,
         "bpm": bpm,
         "breath": breath,
         "bpmBob": bpm_bob,

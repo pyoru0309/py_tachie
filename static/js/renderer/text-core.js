@@ -38,7 +38,14 @@ import {
 import { PROJECT_FPS } from "../timecode.js";
 import { telopStartSec } from "../scenario.js";
 import { telopDurationFrame } from "../scenario.js";
-import { layoutTextRun, measureTextRunWidth, computeOpticalMedianGapForLines } from "./text-layout.js";
+import { layoutTextRun, measureTextRunWidth, computeOpticalMedianGapForLines, sliceCharKerningByLines } from "./text-layout.js";
+import {
+  layoutTextColumn,
+  getVerticalStore,
+  ensureVerticalGlyphs,
+  PUNCT_FALLBACK_SHIFT_EM,
+  SMALL_KANA_FALLBACK_SHIFT_EM,
+} from "./text-vertical.js";
 
 // グリフ列を 1 行ずつ ctx に描画する。
 //
@@ -60,6 +67,12 @@ import { layoutTextRun, measureTextRunWidth, computeOpticalMedianGapForLines } f
 //                                      pop_per_char のように「グリフ単位 transform」を入れる用途。
 //                                      visible:false でそのグリフをスキップ。null/undefined のグリフは通常描画。
 export function drawTextLines(ctx, params) {
+  // 縦書き (params.vertical あり) は専用経路へ。silhouette (glow/影/縁取り) も
+  // 同じ params を spread して呼ぶため、この 1 箇所のディスパッチで全効果が縦書き対応になる。
+  if (params.vertical) {
+    drawTextColumns(ctx, params);
+    return;
+  }
   const {
     textLeft, textTop, lines, baseLineWidths, baseLineAscents, baseLineHeights,
     baseW, lineGap, outlineWidth, fontSpec, align,
@@ -67,6 +80,10 @@ export function drawTextLines(ctx, params) {
     enableOpticalKerning = false, opticalKerningHighQuality = false, fontSize = 0,
     glyphTransformFn = null,
     medianGapOverride = null,
+    // R8: useRunLayout=true なら optical OFF でも layoutTextRun 経路で描く
+    // (個別文字間 charKerningByLine を行ごとに適用するため)。
+    useRunLayout = enableOpticalKerning,
+    charKerningByLine = null,
   } = params;
   ctx.save();
   ctx.font = fontSpec;
@@ -124,8 +141,9 @@ export function drawTextLines(ctx, params) {
       if (align === "right") x = textLeft + outlineWidth + (baseW - lineW);
       else if (align !== "left") x = textLeft + outlineWidth + (baseW - lineW) / 2;
       const bottomY = glyphTopY + baseLineHeights[i];
-      if (enableOpticalKerning) {
-        // optical kerning: layoutTextRun が決めた glyph[].x で 1 文字ずつ。
+      if (useRunLayout) {
+        // run layout: layoutTextRun が決めた glyph[].x で 1 文字ずつ。
+        // optical OFF + charKerning のみでも同経路で描く (= 個別文字間を反映)。
         // baseline は手動 letter_spacing 経路と同じ理由で alphabetic に揃える。
         ctx.textBaseline = "alphabetic";
         const baselineY = bottomY - (baseLineDescents?.[i] ?? 0);
@@ -133,10 +151,11 @@ export function drawTextLines(ctx, params) {
           fontSpec,
           fontSize,
           letterSpacing: lsPx,
-          opticalKerning: true,
+          opticalKerning: enableOpticalKerning,
           opticalKerningHighQuality,
           outlineWidth,
           medianGapOverride,
+          charKerning: charKerningByLine ? charKerningByLine[i] : null,
         });
         for (const g of run.glyphs) {
           if (g.drawable === false) {
@@ -185,6 +204,119 @@ export function drawTextLines(ctx, params) {
         ctx.textBaseline = "bottom";
       }
       glyphTopY += baseLineHeights[i] + lineGap + outlineWidth * 2;
+    }
+  }
+  ctx.restore();
+}
+
+// 縦書き描画。drawTextLines と同じ contract (stroke→fill 2 パス /
+// glyphTransformFn / fillStyle / strokeStyle) を守りつつ、カラム (= 横書きの行)
+// を右→左に並べて 1 グリフずつ描く。
+//
+// params.vertical: {
+//   columns: [{ glyphs, height }]   layoutTextColumn の結果 (行順 = 右から)
+//   colWidth                        カラム幅 (= fontSize)
+//   colGap                          カラム間隔 (横書きの lineGap 相当)
+//   baseH                           最長カラム高さ (align 用)
+//   emAscentRatio                   baseline 位置 = セル上端 + ratio * fontSize
+//   upem                            GSUB vert グリフ (Path2D, フォント座標系) のスケール基準
+//   rotatedBaselineShift            回転グリフのベースライン補正 ((asc-desc)/2)
+// }
+function drawTextColumns(ctx, params) {
+  const {
+    textLeft, textTop, outlineWidth, fontSpec, align,
+    fillStyle, strokeStyle, useStroke,
+    fontSize = 0,
+    glyphTransformFn = null,
+    vertical,
+  } = params;
+  const { columns, colWidth, colGap, baseH, emAscentRatio, upem, rotatedBaselineShift } = vertical;
+  ctx.save();
+  ctx.font = fontSpec;
+  // 縦書きは常に per-glyph 描画なので、共通ベースライン (alphabetic) で統一する。
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = fillStyle;
+  const doStroke = useStroke && outlineWidth > 0;
+  if (doStroke) {
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = outlineWidth * 2;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.miterLimit = 2;
+  }
+  const nCols = columns.length;
+  const colStride = colWidth + colGap + outlineWidth * 2;
+  const pathScale = fontSize / (upem || 1000);
+  // 横書きと同じ「全グリフ stroke → 全グリフ fill」の 2 パス (穴/スジ対策)。
+  const phases = doStroke ? ["stroke", "fill"] : ["fill"];
+  for (const phase of phases) {
+    const isStroke = phase === "stroke";
+    let globalCharIdx = 0;
+    for (let i = 0; i < nCols; i += 1) {
+      const col = columns[i];
+      // 1 行目 (columns[0]) が最右カラム
+      const colX = textLeft + outlineWidth + (nCols - 1 - i) * colStride;
+      let colTop = textTop + outlineWidth;
+      // align は縦書きでは「カラム内の縦位置」: left=上 / center=中央 / right=下
+      if (align === "right") colTop += baseH - col.height;
+      else if (align !== "left") colTop += (baseH - col.height) / 2;
+      for (const g of col.glyphs) {
+        if (!g.drawable) {
+          globalCharIdx += 1;
+          continue;
+        }
+        const t = glyphTransformFn ? glyphTransformFn(globalCharIdx, g.text) : null;
+        if (t && t.visible === false) {
+          globalCharIdx += 1;
+          continue;
+        }
+        const dx = t ? Number(t.dx) || 0 : 0;
+        const dy = t ? Number(t.dy) || 0 : 0;
+        const sc = (t && t.scale != null && Number.isFinite(t.scale)) ? Number(t.scale) : 1;
+        const al = (t && t.alpha != null && Number.isFinite(t.alpha)) ? Number(t.alpha) : 1;
+        const cellTop = colTop + g.y;
+        const baselineY = cellTop + emAscentRatio * fontSize;
+        ctx.save();
+        if (al !== 1) ctx.globalAlpha = (ctx.globalAlpha ?? 1) * al;
+        if (g.entry) {
+          // フォント自身の縦書き代替字形 (GSUB vert)。Path2D はフォント座標系
+          // (y-up, upem スケール) なので translate + scale(s, -s) で描く。
+          const x0 = colX + (colWidth - g.entry.hAdvEm * fontSize) / 2;
+          ctx.translate(x0 + dx, baselineY + dy);
+          if (sc !== 1) ctx.scale(sc, sc);
+          ctx.scale(pathScale, -pathScale);
+          if (isStroke) {
+            ctx.lineWidth = (outlineWidth * 2) / pathScale;
+            ctx.stroke(g.entry.path);
+          } else {
+            ctx.fill(g.entry.path);
+          }
+        } else if (g.cls === "rotate") {
+          // フォールバック: セル中心 pivot で 90° 時計回り (長音・括弧・欧文)
+          ctx.translate(colX + colWidth / 2 + dx, cellTop + g.advance / 2 + dy);
+          if (sc !== 1) ctx.scale(sc, sc);
+          ctx.rotate(Math.PI / 2);
+          if (isStroke) ctx.strokeText(g.text, -g.wPx / 2, rotatedBaselineShift);
+          else ctx.fillText(g.text, -g.wPx / 2, rotatedBaselineShift);
+        } else {
+          // 正立。punct / small はフォールバックの右上シフトを加える
+          let gx = colX + (colWidth - g.wPx) / 2;
+          let gy = baselineY;
+          if (g.cls === "punct") {
+            gx += PUNCT_FALLBACK_SHIFT_EM * fontSize;
+            gy -= PUNCT_FALLBACK_SHIFT_EM * fontSize;
+          } else if (g.cls === "small") {
+            gx += SMALL_KANA_FALLBACK_SHIFT_EM * fontSize;
+            gy -= SMALL_KANA_FALLBACK_SHIFT_EM * fontSize;
+          }
+          ctx.translate(gx + dx, gy + dy);
+          if (sc !== 1) ctx.scale(sc, sc);
+          if (isStroke) ctx.strokeText(g.text, 0, 0);
+          else ctx.fillText(g.text, 0, 0);
+        }
+        ctx.restore();
+        globalCharIdx += 1;
+      }
     }
   }
   ctx.restore();
@@ -360,14 +492,17 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
   // px 単位で受け取る前提なので、ここで一度だけ px へ変換する。
   const letterSpacing = (Number(style.letterSpacing) || 0) / 1000 * fontSize;
   const lineSpacingExtra = Number(style.lineSpacing) || 0;
+  // ★ 縦書きモード。"vertical" のとき行 = カラム (右→左) として組む。
+  //   optical kerning は横方向の bearing / プロファイル前提のため縦書きでは無効化する。
+  const isVertical = String(style.writingMode || "horizontal").toLowerCase() === "vertical";
   // textDefaults と telop 個別 style の両方を許容する (一括反映 / per-telop の
   // 切り替えに対応)。優先順は per-telop > telopDefaults。
-  const enableOpticalKerning = (() => {
+  const enableOpticalKerning = !isVertical && (() => {
     if (style.enableOpticalKerning != null) return !!style.enableOpticalKerning;
     const td = state.manifest?.config?.telopDefaults || {};
     return !!td.enableOpticalKerning;
   })();
-  const opticalKerningHighQuality = (() => {
+  const opticalKerningHighQuality = !isVertical && (() => {
     if (style.opticalKerningHighQuality != null) return !!style.opticalKerningHighQuality;
     const td = state.manifest?.config?.telopDefaults || {};
     return !!td.opticalKerningHighQuality;
@@ -396,22 +531,32 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
       })
     : null;
 
+  // R8: 個別文字間カーニング。生テキストの gap マップを行ごとに切り分ける。
+  // charKerning があるときは optical OFF でも layoutTextRun 経路で描く (= run layout)。
+  const charKerningMap = (style.charKerning && typeof style.charKerning === "object" && Object.keys(style.charKerning).length > 0)
+    ? style.charKerning : null;
+  const lineCharKerning = charKerningMap ? sliceCharKerningByLines(charKerningMap, lines) : null;
+  const hasCharKerning = !!(lineCharKerning && lineCharKerning.some((m) => m && Object.keys(m).length > 0));
+  const useRunLayout = enableOpticalKerning || hasCharKerning;
+
   let baseW = 0;
   const baseLineWidths = [];
   const baseLineAscents = [];
   const baseLineDescents = [];
   const baseLineHeights = [];
-  for (const line of lines) {
+  for (let lineIdx = 0; !isVertical && lineIdx < lines.length; lineIdx += 1) {
+    const line = lines[lineIdx];
     let lineW;
-    if (enableOpticalKerning) {
+    if (useRunLayout) {
       lineW = measureTextRunWidth(ctx, line || " ", {
         fontSpec,
         fontSize,
         letterSpacing,
-        opticalKerning: true,
+        opticalKerning: enableOpticalKerning,
         opticalKerningHighQuality,
         outlineWidth,
         medianGapOverride: opticalMedianGap,
+        charKerning: lineCharKerning ? lineCharKerning[lineIdx] : null,
       });
     } else if (supportsNativeLs || letterSpacing === 0) {
       lineW = ctx.measureText(line || " ").width;
@@ -447,6 +592,44 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
     baseW = Math.max(baseW, lineW);
   }
   ctx.restore();
+
+  // ★ 縦書きの計測: 行 = カラムとして layoutTextColumn で組む。
+  //   GSUB vert グリフはストアにあるぶんだけ使い、足りない文字は背景で取得を
+  //   仕掛ける (完了で verticalGlyphsEpoch が進み、静的キャッシュが焼き直される)。
+  let verticalData = null;
+  if (isVertical) {
+    const store = getVerticalStore(familyId, fontWeightId);
+    ensureVerticalGlyphs(familyId, fontWeightId, text);
+    ctx.save();
+    ctx.font = fontSpec;
+    ctx.textBaseline = "alphabetic";
+    const m = ctx.measureText("永");
+    const fbAsc = Number.isFinite(m.fontBoundingBoxAscent) ? m.fontBoundingBoxAscent : fontSize * 0.8;
+    const fbDesc = Number.isFinite(m.fontBoundingBoxDescent) ? m.fontBoundingBoxDescent : fontSize * 0.2;
+    // baseline 位置: フォントの em ボックス比率 (サーバ由来)。未取得時は
+    // fontBoundingBox の比率で近似する (fillText と Path2D の基準を一致させる)。
+    const emAscentRatio = (store && store.status === "ready")
+      ? store.emAscent
+      : fbAsc / Math.max(1, fbAsc + fbDesc);
+    const columns = lines.map((line, idx) =>
+      layoutTextColumn(ctx, line || "　", {
+        fontSize,
+        letterSpacing,
+        charKerning: lineCharKerning ? lineCharKerning[idx] : null,
+        store,
+      }),
+    );
+    ctx.restore();
+    verticalData = {
+      columns,
+      colWidth: fontSize,
+      colGap: 0, // 後段で lineGap 確定後に代入
+      baseH: Math.max(1, ...columns.map((c) => c.height)),
+      emAscentRatio,
+      upem: store?.upem || 1000,
+      rotatedBaselineShift: (fbAsc - fbDesc) / 2,
+    };
+  }
   // lineSpacingExtra は負値を許容する (= 行間を詰める / 行を重ねる)。大きい
   // フォントサイズでは既定 gap (fontSize/6) が大きく、従来の `Math.max(0, ...)`
   // だと負の行間を指定しても gap=0 止まりで詰められなかった。下限はベース行高の
@@ -456,10 +639,21 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
   const lineGap = Math.max(-maxBaseLineHeight, baseGap + lineSpacingExtra);
 
   const nLines = Math.max(1, lines.length);
-  const visibleW = baseW + outlineWidth * 2;
-  const visibleH = baseLineHeights.reduce((a, b) => a + b, 0)
-    + lineGap * (nLines - 1)
-    + outlineWidth * 2 * nLines;
+  let visibleW;
+  let visibleH;
+  if (isVertical) {
+    // カラム間隔は横書きの行間 (lineGap) と同じ規則を使う
+    verticalData.colGap = lineGap;
+    visibleW = verticalData.colWidth * nLines
+      + lineGap * (nLines - 1)
+      + outlineWidth * 2 * nLines;
+    visibleH = verticalData.baseH + outlineWidth * 2;
+  } else {
+    visibleW = baseW + outlineWidth * 2;
+    visibleH = baseLineHeights.reduce((a, b) => a + b, 0)
+      + lineGap * (nLines - 1)
+      + outlineWidth * 2 * nLines;
+  }
 
   const padX = Math.max(0, Number(style.boxPaddingX) || 24);
   const padY = Math.max(0, Number(style.boxPaddingY) || 16);
@@ -485,7 +679,32 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
   const position = String(telop.position || "bottom");
   let anchorX;
   let anchorY;
-  if (position === "custom") {
+  if (isVertical) {
+    // ★ 縦書きは行 (カラム) が右→左に進むため、横書きと軸が入れ替わる:
+    //   - 「位置」= ブロックの X (行を置き始める側): top=右 / center=中央 / bottom=左
+    //   - 「文字揃え」= ブロックの Y (行内の揃えと同軸): left=上 / center=中央 / right=下
+    //   文字揃えはカラム内の縦揃え (drawTextColumns) と box の Y 位置の両方に効く
+    //   (横書きで align が「行の揃え + box X 位置」の両方に効くのと対称)。
+    const ALIGN_MARGIN_Y = 80;
+    const alignAnchorY = () => {
+      if (align === "left") return ALIGN_MARGIN_Y;
+      if (align === "right") return canvasH - boxH - ALIGN_MARGIN_Y;
+      return Math.round((canvasH - boxH) / 2);
+    };
+    if (position === "custom") {
+      anchorX = telop.x != null ? Number(telop.x) : canvasW - boxW - ALIGN_MARGIN_X;
+      anchorY = telop.y != null ? Number(telop.y) : alignAnchorY();
+    } else if (position === "top") {
+      anchorX = canvasW - boxW - ALIGN_MARGIN_X; // 右
+      anchorY = alignAnchorY();
+    } else if (position === "center") {
+      anchorX = Math.round((canvasW - boxW) / 2);
+      anchorY = alignAnchorY();
+    } else {
+      anchorX = ALIGN_MARGIN_X; // 左
+      anchorY = alignAnchorY();
+    }
+  } else if (position === "custom") {
     anchorX = telop.x != null ? Number(telop.x) : _alignAnchorX();
     anchorY = telop.y != null ? Number(telop.y) : canvasH - boxH - 80;
   } else if (position === "top") {
@@ -537,6 +756,11 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
     glyphTransformFn,
     // 行幅計測 (baseLineWidths) と同じ全体中央値を描画にも渡してセンタリングを揃える。
     medianGapOverride: opticalMedianGap,
+    // R8: 個別文字間。useRunLayout のとき layoutTextRun 経路で行ごとに適用。
+    useRunLayout,
+    charKerningByLine: lineCharKerning,
+    // 縦書き: drawTextLines 冒頭で drawTextColumns へディスパッチされる。
+    vertical: verticalData,
   };
 
   const glow = style.glow && typeof style.glow === "object" ? style.glow : null;

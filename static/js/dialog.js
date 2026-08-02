@@ -25,6 +25,7 @@ const deps = {
   scheduleScenarioSave: () => {},
   updateSelectedCutFromCurrent: () => {},
   activeScene: () => null,
+  selectedCutIdSet: () => new Set(),
 };
 
 export function bindDialog(injected = {}) {
@@ -597,6 +598,75 @@ export function closeSceneDialog() {
 // 一括反映ダイアログ／キャラ配置・お芝居の一括適用
 // =========================================================================
 
+// =========================================================================
+// 適用範囲スコープ (R1/R5): 複数選択時に「全部 / 選択中のみ」を尋ねる
+// =========================================================================
+
+// 返り値 "all" | "selected" | null(キャンセル)。動的に dialog を生成する。
+export function promptApplyScope({ kind = "カット", selectedCount = 0 } = {}) {
+  return new Promise((resolve) => {
+    const dialog = document.createElement("dialog");
+    dialog.className = "apply-scope-dialog";
+    const h = document.createElement("h2");
+    h.textContent = "適用範囲を選択";
+    const p = document.createElement("p");
+    p.className = "apply-scope-desc";
+    p.textContent = `${kind}を ${selectedCount} 件選択しています。どの範囲に適用しますか？`;
+    const actions = document.createElement("div");
+    actions.className = "apply-scope-actions";
+    const selectedBtn = document.createElement("button");
+    selectedBtn.type = "button";
+    selectedBtn.className = "primary-button";
+    selectedBtn.textContent = `選択中の${kind}にのみ適用`;
+    const allBtn = document.createElement("button");
+    allBtn.type = "button";
+    allBtn.className = "ghost-button";
+    allBtn.textContent = `全${kind}に適用`;
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "ghost-button";
+    cancelBtn.textContent = "キャンセル";
+    actions.append(selectedBtn, allBtn, cancelBtn);
+    dialog.append(h, p, actions);
+    document.body.append(dialog);
+    let done = false;
+    const finish = (val) => {
+      if (done) return;
+      done = true;
+      if (dialog.open) dialog.close();
+      dialog.remove();
+      resolve(val);
+    };
+    selectedBtn.addEventListener("click", () => finish("selected"));
+    allBtn.addEventListener("click", () => finish("all"));
+    cancelBtn.addEventListener("click", () => finish(null));
+    dialog.addEventListener("close", () => finish(null));
+    dialog.showModal();
+    migrateInDialogToasts();
+  });
+}
+
+// カット一括適用のスコープを解決する。2 件以上選択時のみ尋ねる。
+//   { scope: "all" | "selected" | null, ids: Set<string> | null }
+//   scope=null はキャンセル。ids は scope="selected" のときの対象カット ID 集合。
+async function resolveCutApplyScope() {
+  const ids = new Set(deps.selectedCutIdSet() || []);
+  if (ids.size < 2) return { scope: "all", ids: null };
+  const choice = await promptApplyScope({ kind: "カット", selectedCount: ids.size });
+  if (!choice) return { scope: null, ids: null };
+  if (choice === "selected") return { scope: "selected", ids };
+  return { scope: "all", ids: null };
+}
+
+// scope/ids を踏まえて「このカットが適用対象か」を判定する。
+//   - 現在のカット (source) は常に対象外
+//   - scope="selected" のときは ids に含まれるカットのみ
+function _isCutInApplyScope(cutId, scope, ids) {
+  if (cutId === state.selectedCutId) return false;
+  if (scope === "selected") return ids ? ids.has(cutId) : false;
+  return true;
+}
+
 // ===== キャラ配置「同一キャラに一括適用」 =====
 export async function applyCharacterToAllCuts() {
   updateSelectedCharacterFromControls();
@@ -611,49 +681,96 @@ export async function applyCharacterToAllCuts() {
     showToast("対象キャラのIDが解決できません");
     return;
   }
+  // R5: 複数カット選択時は適用範囲を尋ねる。
+  const { scope, ids } = await resolveCutApplyScope();
+  if (scope === null) return; // キャンセル
   const cuts = state.scenario?.cuts || [];
-  // 現在のカット以外で同じ characterId を持つキャラ数を数える
+  // スコープ内かつ同じ characterId を持つキャラがいるカット数を数える
   let targetCount = 0;
   for (const cut of cuts) {
-    if (cut.id === state.selectedCutId) continue;
+    if (!_isCutInApplyScope(cut.id, scope, ids)) continue;
     const list = (cut.state?.characters || []);
     if (list.some((c) => c && c.characterId === characterId)) targetCount += 1;
   }
   if (targetCount === 0) {
-    showToast("他のカットに同じキャラがいません");
+    showToast("対象カットに同じキャラがいません");
     return;
   }
-  const sourceCharacter = {
+  // R6: ベース〜振幅まで含む拡張ソース。
+  const src = {
+    baseId: character.baseId ?? "",
+    cheekId: character.cheekId ?? "",
+    eyeId: character.eyeId ?? "",
+    mouthId: character.mouthId ?? "",
+    hairstylePresetId: character.hairstylePresetId ?? "",
+    eyeAboveBangs: Boolean(character.eyeAboveBangs),
+    frontIds: Array.isArray(character.frontIds) ? [...character.frontIds] : [],
+    motion: character.motion ? JSON.parse(JSON.stringify(character.motion)) : null,
+    bobBpm: Number(character.bob?.bpm ?? 0),
+    bobAmplitudePx: Number(character.bob?.amplitudePx ?? 0),
     x: Number(character.character?.x ?? 0),
     y: Number(character.character?.y ?? 0),
     scale: Number(character.character?.scale ?? 1),
     removeWhite: Boolean(character.removeWhite),
   };
   const items = [
-    { key: "x", label: "X 座標", valueText: `${sourceCharacter.x}` },
-    { key: "y", label: "Y 座標", valueText: `${sourceCharacter.y}` },
-    { key: "scale", label: "拡大率", valueText: sourceCharacter.scale.toFixed(2) },
-    { key: "removeWhite", label: "白背景を透過扱いにする", valueText: sourceCharacter.removeWhite ? "ON" : "OFF" },
+    { key: "baseId", label: "ベース", valueText: src.baseId || "未設定" },
+    { key: "expression", label: "表情プリセット（頬・目・口）", valueText: `${src.cheekId || "-"} / ${src.eyeId || "-"} / ${src.mouthId || "-"}` },
+    { key: "cheekId", label: "頬", valueText: src.cheekId || "未設定" },
+    { key: "eyeId", label: "目", valueText: src.eyeId || "未設定" },
+    { key: "mouthId", label: "口", valueText: src.mouthId || "未設定" },
+    { key: "hairstylePresetId", label: "髪型", valueText: src.hairstylePresetId || "未設定" },
+    { key: "eyeAboveBangs", label: "目を前髪より前に出す", valueText: src.eyeAboveBangs ? "ON" : "OFF" },
+    { key: "frontIds", label: "前面オブジェクト", valueText: src.frontIds.length ? `${src.frontIds.length}個` : "なし" },
+    { key: "motion", label: "モーション", valueText: src.motion?.type && src.motion.type !== "none" ? src.motion.type : "なし" },
+    { key: "bobBpm", label: "BPM", valueText: `${src.bobBpm}` },
+    { key: "bobAmplitudePx", label: "振幅", valueText: `${src.bobAmplitudePx}px` },
+    { key: "x", label: "X 座標", valueText: `${src.x}` },
+    { key: "y", label: "Y 座標", valueText: `${src.y}` },
+    { key: "scale", label: "拡大率", valueText: src.scale.toFixed(2) },
+    { key: "removeWhite", label: "白背景を透過扱いにする", valueText: src.removeWhite ? "ON" : "OFF" },
   ];
   const charLabel = character.name || characterId;
+  const scopeText = scope === "selected" ? "選択中の" : "他の";
   const result = await promptBulkApply({
     title: "同一キャラに一括適用",
-    description: `「${charLabel}」と同じキャラ（characterId=${characterId}）が登場する他の ${targetCount} カットに、チェックを入れた項目を反映します。表情系（ベース・目・口・前髪など）は変更しません。`,
+    description: `「${charLabel}」と同じキャラ（characterId=${characterId}）が登場する${scopeText} ${targetCount} カットに、チェックを入れた項目を反映します。「個別文字間」など一部の設定は対象外です。`,
     items,
+    // 項目が多く、全 ON 既定は事故になりやすいので既定は OFF。
+    defaultChecked: false,
   });
   if (!result.confirmed || result.selectedKeys.size === 0) return;
+  const keys = result.selectedKeys;
   let appliedCount = 0;
   for (const cut of cuts) {
-    if (cut.id === state.selectedCutId) continue;
+    if (!_isCutInApplyScope(cut.id, scope, ids)) continue;
     const list = (cut.state?.characters || []);
     let touched = false;
     for (const target of list) {
       if (!target || target.characterId !== characterId) continue;
+      if (keys.has("baseId")) target.baseId = src.baseId;
+      if (keys.has("expression")) {
+        target.cheekId = src.cheekId;
+        target.eyeId = src.eyeId;
+        target.mouthId = src.mouthId;
+      }
+      if (keys.has("cheekId")) target.cheekId = src.cheekId;
+      if (keys.has("eyeId")) target.eyeId = src.eyeId;
+      if (keys.has("mouthId")) target.mouthId = src.mouthId;
+      if (keys.has("hairstylePresetId")) target.hairstylePresetId = src.hairstylePresetId;
+      if (keys.has("eyeAboveBangs")) target.eyeAboveBangs = src.eyeAboveBangs;
+      if (keys.has("frontIds")) target.frontIds = [...src.frontIds];
+      if (keys.has("motion")) target.motion = src.motion ? JSON.parse(JSON.stringify(src.motion)) : null;
+      if (keys.has("bobBpm") || keys.has("bobAmplitudePx")) {
+        target.bob = { ...(target.bob || {}) };
+        if (keys.has("bobBpm")) target.bob.bpm = src.bobBpm;
+        if (keys.has("bobAmplitudePx")) target.bob.amplitudePx = src.bobAmplitudePx;
+      }
       target.character = { ...(target.character || {}) };
-      if (result.selectedKeys.has("x")) target.character.x = sourceCharacter.x;
-      if (result.selectedKeys.has("y")) target.character.y = sourceCharacter.y;
-      if (result.selectedKeys.has("scale")) target.character.scale = sourceCharacter.scale;
-      if (result.selectedKeys.has("removeWhite")) target.removeWhite = sourceCharacter.removeWhite;
+      if (keys.has("x")) target.character.x = src.x;
+      if (keys.has("y")) target.character.y = src.y;
+      if (keys.has("scale")) target.character.scale = src.scale;
+      if (keys.has("removeWhite")) target.removeWhite = src.removeWhite;
       touched = true;
     }
     if (touched) appliedCount += 1;
@@ -667,7 +784,7 @@ export async function applyCharacterToAllCuts() {
 // ===== お芝居「文字設定を一括反映」 =====
 // scope = "all" → 全カット、scope = "same-speaker" → 同一 characterId の話者を持つカットのみ。
 // 同一話者反映は「セリフ枠 (showSpeechBox / boxBorder*) は対象外、文字スタイル + glow/dropShadow のみ」を反映。
-export async function applyDialogTextStyleToAllCuts(scope = "all") {
+export async function applyDialogTextStyleToAllCuts(textStyleScope = "all") {
   // 入力欄の値で payload() が更新されるため一度呼ぶ
   deps.updateSelectedCutFromCurrent();
   const cuts = state.scenario?.cuts || [];
@@ -675,6 +792,9 @@ export async function applyDialogTextStyleToAllCuts(scope = "all") {
     showToast("他のカットがありません");
     return;
   }
+  // R5: 複数カット選択時は適用範囲を尋ねる。
+  const { scope, ids } = await resolveCutApplyScope();
+  if (scope === null) return;
   const currentCut = cuts.find((c) => c.id === state.selectedCutId);
   const ts = currentCut?.state?.textStyle || {};
   const sourceSpeakerCharId = String(currentCut?.state?.speakerCharacterId || "");
@@ -690,7 +810,15 @@ export async function applyDialogTextStyleToAllCuts(scope = "all") {
   };
   const sourceCharacterId = speakerCharacterIdOf(currentCut);
   let targetCuts = cuts.filter((c) => c.id !== state.selectedCutId);
-  if (scope === "same-speaker") {
+  // R5: 選択範囲スコープで対象カットを絞る (引数 scope = 関数引数の scope とは別物)。
+  if (scope === "selected") {
+    targetCuts = targetCuts.filter((c) => ids.has(c.id));
+    if (targetCuts.length === 0) {
+      showToast("選択中の他カットがありません");
+      return;
+    }
+  }
+  if (textStyleScope === "same-speaker") {
     if (!sourceCharacterId) {
       showToast("現在のカットに話者が設定されていません");
       return;
@@ -727,12 +855,12 @@ export async function applyDialogTextStyleToAllCuts(scope = "all") {
     { key: "dialogueGlow", label: "セリフ光彩", valueText: onOff(source.dialogueGlow?.enabled) },
     { key: "dialogueDropShadow", label: "セリフドロップシャドウ", valueText: onOff(source.dialogueDropShadow?.enabled) },
   ];
-  const title = scope === "same-speaker"
+  const title = textStyleScope === "same-speaker"
     ? "同一話者の文字設定を一括反映"
     : "セリフの文字設定を一括反映";
-  const description = scope === "same-speaker"
-    ? `現在のカットと同じ話者 (characterId=${sourceCharacterId}) を持つ他の ${otherCount} カットに、チェックを入れた項目を反映します。セリフ枠は対象外です。`
-    : `現在のカットのセリフ文字設定を、他の ${otherCount} カットに反映します。チェックを入れた項目だけが反映されます。`;
+  const description = textStyleScope === "same-speaker"
+    ? `現在のカットと同じ話者 (characterId=${sourceCharacterId}) を持つ ${otherCount} カットに、チェックを入れた項目を反映します。セリフ枠は対象外です。`
+    : `現在のカットのセリフ文字設定を、${otherCount} カットに反映します。チェックを入れた項目だけが反映されます。`;
   const result = await promptBulkApply({ title, description, items });
   if (!result.confirmed || result.selectedKeys.size === 0) return;
   let count = 0;
@@ -759,6 +887,8 @@ export async function applyEffectSceneToAllCuts() {
     showToast("他のカットがありません");
     return;
   }
+  const { scope, ids } = await resolveCutApplyScope();
+  if (scope === null) return;
   const currentCut = cuts.find((c) => c.id === state.selectedCutId);
   const cs = currentCut?.state || {};
   const source = {
@@ -776,7 +906,7 @@ export async function applyEffectSceneToAllCuts() {
   // 経由でコピーされる)。
   const bgItem = (state.manifest?.backgrounds || []).find((b) => (b.path ?? b.id) === source.background);
   const fgItem = (state.manifest?.foregrounds || []).find((b) => (b.path ?? b.id) === source.foreground);
-  const otherCount = cuts.length - 1;
+  const otherCount = cuts.filter((c) => _isCutInApplyScope(c.id, scope, ids)).length;
   // 背景色+不透明度はセットで適用 (片方だけ反映する意味がほぼ無いので 1 項目に集約)。
   const bgColorText = source.backgroundColorOpacity > 0
     ? `${source.backgroundColor} (${Math.round(source.backgroundColorOpacity * 100)}%)`
@@ -807,7 +937,7 @@ export async function applyEffectSceneToAllCuts() {
   if (!result.confirmed || result.selectedKeys.size === 0) return;
   let count = 0;
   for (const cut of cuts) {
-    if (cut.id === state.selectedCutId) continue;
+    if (!_isCutInApplyScope(cut.id, scope, ids)) continue;
     cut.state = cut.state || {};
     for (const k of result.selectedKeys) {
       if (k === "backgroundColorPair") {
@@ -839,6 +969,8 @@ export async function applyEffectCharacterToAllCuts() {
     showToast("他のカットがありません");
     return;
   }
+  const { scope, ids } = await resolveCutApplyScope();
+  if (scope === null) return;
   const currentCut = cuts.find((c) => c.id === state.selectedCutId);
   const eff = (currentCut?.state?.characterEffects && typeof currentCut.state.characterEffects === "object")
     ? currentCut.state.characterEffects
@@ -849,7 +981,7 @@ export async function applyEffectCharacterToAllCuts() {
     dropShadow: { ...(eff.dropShadow || {}) },
   };
   const onOff = (v) => (v ? "ON" : "OFF");
-  const otherCount = cuts.length - 1;
+  const otherCount = cuts.filter((c) => _isCutInApplyScope(c.id, scope, ids)).length;
   const items = [
     { key: "colorFilter", label: "色フィルター（乗算）", valueText: onOff(source.colorFilter.enabled) },
     { key: "glow", label: "光彩", valueText: onOff(source.glow.enabled) },
@@ -863,7 +995,7 @@ export async function applyEffectCharacterToAllCuts() {
   if (!result.confirmed || result.selectedKeys.size === 0) return;
   let count = 0;
   for (const cut of cuts) {
-    if (cut.id === state.selectedCutId) continue;
+    if (!_isCutInApplyScope(cut.id, scope, ids)) continue;
     cut.state = cut.state || {};
     cut.state.characterEffects = { ...(cut.state.characterEffects || {}) };
     for (const k of result.selectedKeys) {
@@ -886,6 +1018,8 @@ export async function applyDialogBoxStyleToAllCuts() {
     showToast("他のカットがありません");
     return;
   }
+  const { scope, ids } = await resolveCutApplyScope();
+  if (scope === null) return;
   const currentCut = cuts.find((c) => c.id === state.selectedCutId);
   const ts = currentCut?.state?.textStyle || {};
   const source = {
@@ -895,7 +1029,7 @@ export async function applyDialogBoxStyleToAllCuts() {
     showSpeechBox: Boolean(currentCut?.state?.showSpeechBox ?? true),
     showSpeakerName: Boolean(ts.showSpeakerName ?? true),
   };
-  const otherCount = cuts.length - 1;
+  const otherCount = cuts.filter((c) => _isCutInApplyScope(c.id, scope, ids)).length;
   const placementLabel = ({ bottom: "下", top: "上", left: "左", right: "右", center: "中央" }[source.speechPlacement] || source.speechPlacement);
   const items = [
     { key: "speechPlacement", label: "枠位置", valueText: placementLabel },
@@ -912,7 +1046,7 @@ export async function applyDialogBoxStyleToAllCuts() {
   if (!result.confirmed || result.selectedKeys.size === 0) return;
   let count = 0;
   for (const cut of cuts) {
-    if (cut.id === state.selectedCutId) continue;
+    if (!_isCutInApplyScope(cut.id, scope, ids)) continue;
     cut.state = cut.state || {};
     cut.state.textStyle = { ...(cut.state.textStyle || {}) };
     if (result.selectedKeys.has("speechPlacement")) cut.state.textStyle.speechPlacement = source.speechPlacement;
@@ -958,17 +1092,20 @@ export async function applyTextDefaultsToAllCuts(diff) {
   showToast(`${cuts.length} 件のカットに ${labels} を反映しました`);
 }
 
-export async function applyTelopDefaultsToAllTelops(diff) {
+// options.ids: Set<string> | null。指定時はその ID のテロップにのみ反映 (R1 選択スコープ)。
+export async function applyTelopDefaultsToAllTelops(diff, options = {}) {
   const scene = deps.activeScene();
   const telops = scene?.telops || [];
   if (!Array.isArray(scene?.telops) || telops.length === 0 || Object.keys(diff).length === 0) return;
   // diff.__sourceKind が指定されていれば、それと kind が一致するテロップのみ反映先にする
   // (= caption の effect 設定を mv_text にコピーしない、Phase 3 仕様)。
   const sourceKind = diff.__sourceKind || null;
+  const scopeIds = options && options.ids instanceof Set ? options.ids : null;
   let appliedCount = 0;
   for (const telop of telops) {
     if (!telop || typeof telop !== "object") continue;
     if (sourceKind && String(telop.kind || "caption") !== sourceKind) continue;
+    if (scopeIds && !scopeIds.has(telop.id)) continue;
     telop.style = telop.style || {};
     for (const [key, value] of Object.entries(diff)) {
       if (key === "__sourceKind") continue;

@@ -431,6 +431,13 @@ export function payload() {
       fontFamily: elements.fontFamily.value,
       fontWeight: elements.fontWeight.value,
       align: elements.align.value,
+      // R8: 個別文字間カーニングはフォーム入力を持たないので、現在のカットの値を
+      // そのまま carry する (= payload 再構築で消えないようにする)。空なら省略。
+      charKerning: (() => {
+        const cur = state.scenario?.cuts?.find((c) => c && c.id === state.selectedCutId);
+        const ck = cur?.state?.textStyle?.charKerning;
+        return ck && typeof ck === "object" && Object.keys(ck).length > 0 ? { ...ck } : undefined;
+      })(),
       speechPlacement: elements.speechPlacement.value,
       lines: Number(elements.lines.value),
       boxOpacity: opacityToRender(elements.boxOpacity.value),
@@ -455,8 +462,11 @@ export function payload() {
         return Number(state.manifest.config.textDefaults?.lineGap ?? 16);
       })(),
       letterSpacing: (() => {
+        // R7: テロップと同じ 1/1000em 単位。10 刻みに丸めて -500..1000 にクランプ。
         const raw = elements.cutLetterSpacing?.value;
-        if (raw !== undefined && raw !== "" && Number.isFinite(Number(raw))) return Number(raw);
+        if (raw !== undefined && raw !== "" && Number.isFinite(Number(raw))) {
+          return Math.max(-500, Math.min(1000, Math.round(Number(raw) / 10) * 10));
+        }
         return Number(state.manifest.config.textDefaults?.letterSpacing ?? 0);
       })(),
       speakerNameFontSize: Number(state.manifest.config.textDefaults?.speakerNameFontSize ?? 28),
@@ -554,8 +564,37 @@ export function cutFromCurrent() {
     startFrame: existing ? cutStartFrame(existing) : 0,
     durationFrame: Math.max(1, Number(elements.duration?.dataset.frames) || PROJECT_FPS * 3),
     audio: elements.audio.value.trim(),
+    // 発話ディレイ (秒): 話者音声を冒頭から遅らせる (cut 直下フィールド)。
+    audioDelaySec: (() => {
+      const raw = Number(elements.cutAudioDelayInput?.value);
+      if (Number.isFinite(raw) && raw > 0) return Math.round(raw * 1000) / 1000;
+      return 0;
+    })(),
+    // R10: カット入りトランジション (cut 直下フィールド)。
+    transition: collectCutTransitionFromControls(existing),
     state: { ...carriedFromExisting, ...payload() },
   };
+}
+
+// R10: 演出タブのトランジション入力から { type, durationFrame } を組む。
+function collectCutTransitionFromControls(existing) {
+  const typeEl = elements.cutTransitionTypeSelect;
+  const durEl = elements.cutTransitionDurationInput;
+  if (!typeEl) {
+    // フォーム未生成時は既存値を維持。
+    const t = existing?.transition;
+    return t && typeof t === "object" ? { type: String(t.type || "none"), durationFrame: Math.max(0, Math.round(Number(t.durationFrame) || 0)) } : { type: "none", durationFrame: 0 };
+  }
+  const type = String(typeEl.value || "none");
+  if (type === "none") return { type: "none", durationFrame: 0 };
+  const raw = Number(durEl?.value);
+  const durationFrame = Number.isFinite(raw) && raw > 0 ? Math.round(raw) : Math.max(1, Math.round(PROJECT_FPS * 0.5));
+  const out = { type, durationFrame: Math.max(1, durationFrame) };
+  if (type === "wipe") {
+    const d = String(elements.cutTransitionWipeDirSelect?.value || "right").toLowerCase();
+    out.wipeDirection = ["right", "left", "up", "down"].includes(d) ? d : "right";
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -597,6 +636,37 @@ function setRangeSelection(anchorId, primaryId) {
   for (let i = lo; i <= hi; i += 1) ids.add(cuts[i].id);
   state.selectedCutIds = ids;
   state.cutSelectionAnchorId = anchorId;
+}
+
+// R3: タイムラインのカットレーン(バー)クリックの選択処理。cutList 撤去後はこちらが
+// カット選択の入口。通常クリック=単一選択 (多重選択を解除)、Shift=範囲、Cmd/Ctrl=トグル。
+// 複製/ペーストで残った selectedCutIds が「通常クリックしても消えない」バグの対策でもある。
+export function selectCutFromTimeline(cut, mods = {}) {
+  if (!cut) return;
+  if (mods.shiftKey) {
+    ensureCutSelectionState();
+    const anchor = state.cutSelectionAnchorId || state.selectedCutId || cut.id;
+    state.selectedCutId = cut.id;
+    setRangeSelection(anchor, cut.id);
+    loadCut(cut, { keepTelopSelection: true }).catch((error) => console.error(error));
+    return;
+  }
+  if (mods.metaKey || mods.ctrlKey) {
+    ensureCutSelectionState();
+    const ids = new Set(state.selectedCutIds);
+    if (ids.size === 0 && state.selectedCutId) ids.add(state.selectedCutId);
+    if (ids.has(cut.id)) ids.delete(cut.id);
+    else ids.add(cut.id);
+    state.selectedCutIds = ids;
+    state.selectedCutId = cut.id;
+    state.cutSelectionAnchorId = cut.id;
+    loadCut(cut, { keepTelopSelection: true }).catch((error) => console.error(error));
+    return;
+  }
+  // 通常クリック: 単一選択に戻す (多重選択を解除 = 複製/ペースト後の残留ハイライト解消)。
+  clearMultiCutSelection();
+  state.cutSelectionAnchorId = cut.id;
+  loadCut(cut).catch((error) => console.error(error));
 }
 
 function handleCutItemClick(cut, event) {
@@ -921,6 +991,29 @@ export async function loadCut(cut, options = {}) {
     const v = normalizeColorValue(data.backgroundColor || "#000000", "#000000");
     elements.backgroundColor.value = v;
     setSwatchDisplay(elements.backgroundColorValue, v);
+  }
+  // R10: カット入りトランジション (cut 直下) を演出タブへ反映。
+  if (elements.cutTransitionTypeSelect) {
+    const tr = (cut && typeof cut.transition === "object") ? cut.transition : null;
+    const type = tr ? String(tr.type || "none") : "none";
+    elements.cutTransitionTypeSelect.value = type;
+    if (elements.cutTransitionDurationInput) {
+      const df = tr ? Math.max(0, Math.round(Number(tr.durationFrame) || 0)) : 0;
+      elements.cutTransitionDurationInput.value = String(df > 0 ? df : Math.round(PROJECT_FPS * 0.5));
+    }
+    if (elements.cutTransitionWipeDirSelect) {
+      const dir = tr && tr.wipeDirection ? String(tr.wipeDirection) : "right";
+      elements.cutTransitionWipeDirSelect.value = ["right", "left", "up", "down"].includes(dir) ? dir : "right";
+    }
+    // ワイプ方向セレクトは type=wipe のときだけ表示。
+    if (elements.cutTransitionWipeDirLabel) {
+      elements.cutTransitionWipeDirLabel.hidden = type !== "wipe";
+    }
+  }
+  // 発話ディレイ (cut 直下フィールド) を演出タブへ反映。
+  if (elements.cutAudioDelayInput) {
+    const ad = cut ? Math.max(0, Number(cut.audioDelaySec) || 0) : 0;
+    elements.cutAudioDelayInput.value = ad > 0 ? String(ad) : "0";
   }
   if (elements.backgroundColorOpacity) {
     const raw = Number(data.backgroundColorOpacity);

@@ -1,11 +1,13 @@
 import { opacityToUi, debounce, normalizeColorValue } from "./utils.js";
 import { bindTimecodeInput, PROJECT_FPS, parseTimecode } from "./timecode.js";
-import { cutDurationFrame, cutStartSec, cutDurationSec } from "./scenario.js";
+import { cutDurationFrame, cutStartSec, cutDurationSec, recalcCutStartSec, cutTransition } from "./scenario.js";
+import { recordHistory } from "./history.js";
 import {
   fillFontWeights,
   fillDefaultFontWeights,
   fillTelopDefaultFontWeights,
   registerProjectFonts,
+  watchSystemFontsReady,
 } from "./font.js";
 import { state } from "./state.js";
 import { elements } from "./elements.js";
@@ -53,7 +55,11 @@ import {
   stepPlayheadFrames,
   seekPlayheadToStart,
   seekPlayheadToEnd,
+  addTimelineLane,
+  removeEmptyTimelineLane,
+  renderTelopTrack,
 } from "./timeline.js";
+import { shiftCharKerningForEdit } from "./renderer/text-layout.js";
 import {
   bindTelop,
   defaultTelop,
@@ -132,6 +138,7 @@ import {
   applyEffectCharacterToAllCuts,
   applyTelopDefaultsToAllTelops,
   promptBulkApply,
+  promptApplyScope,
 } from "./dialog.js";
 import {
   bindScenarioActions,
@@ -144,10 +151,12 @@ import {
   renderCutList,
   addCutFromCurrent,
   updateSelectedCutFromCurrent,
+  selectCutFromTimeline,
   scheduleScenarioSave,
   handleEditorChanged,
   saveScenario,
   bindAddCutBatchDialog,
+  openAddCutBatchDialog,
   undoEdit,
   redoEdit,
   splitCutAtPlayhead,
@@ -361,6 +370,22 @@ function bindKeyboardShortcuts() {
         redoEdit().catch((error) => console.error(error));
         return;
       }
+      // Cmd/Ctrl+C / +V: 項目のコピー & ペースト。入力欄では既に return 済み (= OS の
+      // 通常コピペ)。ページ上のテキスト選択があるときはブラウザのコピーに委譲する。
+      if (key === "c" && !event.shiftKey) {
+        if (state.projectDashboardVisible || !state.activeProjectId) return;
+        const sel = window.getSelection?.();
+        if (sel && String(sel).length > 0) return; // テキスト選択中はブラウザのコピーを優先
+        event.preventDefault();
+        copySelectionToClipboard();
+        return;
+      }
+      if (key === "v" && !event.shiftKey) {
+        if (state.projectDashboardVisible || !state.activeProjectId) return;
+        event.preventDefault();
+        pasteFromClipboard();
+        return;
+      }
       return;
     }
 
@@ -495,14 +520,14 @@ function bindKeyboardShortcuts() {
 // メニュー項目クリック・外側クリック・Esc で閉じる。メニュー項目側の click は
 // 既に bind 済みハンドラ (addTelop / openPosterTypographyDialog / addSoundEffect /
 // addVideoLayer) が走るので、ここでは「クリック後に閉じる」だけを足す。
-function _bindAddItemDropdown() {
-  const dropdown = elements.addItemDropdown;
-  const trigger = elements.addItemDropdownTrigger;
+// 汎用ドロップダウン開閉。onOpen(menu) を渡すと開く直前に項目の出し分け等ができる。
+function _bindGenericDropdown(dropdown, trigger, { onOpen } = {}) {
   if (!dropdown || !trigger) return;
   const menu = dropdown.querySelector(".dropdown-menu");
   if (!menu) return;
   const setOpen = (open) => {
     if (open) {
+      if (typeof onOpen === "function") onOpen(menu);
       menu.removeAttribute("hidden");
       dropdown.classList.add("open");
       trigger.setAttribute("aria-expanded", "true");
@@ -525,6 +550,354 @@ function _bindAddItemDropdown() {
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") setOpen(false);
+  });
+}
+
+function _bindAddItemDropdown() {
+  _bindGenericDropdown(elements.addItemDropdown, elements.addItemDropdownTrigger);
+}
+
+// R4: 操作プルダウン (選択種別で動的に内容が変わる) を配線する。
+function _dispatchDuplicate() {
+  if (state.editorTarget === "telop") duplicateSelectedTelop();
+  else if (state.editorTarget === "soundEffect") duplicateSelectedSoundEffect();
+  else if (state.editorTarget === "videoLayer") duplicateSelectedVideoLayer();
+  else duplicateSelectedCuts();
+}
+function _dispatchDelete() {
+  if (state.editorTarget === "telop") deleteSelectedTelops();
+  else if (state.editorTarget === "soundEffect") deleteSelectedSoundEffect();
+  else if (state.editorTarget === "videoLayer") deleteSelectedVideoLayer();
+  else deleteSelectedCuts();
+}
+function _dispatchSplit() {
+  try {
+    if (state.editorTarget === "soundEffect") splitSelectedSoundEffect();
+    else if (state.editorTarget === "videoLayer") splitSelectedVideoLayer();
+    else if (state.editorTarget === "telop") showToast("テロップは分割できません");
+    else splitCutAtPlayhead();
+  } catch (error) {
+    console.error(error);
+    showToast("分割に失敗しました", "error");
+  }
+}
+// 現在の選択種別ラベル。
+function _editorTargetLabel() {
+  switch (state.editorTarget) {
+    case "telop": return "テロップ";
+    case "soundEffect": return "効果音";
+    case "videoLayer": return "動画";
+    default: return "カット";
+  }
+}
+function _bindActionDropdown() {
+  const onOpen = () => {
+    const target = state.editorTarget || "cut";
+    if (elements.actionDropdownLabel) {
+      elements.actionDropdownLabel.textContent = `操作: ${_editorTargetLabel()}`;
+    }
+    const show = (el, visible) => { if (el) el.hidden = !visible; };
+    // 複製 / 削除 / コピー は全種別共通。
+    show(elements.actionDuplicateButton, true);
+    show(elements.actionDeleteButton, true);
+    show(elements.actionCopyButton, true);
+    // 貼り付けはクリップボードに項目があるときのみ。
+    show(elements.actionPasteButton, !!(state.clipboard && state.clipboard.items?.length));
+    // 分割はカット / 効果音 / 動画のみ (テロップは不可)。
+    show(elements.actionSplitButton, target !== "telop");
+    // 一括追加は種別に応じて。カット選択時=カット一括追加、テロップ選択時=テロップ一括追加。
+    show(elements.actionAddCutBatchButton, target === "cut");
+    show(elements.actionAddTelopBatchButton, target === "telop");
+  };
+  _bindGenericDropdown(elements.actionDropdown, elements.actionDropdownTrigger, { onOpen });
+  elements.actionDuplicateButton?.addEventListener("click", _dispatchDuplicate);
+  elements.actionCopyButton?.addEventListener("click", copySelectionToClipboard);
+  elements.actionPasteButton?.addEventListener("click", pasteFromClipboard);
+  elements.actionDeleteButton?.addEventListener("click", _dispatchDelete);
+  elements.actionSplitButton?.addEventListener("click", _dispatchSplit);
+  elements.actionAddCutBatchButton?.addEventListener("click", openAddCutBatchDialog);
+  elements.actionAddTelopBatchButton?.addEventListener("click", openAddTelopBatchDialog);
+}
+
+// R2: レイヤー(レーン)追加プルダウンを配線する。
+function _bindAddLaneDropdown() {
+  _bindGenericDropdown(elements.addLaneDropdown, elements.addLaneDropdownTrigger);
+  elements.addTelopLaneButton?.addEventListener("click", () => addTimelineLane("telop"));
+  elements.addSoundEffectLaneButton?.addEventListener("click", () => addTimelineLane("soundEffect"));
+  elements.addVideoLaneButton?.addEventListener("click", () => addTimelineLane("videoLayer"));
+  elements.removeEmptyLaneButton?.addEventListener("click", () => {
+    const target = state.editorTarget;
+    const kind = target === "soundEffect" ? "soundEffect" : target === "videoLayer" ? "videoLayer" : "telop";
+    removeEmptyTimelineLane(kind);
+  });
+}
+
+// =========================================================================
+// 項目のコピー & ペースト (cut / telop / soundEffect / videoLayer)。
+// アプリ内クリップボード (state.clipboard) に deep clone を保持し、貼り付け時に
+// 新しい ID を採番して挿入する。OS クリップボードは使わない (アプリ専用オブジェクト)。
+// =========================================================================
+function _newItemId(prefix) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+function _itemListForKind(scene, kind) {
+  if (kind === "telop") return scene.telops;
+  if (kind === "soundEffect") return scene.soundEffects;
+  if (kind === "videoLayer") return scene.videoLayers;
+  return null;
+}
+function _selectedIdsForKind(kind) {
+  if (kind === "telop") {
+    if (state.selectedTelopIds?.size) return Array.from(state.selectedTelopIds);
+    return state.selectedTelopId ? [state.selectedTelopId] : [];
+  }
+  if (kind === "soundEffect") {
+    if (state.selectedSoundEffectIds?.size) return Array.from(state.selectedSoundEffectIds);
+    return state.selectedSoundEffectId ? [state.selectedSoundEffectId] : [];
+  }
+  if (kind === "videoLayer") {
+    if (state.selectedVideoLayerIds?.size) return Array.from(state.selectedVideoLayerIds);
+    return state.selectedVideoLayerId ? [state.selectedVideoLayerId] : [];
+  }
+  return Array.from(selectedCutIdSet());
+}
+function _editorTargetKind() {
+  return state.editorTarget === "telop" ? "telop"
+    : state.editorTarget === "soundEffect" ? "soundEffect"
+    : state.editorTarget === "videoLayer" ? "videoLayer" : "cut";
+}
+const _KIND_LABEL = { cut: "カット", telop: "テロップ", soundEffect: "効果音", videoLayer: "動画" };
+
+function copySelectionToClipboard() {
+  const scene = activeScene();
+  if (!scene) return;
+  const kind = _editorTargetKind();
+  const ids = _selectedIdsForKind(kind);
+  if (ids.length === 0) { showToast("コピーする項目が選択されていません"); return; }
+  const clone = (x) => JSON.parse(JSON.stringify(x));
+  if (kind === "cut") {
+    const cuts = state.scenario?.cuts || [];
+    const idSet = new Set(ids);
+    const items = cuts.filter((c) => idSet.has(c.id)).map(clone);
+    if (items.length === 0) return;
+    // 紐づくテロップ/効果音/動画も一緒にコピーする (複製と同じ挙動)。
+    const linked = {
+      telops: (scene.telops || []).filter((t) => idSet.has(t.linkedCutId)).map(clone),
+      soundEffects: (scene.soundEffects || []).filter((s) => idSet.has(s.linkedCutId)).map(clone),
+      videoLayers: (scene.videoLayers || []).filter((v) => idSet.has(v.linkedCutId)).map(clone),
+    };
+    state.clipboard = { kind, items, linked };
+    showToast(`カットを${items.length}件コピーしました`);
+    return;
+  }
+  const list = _itemListForKind(scene, kind) || [];
+  const idSet = new Set(ids);
+  const items = list.filter((x) => idSet.has(x.id)).map(clone);
+  if (items.length === 0) return;
+  state.clipboard = { kind, items };
+  showToast(`${_KIND_LABEL[kind]}を${items.length}件コピーしました`);
+}
+
+function _pasteCutsFromClipboard(scene, clip) {
+  const cuts = state.scenario?.cuts;
+  if (!Array.isArray(cuts)) return;
+  // 挿入位置: 選択中カットの直後、無ければ末尾。
+  let insertIdx = cuts.length;
+  const curIdx = cuts.findIndex((c) => c.id === state.selectedCutId);
+  if (curIdx >= 0) insertIdx = curIdx + 1;
+  // 元 startFrame (コピー時のスナップショット) を控える。リンクアイテムのシフト計算用。
+  const srcOldStart = new Map();
+  const sourceToCloneId = new Map();
+  const cloneCuts = clip.items.map((src) => {
+    srcOldStart.set(src.id, Math.max(0, Math.round(Number(src.startFrame) || 0)));
+    const c = JSON.parse(JSON.stringify(src));
+    const newId = _newItemId("cut");
+    sourceToCloneId.set(src.id, newId);
+    c.id = newId;
+    return c;
+  });
+  cuts.splice(insertIdx, 0, ...cloneCuts);
+  state.selectedCutId = cloneCuts[cloneCuts.length - 1].id;
+  state.selectedCutIds = new Set(cloneCuts.map((c) => c.id));
+  state.cutSelectionAnchorId = cloneCuts[0].id;
+  recalcCutStartSec();
+  // リンクアイテムを複製して clone カットへ張り替え (複製と同じロジック)。
+  const linked = clip.linked || { telops: [], soundEffects: [], videoLayers: [] };
+  const dupLinked = (item, prefix) => {
+    const sourceId = item.linkedCutId;
+    const cloneId = sourceToCloneId.get(sourceId);
+    if (!cloneId) return null;
+    const cloneCut = cuts.find((c) => c.id === cloneId);
+    const oldStart = srcOldStart.get(sourceId) ?? 0;
+    const shift = (Number(cloneCut?.startFrame) || 0) - oldStart;
+    const dup = JSON.parse(JSON.stringify(item));
+    dup.id = _newItemId(prefix);
+    dup.linkedCutId = cloneId;
+    dup.startFrame = Math.max(0, (Number(item.startFrame) || 0) + shift);
+    return dup;
+  };
+  if (Array.isArray(scene.telops)) {
+    for (const t of linked.telops || []) { const d = dupLinked(t, "telop"); if (d) scene.telops.push(d); }
+  }
+  if (Array.isArray(scene.soundEffects)) {
+    for (const s of linked.soundEffects || []) { const d = dupLinked(s, "se"); if (d) scene.soundEffects.push(d); }
+  }
+  if (Array.isArray(scene.videoLayers)) {
+    for (const v of linked.videoLayers || []) { const d = dupLinked(v, "vl"); if (d) scene.videoLayers.push(d); }
+  }
+  loadCut(cloneCuts[cloneCuts.length - 1]).catch((error) => console.error(error));
+  scheduleScenarioSave();
+  recordHistory();
+  showToast(`カットを${cloneCuts.length}件貼り付けました`);
+}
+
+function pasteFromClipboard() {
+  const clip = state.clipboard;
+  if (!clip || !Array.isArray(clip.items) || clip.items.length === 0) {
+    showToast("コピーされた項目がありません");
+    return;
+  }
+  const scene = activeScene();
+  if (!scene) return;
+  if (clip.kind === "cut") { _pasteCutsFromClipboard(scene, clip); return; }
+  const list = _itemListForKind(scene, clip.kind);
+  if (!Array.isArray(list)) return;
+  const prefix = clip.kind === "telop" ? "telop" : clip.kind === "soundEffect" ? "se" : "vl";
+  // グループ全体を再生ヘッドへ移動 (相対オフセット・レーンは保持)。
+  const playFrame = Math.max(0, Math.round((Number(state.timeline?.currentSec) || 0) * PROJECT_FPS));
+  const earliest = Math.min(
+    ...clip.items.map((it) => Math.max(0, Math.round(Number(it.startFrame) || 0))),
+  );
+  const delta = playFrame - earliest;
+  const created = [];
+  for (const it of clip.items) {
+    const c = JSON.parse(JSON.stringify(it));
+    c.id = _newItemId(prefix);
+    c.startFrame = Math.max(0, (Math.round(Number(it.startFrame) || 0)) + delta);
+    // 貼り付けは位置が明示されるのでカットリンクは解除する。
+    c.linkedCutId = null;
+    list.push(c);
+    created.push(c);
+  }
+  list.sort((a, b) => (Number(a.startFrame) || 0) - (Number(b.startFrame) || 0));
+  state.editorTarget = clip.kind;
+  const ids = created.map((c) => c.id);
+  const primary = ids[ids.length - 1];
+  if (clip.kind === "telop") setMultiTelopSelection(ids, primary);
+  else if (clip.kind === "soundEffect") setMultiSoundEffectSelection(ids, primary);
+  else setMultiVideoLayerSelection(ids, primary);
+  applyEditorTargetView();
+  scheduleScenarioSave();
+  recordHistory();
+  renderTelopTrack();
+  renderPreview();
+  showToast(`${_KIND_LABEL[clip.kind]}を${created.length}件貼り付けました`);
+}
+
+// R10: カット入りトランジションは「カット先頭の 0.5 秒」効果なので、編集中の停止
+// プレビュー (再生ヘッドが窓外) では見えない。設定変更時に遷移の中間地点へシークして
+// 「半分かかった状態」を即プレビューし、変更が反映されることを確認できるようにする。
+function _bindCutTransitionPreview() {
+  const onChange = () => {
+    // ワイプ方向セレクトは type=wipe のときだけ表示。
+    if (elements.cutTransitionWipeDirLabel) {
+      elements.cutTransitionWipeDirLabel.hidden = elements.cutTransitionTypeSelect?.value !== "wipe";
+    }
+    updateSelectedCutFromCurrent(); // トランジション (+他入力) を現在カットへ確定。
+    const cut = state.scenario?.cuts?.find((c) => c.id === state.selectedCutId);
+    if (cut) {
+      const tr = cutTransition(cut);
+      if (tr.type !== "none" && tr.durationFrame > 0) {
+        // 遷移の中間 = overlay 不透明度 ~0.5 (半分かかった状態) を表示。
+        state.timeline.currentSec = cutStartSec(cut) + (tr.durationFrame / 2) / PROJECT_FPS;
+        schedulePlayheadSave();
+      }
+    }
+    scheduleScenarioSave();
+    renderTelopTrack();
+    renderPreview();
+  };
+  elements.cutTransitionTypeSelect?.addEventListener("change", onChange);
+  elements.cutTransitionDurationInput?.addEventListener("change", onChange);
+  elements.cutTransitionWipeDirSelect?.addEventListener("change", onChange);
+  // 発話ディレイは音声タイミングだけの変更なので、確定 + 保存のみ (シーク不要)。
+  elements.cutAudioDelayInput?.addEventListener("change", () => {
+    updateSelectedCutFromCurrent();
+    scheduleScenarioSave();
+  });
+}
+
+// R8: セリフ本文の個別文字間カーニング UI + テキスト編集追従シフト。
+function _bindDialogueKerning() {
+  const ta = elements.dialogue;
+  if (!ta) return;
+  const curCut = () => state.scenario?.cuts?.find((c) => c && c.id === state.selectedCutId) || null;
+  const gapAtCursor = () => {
+    const pos = ta.selectionStart ?? 0;
+    const before = Array.from(ta.value.slice(0, pos)).length;
+    const total = Array.from(ta.value).length;
+    const gap = before - 1;
+    return gap >= 0 && gap <= total - 2 ? gap : -1;
+  };
+  const refresh = () => {
+    if (!elements.dialogueKerningReadout) return;
+    const gap = gapAtCursor();
+    if (gap < 0) {
+      elements.dialogueKerningReadout.textContent = "本文の文字間にカーソルを置いて調整";
+      return;
+    }
+    const cur = Number(curCut()?.state?.textStyle?.charKerning?.[gap]) || 0;
+    elements.dialogueKerningReadout.textContent = `${gap + 1}↔${gap + 2} 文字目: ${cur} (1/1000em)`;
+  };
+  const apply = (delta, reset = false) => {
+    const gap = gapAtCursor();
+    if (gap < 0) { showToast("文字と文字の間にカーソルを置いてください"); return; }
+    const cut = curCut();
+    if (!cut) return;
+    cut.state = cut.state || {};
+    cut.state.textStyle = cut.state.textStyle || {};
+    const ck = { ...(cut.state.textStyle.charKerning || {}) };
+    const next = reset ? 0 : Math.max(-2000, Math.min(2000, (Number(ck[gap]) || 0) + delta));
+    if (next === 0) delete ck[gap];
+    else ck[gap] = next;
+    if (Object.keys(ck).length > 0) cut.state.textStyle.charKerning = ck;
+    else delete cut.state.textStyle.charKerning;
+    scheduleScenarioSave();
+    renderPreview();
+    refresh();
+  };
+  elements.dialogueKerningMinusButton?.addEventListener("click", () => apply(-100));
+  elements.dialogueKerningMinus10Button?.addEventListener("click", () => apply(-10));
+  elements.dialogueKerningPlus10Button?.addEventListener("click", () => apply(10));
+  elements.dialogueKerningPlusButton?.addEventListener("click", () => apply(100));
+  elements.dialogueKerningResetButton?.addEventListener("click", () => apply(0, true));
+  ta.addEventListener("keyup", refresh);
+  ta.addEventListener("click", refresh);
+  ta.addEventListener("select", refresh);
+  // edit-shift: 直前テキストと比較して charKerning キーをシフト。
+  let prev = ta.value;
+  ta.addEventListener("focus", () => { prev = ta.value; });
+  ta.addEventListener("input", () => {
+    const cut = curCut();
+    const ck = cut?.state?.textStyle?.charKerning;
+    if (ck && Object.keys(ck).length > 0) {
+      const oldArr = Array.from(prev);
+      const newArr = Array.from(ta.value);
+      let p = 0;
+      while (p < oldArr.length && p < newArr.length && oldArr[p] === newArr[p]) p += 1;
+      let s = 0;
+      while (s < oldArr.length - p && s < newArr.length - p
+        && oldArr[oldArr.length - 1 - s] === newArr[newArr.length - 1 - s]) s += 1;
+      const removed = oldArr.length - p - s;
+      const inserted = newArr.length - p - s;
+      if (removed || inserted) {
+        const shifted = shiftCharKerningForEdit(ck, p, removed, inserted);
+        if (Object.keys(shifted).length > 0) cut.state.textStyle.charKerning = shifted;
+        else delete cut.state.textStyle.charKerning;
+      }
+    }
+    prev = ta.value;
+    refresh();
   });
 }
 
@@ -567,6 +940,7 @@ function bindControls() {
     setMultiVideoLayerSelection,
     renderVideoLayerEditor,
     applyEditorTargetView,
+    selectCutFromTimeline,
   });
   bindTelop({
     activeScene,
@@ -576,6 +950,7 @@ function bindControls() {
     applyEditorTargetView,
     applyTelopDefaultsToAllTelops,
     promptBulkApply,
+    promptApplyScope,
   });
   bindSoundEffect({
     activeScene,
@@ -630,6 +1005,7 @@ function bindControls() {
     scheduleScenarioSave,
     updateSelectedCutFromCurrent,
     activeScene,
+    selectedCutIdSet,
   });
   bindScenarioActions({
     applyEditorTargetView,
@@ -829,6 +1205,7 @@ function bindControls() {
   elements.deleteCharacterButton.addEventListener("click", deleteCharacter);
   elements.moveCharacterUpButton.addEventListener("click", () => moveCharacter(-1));
   elements.moveCharacterDownButton.addEventListener("click", () => moveCharacter(1));
+  elements.addCutButton?.addEventListener("click", addCutFromCurrent);
   elements.addTelopButton?.addEventListener("click", addTelop);
   elements.addTelopBatchButton?.addEventListener("click", openAddTelopBatchDialog);
   elements.addPosterTemplateButton?.addEventListener("click", () => {
@@ -844,6 +1221,11 @@ function bindControls() {
     window.location.href = "/title-editor";
   });
   _bindAddItemDropdown();
+  _bindActionDropdown();
+  _bindAddLaneDropdown();
+  _bindGenericDropdown(elements.exportDropdown, elements.exportDropdownTrigger);
+  _bindDialogueKerning();
+  _bindCutTransitionPreview();
   bindAddTelopBatchDialog();
   bindAddCutBatchDialog();
   elements.applyCharacterToAllCutsButton?.addEventListener("click", () => {
@@ -1434,6 +1816,8 @@ async function init() {
   state.projectFontsReady = registerProjectFonts().catch((err) =>
     console.warn("registerProjectFonts failed", err),
   );
+  // PC インストール済みフォントのスキャン完了を待ってフォント一覧へ反映する
+  watchSystemFontsReady(refreshManifest);
   const defaults = state.manifest.defaults;
 
   fillProjectSelect();

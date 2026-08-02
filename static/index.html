@@ -137,14 +137,31 @@
               <span>アセット管理</span>
             </button>
             <span class="top-actions-divider" aria-hidden="true"></span>
-            <button id="renderButton" class="primary-button" type="button">
-              <span class="msym button-icon" aria-hidden="true">image</span>
-              <span>PNG出力</span>
-            </button>
-            <button id="exportVideoButton" class="primary-button" type="button">
-              <span class="msym button-icon" aria-hidden="true">movie</span>
-              <span>動画出力</span>
-            </button>
+            <div class="dropdown-button" id="exportDropdown">
+              <button type="button" class="primary-button" id="exportDropdownTrigger" aria-haspopup="menu" aria-expanded="false" title="PNG静止画・動画・字幕データを書き出します">
+                <span class="msym button-icon" aria-hidden="true">ios_share</span>
+                <span>エクスポート</span>
+                <span class="msym button-icon dropdown-caret" aria-hidden="true">expand_more</span>
+              </button>
+              <div class="dropdown-menu" role="menu" hidden>
+                <button id="renderButton" type="button" role="menuitem" class="dropdown-menu-item" title="現在のフレームを 1920×1080 PNG で outputs に保存します">
+                  <span class="msym button-icon" aria-hidden="true">image</span>
+                  <span>PNG静止画</span>
+                </button>
+                <button id="exportVideoButton" type="button" role="menuitem" class="dropdown-menu-item" title="シーンを MP4 動画として書き出します">
+                  <span class="msym button-icon" aria-hidden="true">movie</span>
+                  <span>動画</span>
+                </button>
+                <button id="exportTelopSubtitlesButton" type="button" role="menuitem" class="dropdown-menu-item" title="テロップを SRT / VTT 字幕として outputs に同時書き出しします">
+                  <span class="msym button-icon" aria-hidden="true">subtitles</span>
+                  <span>テロップデータ (SRT/VTT)</span>
+                </button>
+                <button id="exportSerifSubtitlesButton" type="button" role="menuitem" class="dropdown-menu-item" title="セリフを SRT / VTT 字幕として outputs に同時書き出しします（話者名付き）">
+                  <span class="msym button-icon" aria-hidden="true">record_voice_over</span>
+                  <span>セリフデータ (SRT/VTT)</span>
+                </button>
+              </div>
+            </div>
             <button id="manualBackupButton" type="button" title="scenarios/main.json の手動バックアップを取ります（手動バックアップは自動で削除されません）">
               <span class="msym button-icon" aria-hidden="true">save</span>
               <span>バックアップ</span>
@@ -665,6 +682,15 @@
             </div>
             <p id="dialogueVoiceHint" class="asset-hint" hidden></p>
             <textarea id="dialogueInput" rows="4"></textarea>
+            <div class="indiv-kerning-row">
+              <span class="indiv-kerning-title">個別字間</span>
+              <button id="dialogueKerningMinusButton" type="button" class="compact-action-button">−100</button>
+              <button id="dialogueKerningMinus10Button" type="button" class="compact-action-button">−10</button>
+              <button id="dialogueKerningPlus10Button" type="button" class="compact-action-button">＋10</button>
+              <button id="dialogueKerningPlusButton" type="button" class="compact-action-button">＋100</button>
+              <button id="dialogueKerningResetButton" type="button" class="compact-action-button">リセット</button>
+              <span id="dialogueKerningReadout" class="indiv-kerning-readout">本文の文字間にカーソルを置いて調整</span>
+            </div>
             <div class="inline-fields">
               <label>
                 文字サイズ
@@ -708,8 +734,8 @@
                 </select>
               </label>
               <label>
-                文字間 (px)
-                <input id="cutLetterSpacingInput" type="number" min="-5" max="20" step="0.1" />
+                文字間 (1/1000em)
+                <input id="cutLetterSpacingInput" type="number" min="-500" max="1000" step="10" />
               </label>
               <label>
                 行間 (px)
@@ -798,6 +824,8 @@
                 <select id="linesSelect">
                   <option value="1">1段</option>
                   <option value="2">2段</option>
+                  <option value="3">3段</option>
+                  <option value="4">4段</option>
                 </select>
               </label>
               <label>
@@ -877,6 +905,40 @@
                 <span>背景・場面を一括適用</span>
               </button>
             </div>
+          </div>
+          <div class="panel-section">
+            <h2>トランジション（カット入り）</h2>
+            <div class="inline-fields">
+              <label>
+                種類
+                <select id="cutTransitionTypeSelect">
+                  <option value="none">なし</option>
+                  <option value="crossfade">クロスフェード</option>
+                  <option value="wipe">ワイプ</option>
+                  <option value="whiteout">ホワイトアウト／イン</option>
+                  <option value="blackout">ブラックアウト／イン</option>
+                  <option value="crosszoom">クロスズーム</option>
+                </select>
+              </label>
+              <label>
+                長さ(フレーム)
+                <input id="cutTransitionDurationInput" type="number" min="1" max="120" step="1" />
+              </label>
+              <label id="cutTransitionWipeDirLabel" hidden>
+                ワイプ方向
+                <select id="cutTransitionWipeDirSelect">
+                  <option value="right">左 → 右</option>
+                  <option value="left">右 → 左</option>
+                  <option value="down">上 → 下</option>
+                  <option value="up">下 → 上</option>
+                </select>
+              </label>
+              <label>
+                発話ディレイ(秒)
+                <input id="cutAudioDelayInput" type="number" min="0" max="10" step="0.1" />
+              </label>
+            </div>
+            <p class="asset-hint">直前カットの末尾と このカットの先頭で、効果時間を半分ずつシェアしてつなぎます（境界をまたぐので両カットが動いたまま切り替わります）。先頭カットでは「ホワイトアウト＝白から」「ブラックアウト＝黒から」のフェードインになります。<br>発話ディレイは、このカットの話者音声を冒頭から指定秒だけ遅らせます（トランジション中に声が出始める不自然さを避けるのに使います）。</p>
           </div>
 
           <div class="panel-section">
@@ -1010,22 +1072,44 @@
             <span class="msym button-icon" id="linkToggleIcon" aria-hidden="true">link</span>
             <span id="linkToggleLabel">カットへリンク</span>
           </button>
-          <button id="duplicateSelectedCutsButton" type="button" class="ghost-button" title="選択カットを複製">
-            <span class="msym button-icon" aria-hidden="true">content_copy</span>
-            <span>選択カットを複製</span>
-          </button>
-          <button id="deleteSelectedCutsButton" type="button" class="ghost-button" title="選択カットを削除">
-            <span class="msym button-icon" aria-hidden="true">delete</span>
-            <span>選択カットを削除</span>
-          </button>
-          <button id="splitCutAtPlayheadButton" type="button" class="ghost-button" title="再生位置でカットを 2 つに分割します（後半は音声・セリフ空）">
-            <span class="msym button-icon" aria-hidden="true">content_cut</span>
-            <span>再生位置でカット分割</span>
-          </button>
-          <button id="openAddCutBatchDialogButton" type="button" class="ghost-button">
-            <span class="msym button-icon" aria-hidden="true">playlist_add</span>
-            <span>カットを一括追加</span>
-          </button>
+          <!-- R4: 選択項目への操作 (選択種別で動的に内容が変わる) -->
+          <div class="dropdown-button" id="actionDropdown">
+            <button type="button" class="ghost-button" id="actionDropdownTrigger" aria-haspopup="menu" aria-expanded="false" title="選択中の項目への操作（複製・削除・分割・一括追加）">
+              <span class="msym button-icon" aria-hidden="true">build</span>
+              <span id="actionDropdownLabel">操作</span>
+              <span class="msym button-icon dropdown-caret" aria-hidden="true">expand_more</span>
+            </button>
+            <div class="dropdown-menu" role="menu" hidden>
+              <button id="actionDuplicateButton" type="button" role="menuitem" class="dropdown-menu-item">
+                <span class="msym button-icon" aria-hidden="true">content_copy</span>
+                <span>複製</span>
+              </button>
+              <button id="actionCopyButton" type="button" role="menuitem" class="dropdown-menu-item" title="選択項目をコピー (Cmd/Ctrl+C)">
+                <span class="msym button-icon" aria-hidden="true">file_copy</span>
+                <span>コピー</span>
+              </button>
+              <button id="actionPasteButton" type="button" role="menuitem" class="dropdown-menu-item" title="コピーした項目を再生位置に貼り付け (Cmd/Ctrl+V)">
+                <span class="msym button-icon" aria-hidden="true">content_paste</span>
+                <span>貼り付け</span>
+              </button>
+              <button id="actionDeleteButton" type="button" role="menuitem" class="dropdown-menu-item">
+                <span class="msym button-icon" aria-hidden="true">delete</span>
+                <span>削除</span>
+              </button>
+              <button id="actionSplitButton" type="button" role="menuitem" class="dropdown-menu-item" title="再生位置で分割（カット/効果音/動画）">
+                <span class="msym button-icon" aria-hidden="true">content_cut</span>
+                <span>分割（再生位置）</span>
+              </button>
+              <button id="actionAddCutBatchButton" type="button" role="menuitem" class="dropdown-menu-item">
+                <span class="msym button-icon" aria-hidden="true">playlist_add</span>
+                <span>カットを一括追加</span>
+              </button>
+              <button id="actionAddTelopBatchButton" type="button" role="menuitem" class="dropdown-menu-item">
+                <span class="msym button-icon" aria-hidden="true">format_list_bulleted</span>
+                <span>テロップを一括追加</span>
+              </button>
+            </div>
+          </div>
           <div class="dropdown-button" id="addItemDropdown">
             <button type="button" class="ghost-button" id="addItemDropdownTrigger" aria-haspopup="menu" aria-expanded="false">
               <span class="msym button-icon" aria-hidden="true">add</span>
@@ -1033,6 +1117,10 @@
               <span class="msym button-icon dropdown-caret" aria-hidden="true">expand_more</span>
             </button>
             <div class="dropdown-menu" role="menu" hidden>
+              <button id="addCutButton" type="button" role="menuitem" class="dropdown-menu-item">
+                <span class="msym button-icon" aria-hidden="true">movie_filter</span>
+                <span>カット</span>
+              </button>
               <button id="addTelopButton" type="button" role="menuitem" class="dropdown-menu-item">
                 <span class="msym button-icon" aria-hidden="true">subtitles</span>
                 <span>テロップ</span>
@@ -1055,10 +1143,32 @@
               </button>
             </div>
           </div>
-          <button id="addTelopBatchButton" type="button" class="ghost-button">
-            <span class="msym button-icon" aria-hidden="true">format_list_bulleted</span>
-            <span>テロップ一括追加</span>
-          </button>
+          <!-- R2: タイムラインのレーン (段) を追加 -->
+          <div class="dropdown-button" id="addLaneDropdown">
+            <button type="button" class="ghost-button" id="addLaneDropdownTrigger" aria-haspopup="menu" aria-expanded="false" title="テロップ/効果音/動画のレーン（段）を追加します">
+              <span class="msym button-icon" aria-hidden="true">library_add</span>
+              <span>レイヤーを追加</span>
+              <span class="msym button-icon dropdown-caret" aria-hidden="true">expand_more</span>
+            </button>
+            <div class="dropdown-menu" role="menu" hidden>
+              <button id="addTelopLaneButton" type="button" role="menuitem" class="dropdown-menu-item">
+                <span class="msym button-icon" aria-hidden="true">subtitles</span>
+                <span>テロップのレーン</span>
+              </button>
+              <button id="addSoundEffectLaneButton" type="button" role="menuitem" class="dropdown-menu-item">
+                <span class="msym button-icon" aria-hidden="true">graphic_eq</span>
+                <span>効果音のレーン</span>
+              </button>
+              <button id="addVideoLaneButton" type="button" role="menuitem" class="dropdown-menu-item">
+                <span class="msym button-icon" aria-hidden="true">movie</span>
+                <span>動画のレーン</span>
+              </button>
+              <button id="removeEmptyLaneButton" type="button" role="menuitem" class="dropdown-menu-item" title="編集中の種別の末尾の空きレーンを削除します">
+                <span class="msym button-icon" aria-hidden="true">remove</span>
+                <span>空きレーンを削除（編集中の種別）</span>
+              </button>
+            </div>
+          </div>
           <button id="prerenderButton" type="button" class="ghost-button" title="全カットの解析キャッシュ（ビジュアライザー解析・焼き込み）を事前生成して書き出しを高速化します。タイムライン最上部の帯が 緑=解析済 / 赤=解析中 / 灰=未解析 になります。再生中も先読みで自動的に緑になります。">
             <span class="msym button-icon" aria-hidden="true">bolt</span>
             <span id="prerenderButtonLabel">事前解析</span>
@@ -1318,7 +1428,7 @@
                   </label>
                   <label>
                     文字間 (1/1000em)
-                    <input id="defaultLetterSpacingInput" type="number" min="-500" max="1000" step="100" />
+                    <input id="defaultLetterSpacingInput" type="number" min="-500" max="1000" step="10" />
                   </label>
                 </div>
                 <fieldset class="optical-kerning-fieldset">
@@ -1623,7 +1733,7 @@
               </label>
               <label>
                 文字間 (1/1000em)
-                <input id="telopDefaultLetterSpacingInput" type="number" min="-500" max="1000" step="100" />
+                <input id="telopDefaultLetterSpacingInput" type="number" min="-500" max="1000" step="10" />
               </label>
               <label>
                 行間 (px)
@@ -2386,6 +2496,25 @@
                 </button>
               </div>
               <div id="globalFontScanList" class="font-scan-list"></div>
+              <h3>PC インストール済みフォント</h3>
+              <p class="asset-hint">
+                PC にインストールされているフォント（Adobe Fonts などのアクティベート済みフォントを含む）を
+                フォント選択肢に追加します。アセット内（<code>assets/fonts/</code>）のフォントはこれまで通り使えます。
+                フォントを追加・アクティベートした直後は「再スキャン」を押してください。
+              </p>
+              <div class="settings-checkboxes">
+                <label class="checkbox-row">
+                  <input id="globalSystemFontsEnabledInput" type="checkbox" />
+                  PC のインストール済みフォントを使う
+                </label>
+              </div>
+              <div id="globalSystemFontStatus" class="asset-hint" aria-live="polite">未取得</div>
+              <div class="preset-list-actions">
+                <button type="button" id="rescanSystemFontsButton" class="link-button">
+                  <span class="msym button-icon" aria-hidden="true">refresh</span>
+                  <span>PC フォントを再スキャン</span>
+                </button>
+              </div>
             </section>
             <section class="settings-group hidden" data-global-tab-panel="tts">
               <h3>VOICEVOX</h3>
@@ -2487,6 +2616,9 @@
             </section>
             <section class="settings-group hidden" data-global-tab-panel="update">
               <h3>アップデート</h3>
+              <div id="globalCurrentVersion" class="current-version" aria-live="polite">
+                現在のバージョン: <span class="current-version-value">確認中…</span>
+              </div>
               <p class="asset-hint">
                 最新版が公開されているか確認し、ボタン 1 つで取得できます。
                 あなたが作ったプロジェクトやアップロード済み素材は、アップデートで消えません。

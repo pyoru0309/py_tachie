@@ -426,7 +426,7 @@
   <span class="md-ellipsis">
     
   
-    PNG / 動画を書き出す
+    PNG / 動画 / 字幕を書き出す
   
 
     
@@ -738,6 +738,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="フォント">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PC インストール済みフォント
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1265,6 +1282,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="フォント">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PC インストール済みフォント
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1547,6 +1581,18 @@
 ファイル名の末尾が <code>Bold</code> / <code>Medium</code> / <code>Regular</code> などの場合は太さとして推定されます。
 ライブプレビューの canvas は manifest 上のフォント情報を <code>FontFace</code> 登録して、サーバの Pillow と同じ書体で描画します。</p>
 <p>アセット管理のフォント一覧では、見出しに <strong>フォント自身の日本語ファミリ名</strong> (name テーブルの ja-JP / Mac-ja 名、例: <code>NekoSpoon.otf</code> → 「ねこスプーン」) を優先表示します。日本語名を持たない欧文フォントは英語ファミリ名で表示されます。実ファイル名は見出しの下に併記されます。</p>
+<h3 id="pc">PC インストール済みフォント<a class="headerlink" href="#pc" title="Permanent link">&para;</a></h3>
+<p>アセットにファイルを置かなくても、<strong>PC にインストールされているフォント</strong>が書体セレクタに自動で載ります。Adobe Fonts のようにファイルを通常のフォントフォルダに置かない「アクティベート型」のフォントにも対応しています (macOS は CoreText の登録情報、Windows はレジストリと Adobe CoreSync フォルダも参照)。</p>
+<ul>
+<li>一覧はアプリ起動時にバックグラウンドでスキャンされ、2 回目以降はキャッシュで即座に読み込まれます。</li>
+<li>フォントを追加・アクティベートした直後は <strong>全体設定 → 環境タブ → 「PC フォントを再スキャン」</strong> を押してください。</li>
+<li>「PC のインストール済みフォントを使う」をオフにすると、従来どおりアセット内フォントだけになります。</li>
+<li>アセット内フォントと同名の PC フォントは「（PC）」付きで区別して表示されます。</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">プロジェクトを別の PC に持って行く場合</p>
+<p>PC フォントの実体はそのマシンにしかありません。別の PC で開いたとき同じフォントがインストールされていないと、既定のフォールバック書体で表示されます。配布・共同編集するプロジェクトでは、再配布可能なフォントをアセット内 (<code>assets/fonts/</code> またはプロジェクトの <code>fonts/</code>) に置く従来の方法が確実です。</p>
+</div>
 <h2 id="png">セリフ枠の装飾 PNG<a class="headerlink" href="#png" title="Permanent link">&para;</a></h2>
 <p>装飾 PNG は <code>overlays/</code> に置きます。設定画面の <code>装飾 PNG</code> で選択すると、セリフ枠に重ねて描画されます。</p>
 <h2 id="_9">キャラクター<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>

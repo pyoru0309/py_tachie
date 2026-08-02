@@ -35,9 +35,42 @@ function activateGlobalTab(tabId) {
   for (const panel of elements.globalSettingsPanels) {
     panel.classList.toggle("hidden", panel.dataset.globalTabPanel !== tabId);
   }
-  // アップデートタブを開いたら実行環境診断を更新する (書き出しが遅い環境の早期発見)。
+  // アップデートタブを開いたら実行環境診断と現在バージョンを更新する。
   if (tabId === "update") {
     refreshSystemHealth();
+    refreshCurrentVersion();
+  }
+}
+
+// R11: アップデートタブに現在のバージョンを常時表示する (ネット fetch なしの軽量取得)。
+async function refreshCurrentVersion() {
+  const host = elements.globalCurrentVersion;
+  if (!host) return;
+  const valueEl = host.querySelector(".current-version-value");
+  const setValue = (text) => {
+    if (valueEl) valueEl.textContent = text;
+    else host.textContent = `現在のバージョン: ${text}`;
+  };
+  try {
+    const res = await fetch("/api/version");
+    const data = await res.json().catch(() => ({}));
+    // app/version.py の semver を唯一の真実として表示する (git describe は使わない)。
+    // 例: "v0.3.0-dev (cf5dc75)"。SHA は HEAD の短縮 (= どのビルドかの突き合わせ用)。
+    const ver = data && data.version ? String(data.version) : "";
+    if (ver) {
+      const sha = data.sha ? ` (${data.sha})` : "";
+      setValue(`v${ver}${sha}`);
+      return;
+    }
+    // version 未取得時のフォールバック (旧挙動)。
+    if (!data || data.isGitRepo === false) {
+      setValue("不明 (git リポジトリではありません)");
+      return;
+    }
+    const label = data.describe || data.tag || data.sha || "不明";
+    setValue(label);
+  } catch {
+    setValue("取得に失敗しました");
   }
 }
 
@@ -201,6 +234,10 @@ function renderGlobalSettings() {
   if (elements.globalVendorUseCdnInput) {
     elements.globalVendorUseCdnInput.checked =
       Boolean(data.config.vendor?.useCdn);
+  }
+  if (elements.globalSystemFontsEnabledInput) {
+    elements.globalSystemFontsEnabledInput.checked =
+      data.config.systemFonts?.enabled !== false;
   }
   // 描画エンジン (renderer.version) は v2 (WebGL) 固定。旧 v1 (Pillow + Canvas2D)
   // 経路はサーバ・クライアントとも撤去済み。
@@ -590,6 +627,59 @@ function renderFontScanList() {
   }
 }
 
+async function refreshSystemFontStatus() {
+  if (!elements.globalSystemFontStatus) return;
+  try {
+    const res = await fetch("/api/system-fonts");
+    if (!res.ok) throw new Error("system-fonts 取得失敗");
+    const data = await res.json();
+    if (!data.enabled) {
+      elements.globalSystemFontStatus.textContent = "無効（アセット内フォントのみ使用）";
+    } else if (data.status === "scanning") {
+      elements.globalSystemFontStatus.textContent = "スキャン中…";
+      // スキャン完了を追いかけて表示を更新する
+      setTimeout(refreshSystemFontStatus, 1500);
+    } else if (data.status === "ready") {
+      elements.globalSystemFontStatus.textContent =
+        `${data.familyCount} ファミリー / ${data.faceCount} 書体を認識` +
+        (data.fromCache ? "（キャッシュ）" : "");
+    } else if (data.status === "failed") {
+      elements.globalSystemFontStatus.textContent = `スキャン失敗: ${data.error || "不明なエラー"}`;
+    } else {
+      elements.globalSystemFontStatus.textContent = "未スキャン";
+    }
+  } catch (error) {
+    console.error(error);
+    elements.globalSystemFontStatus.textContent = "状態取得に失敗しました";
+  }
+}
+
+async function rescanSystemFonts() {
+  const button = elements.rescanSystemFontsButton;
+  if (button) button.disabled = true;
+  if (elements.globalSystemFontStatus) {
+    elements.globalSystemFontStatus.textContent = "再スキャン中…";
+  }
+  try {
+    const res = await fetch("/api/system-fonts/rescan", { method: "POST" });
+    if (!res.ok) throw new Error("再スキャン失敗");
+    await refreshSystemFontStatus();
+    // フォント一覧 (manifest.config.fonts) に増減を反映する
+    try {
+      const { refreshManifest } = await import("./app-state.js");
+      await refreshManifest();
+    } catch (error) {
+      console.warn("manifest refresh after system font rescan failed", error);
+    }
+    showToast("PC フォントを再スキャンしました");
+  } catch (error) {
+    console.error(error);
+    showToast("PC フォントの再スキャンに失敗しました", "error");
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 async function refreshFontScan() {
   if (!elements.globalFontScanList) return;
   if (elements.globalFontScanStatus) {
@@ -729,8 +819,11 @@ function renderUpdateStatus(data) {
   const applyBtn = elements.applyUpdateButton;
   const details = elements.globalUpdateDetails;
   if (!status || !applyBtn || !details) return;
-  const current = data.currentTag || data.currentSha || "?";
-  const latest = data.latestTag || data.latestSha || "?";
+  // 「現在 → 最新」は短い git SHA を優先表示する。タグ (currentTag/latestTag) は
+  // splite_anime では stray な v1.0 を拾って「v1.0 → v1.0」と無意味になるため、
+  // 更新有無の identifier としては SHA を使う (= behind 個数が実際の判断材料)。
+  const current = data.currentSha || data.currentTag || "?";
+  const latest = data.latestSha || data.latestTag || "?";
   const channelTag = data.channel === "dev" ? "[dev] " : "";
   const switchTag = data.needsBranchSwitch
     ? `（${data.branch} → ${data.targetBranch} へ切替して取得）`
@@ -885,6 +978,7 @@ export async function openGlobalSettings() {
   refreshVendorStatus();
   refreshFontStatus();
   refreshFontScan();
+  refreshSystemFontStatus();
   if (typeof elements.globalSettingsDialog?.showModal === "function") {
     elements.globalSettingsDialog.showModal();
   } else {
@@ -932,6 +1026,11 @@ async function saveGlobalSettings() {
         : Boolean(cfg.vendor?.useCdn),
     },
     fontWeightOverrides: cfg.fontWeightOverrides || {},
+    systemFonts: {
+      enabled: elements.globalSystemFontsEnabledInput
+        ? elements.globalSystemFontsEnabledInput.checked
+        : cfg.systemFonts?.enabled !== false,
+    },
     tts: {
       voicevoxAppPath: (elements.ttsVoicevoxAppPathInput?.value || "").trim(),
       voicevoxBaseUrl: (elements.ttsVoicevoxBaseUrlInput?.value || "").trim(),
@@ -980,6 +1079,8 @@ async function saveGlobalSettings() {
   const previousOverrides = JSON.stringify(
     state.globalConfig?.config?.fontWeightOverrides || {},
   );
+  const previousSystemFontsEnabled =
+    state.globalConfig?.config?.systemFonts?.enabled !== false;
   try {
     const res = await fetch("/api/global-config", {
       method: "POST",
@@ -1013,6 +1114,21 @@ async function saveGlobalSettings() {
       } catch (error) {
         console.error(error);
         showToast("新しいフォルダのプロジェクト読み込みに失敗しました", "error");
+      }
+    }
+    const newSystemFontsEnabled = data.config?.systemFonts?.enabled !== false;
+    if (newSystemFontsEnabled !== previousSystemFontsEnabled) {
+      // PC フォントの有効/無効が変わった → manifest を取り直して一覧を増減。
+      // 有効化直後でスキャン未完了なら watch がスキャン完了後に再反映する。
+      try {
+        const { refreshManifest } = await import("./app-state.js");
+        await refreshManifest();
+        if (newSystemFontsEnabled) {
+          const { watchSystemFontsReady } = await import("./font.js");
+          watchSystemFontsReady(refreshManifest);
+        }
+      } catch (error) {
+        console.warn("manifest refresh after systemFonts toggle failed", error);
       }
     }
     const newOverrides = JSON.stringify(data.config?.fontWeightOverrides || {});
@@ -1077,6 +1193,9 @@ export function bindGlobalSettings(injectedDeps) {
   });
   elements.refreshFontScanButton?.addEventListener("click", () => {
     refreshFontScan();
+  });
+  elements.rescanSystemFontsButton?.addEventListener("click", () => {
+    rescanSystemFonts();
   });
   elements.checkForUpdatesButton?.addEventListener("click", () => {
     checkForUpdates();

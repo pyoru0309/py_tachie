@@ -30,6 +30,7 @@
 
 import { state } from "../state.js";
 import { drawCaptionClip } from "../renderer/text-core.js";
+import { verticalGlyphsEpoch } from "../renderer/text-vertical.js";
 import { fontFamilyCssStack, resolveFontWeightCss } from "../font.js";
 
 // ---------------------------------------------------------------------------
@@ -81,6 +82,8 @@ function _baseFingerprint(clip) {
     s.boxOpacity, s.boxBackgroundColor, s.boxPaddingX, s.boxPaddingY,
     s.enableOpticalKerning, s.opticalKerningHighQuality,
     s.rotation,
+    // 縦書き: モードと GSUB vert グリフ取得 epoch (取得前後で ink が変わる)
+    s.writingMode === "vertical" ? `v${verticalGlyphsEpoch()}` : "",
   ].join(SEP);
 }
 

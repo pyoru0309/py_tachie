@@ -36,6 +36,7 @@ from typing import Any
 
 from .log_setup import app_logger
 from .paths import ASSETS_DIR, PROJECT_ROOT, STATE_DIR
+from .version import __version__ as APP_VERSION
 
 _REQUIREMENTS_PATH = PROJECT_ROOT / "requirements.txt"
 
@@ -83,6 +84,41 @@ def _describe_tag(ref: str) -> str | None:
 def _short_sha(ref: str) -> str | None:
     code, out, _ = _git("rev-parse", "--short", ref)
     return out.strip() if code == 0 and out.strip() else None
+
+
+def _describe_full(ref: str) -> str | None:
+    """`git describe --tags` (abbrev 込み, 例 'v1.0-218-gb4f61d2') を返す。"""
+    code, out, _ = _git("describe", "--tags", ref)
+    return out.strip() if code == 0 and out.strip() else None
+
+
+def get_current_version() -> dict[str, Any]:
+    """ローカルの現在バージョン情報 (R11)。ネットワーク fetch を伴わない軽量版。
+
+    アップデートタブを開いた時点で常時表示するために使う。
+    `version` は app/version.py の semver (= 表示用の唯一の真実、例 '0.3.0-dev')。
+    `sha` は HEAD の短い git SHA (バグ報告で「どのビルドか」を突き合わせる用)。
+    `tag` / `describe` は git タグ由来 (後方互換のため残置。splite_anime の stray な
+    `v1.0` タグを拾うので表示には使わない)。
+    """
+    if not is_git_repo():
+        # git が無くてもアプリ自体のバージョンは出せる。
+        return {
+            "isGitRepo": False,
+            "version": APP_VERSION,
+            "tag": None,
+            "describe": None,
+            "sha": None,
+            "branch": None,
+        }
+    return {
+        "isGitRepo": True,
+        "version": APP_VERSION,
+        "tag": _describe_tag("HEAD"),
+        "describe": _describe_full("HEAD"),
+        "sha": _short_sha("HEAD"),
+        "branch": _current_branch(),
+    }
 
 
 def _status_porcelain() -> list[tuple[str, str]]:

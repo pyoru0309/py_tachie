@@ -89,6 +89,12 @@ export function getRenderer() {
   return renderer;
 }
 
+// R10: preview は preserveDrawingBuffer=true (canvas を drawImage で捕捉可能)、
+// export は false。トランジションの前フレーム自動捕捉の可否判定に使う。
+export function isPreserveDrawingBuffer() {
+  return !!rendererOpts.preserveDrawingBuffer;
+}
+
 export function getCamera() {
   return camera;
 }

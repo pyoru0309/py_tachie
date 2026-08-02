@@ -90,6 +90,7 @@
 | `bpm` | 任意。テロップやモーションの拍合わせに使用 |
 | `cuts` | カット配列 |
 | `telops` | テロップ配列 (カットと独立) |
+| `laneCounts` | 任意。タイムラインの段 (レーン) 数を種別ごとに保持する表示用設定 `{ telop, soundEffect, videoLayer }`。各項目の `lane` と対で使う |
 
 `bgmTracks[].useForLipSync` は 1 シーンにつき 1 トラックだけ ON にできます (ラジオ式)。ON のトラックが口パク解析の入力になります (歌唱+伴奏を分けて納品する場合などに使用)。`loop` を ON にするとシーン終端まで素材を繰り返し再生します (複数 BGM が ON でも排他ではなく、それぞれ独立にループ)。
 
@@ -126,6 +127,8 @@
   "startFrame": 0,
   "durationFrame": 72,
   "audio": "projects/default/assets/audio/voice.wav",
+  "audioDelaySec": 0,
+  "transition": { "type": "crossfade", "durationFrame": 12 },
   "speakerCharacterId": "character_1",
   "state": { /* ... */ }
 }
@@ -137,10 +140,30 @@
 | `startFrame` | シーン上のカット開始フレーム (project fps = 24 固定) |
 | `durationFrame` | カットの表示フレーム数 (最小 1 frame) |
 | `audio` | 音声素材のパス。空文字なら無音 |
+| `audioDelaySec` | 発話ディレイ (秒)。話者音声 (`audio`) を冒頭から遅らせて鳴らす。既定 `0`。カット尺を越える値はクランプ。preview / export 共通 |
+| `transition` | カット入りトランジション (下記)。`null` / `{type:"none"}` で無効 |
 | `speakerCharacterId` | 話者キャラクターのカット内 ID |
 | `state` | 背景・セリフ・キャラクター状態 |
 
 > **タイムコードはフレームベース**: スキーマ上はすべて `startFrame` / `durationFrame` で管理し、UI の表示は `MM:SS.FF` (`bindTimecodeInput` でフォーム入力をフレームへ正規化) です。書き出し fps は 8 / 12 / 24 から独立に選べます。
+
+### transition (カット入りトランジション)
+
+```jsonc
+{
+  "type": "wipe",          // none | crossfade | wipe | whiteout | blackout | crosszoom
+  "durationFrame": 12,     // 効果全体の長さ (project fps = 24)
+  "wipeDirection": "right" // type=wipe のみ: right | left | up | down
+}
+```
+
+| 項目 | 説明 |
+| --- | --- |
+| `type` | 効果種別。`none` で無効 |
+| `durationFrame` | 効果全体の長さ (フレーム)。**境界をまたいで前カット末尾と現カット先頭に半分ずつ** 割り当てられる |
+| `wipeDirection` | `wipe` のときのワイプ方向。既定 `right` |
+
+トランジションは「直前のカット → このカット」をつなぐ演出で、カット境界を中心に前後 `durationFrame/2` ずつをシェアします。描画は前カット・現カットの両シーンを毎フレーム合成する **フルライブ** 方式 (口パク / 目パチ / モーション / BPM 揺れが両カットで継続)。先頭カット (前カット無し) では境界をまたげないので、`whiteout` / `blackout` は単色からのフェードインになります。書き出し経路も同じ合成で再現されます (隣接 = gap 無しのカット間のみ)。
 
 ## state
 
@@ -322,6 +345,7 @@ X/Y はキャラ基準位置からの相対オフセット、拡大率はキャ�
   "id": "telop_001",
   "startFrame": 28,
   "durationFrame": 48,
+  "lane": 0,
   "text": "♪",
   "position": "bottom",
   "x": null,
@@ -335,7 +359,8 @@ X/Y はキャラ基準位置からの相対オフセット、拡大率はキャ�
     "outlineColor": "#000000",
     "letterSpacing": 0,
     "lineGap": 16,
-    "align": "center"
+    "align": "center",
+    "charKerning": { "2": -120 }
   }
 }
 ```
@@ -344,10 +369,12 @@ X/Y はキャラ基準位置からの相対オフセット、拡大率はキャ�
 | --- | --- |
 | `id` | テロップ ID |
 | `startFrame` / `durationFrame` | シーン上の開始フレームと表示フレーム数 |
+| `lane` | タイムライン上の段 (0 始まり)。同時刻に重ねる項目を別レーンに分けるための表示用インデックス。`soundEffects[]` / `videoLayers[]` も同名フィールドを持つ |
 | `text` | テロップ本文 (改行可) |
 | `position` | `top` / `bottom` / `center` / `custom` のいずれか。`custom` のときだけ `x` / `y` を見る |
 | `x` / `y` | 任意座標 (px)。`position` が `custom` のときに有効。`null` のままなら定型位置のフォールバックが使われる |
 | `style.align` | 文字揃え。`left` / `center` / `right` |
+| `style.charKerning` | 個別字間。`{ "<文字間index>": <delta 1/1000em> }` の疎マップ。指定した位置の字間だけを詰める / 空ける。本文編集時はキー位置が自動シフトされる。一括スタイル反映の対象外 (本文ごとに位置が変わるため)。セリフ本文側 (`state.textStyle`) も同じ `charKerning` を持つ |
 | `style.glow` / `style.dropShadow` | テロップ文字の光彩 / ドロップシャドウ (各 `{enabled, color, blurPx, opacity, intensity[, offsetX, offsetY]}`)。テロップ既定値 (`telopDefaults.glow` / `telopDefaults.dropShadow`) の上書き。`intensity` (1〜8, 既定 1, 2026-06 追加) はぼかしで薄くなった発光・影を濃くするスタック合成回数 |
 | `style` | 書体・色・アウトライン・サイズ・文字揃え・行間・字間・光彩・ドロップシャドウ |
 | `linkedCutId` | 任意。設定時はその ID のカットに紐付き、カット並び替え / 複製 / 削除 / duration 変更に追従する。存在しない ID を指していたら正規化で `null` に倒される。`soundEffects[]` / `videoLayers[]` も同名のフィールドで同じ意味 |

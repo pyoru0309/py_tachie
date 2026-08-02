@@ -3,7 +3,7 @@ import { elements } from "./elements.js";
 import { showToast } from "./toast.js";
 import { drawTimeline, autoScrollTimelineToCursor, autoScrollCutListToActive } from "./timeline.js";
 import { PROJECT_FPS, clampCharacterAnimationFps } from "./timecode.js";
-import { cutStartFrame, cutDurationFrame, cutStartSec, cutDurationSec } from "./scenario.js";
+import { cutStartFrame, cutDurationFrame, cutStartSec, cutDurationSec, cutTransition } from "./scenario.js";
 import { captureAndUploadThumbnail } from "./thumbnail.js";
 import { createPreviewScheduler, PRIORITY } from "./preview-scheduler.js";
 import { setCutPrerenderStatus } from "./prerender.js";
@@ -71,9 +71,12 @@ export async function renderPreview(options = {}) {
     ? state.scenario?.cuts?.find((cut) => cut.id === state.selectedCutId)
     : null;
   if (!currentCut) return;
+  // renderButton は「エクスポート ▼」内のメニュー項目 (icon + label span 構成) な
+  // ので、textContent 直書きは避けて label span だけを差し替える。
+  const renderButtonLabel = elements.renderButton?.querySelector("span:not(.button-icon)");
   if (saveOutput) {
     elements.renderButton.disabled = true;
-    elements.renderButton.textContent = "出力中";
+    if (renderButtonLabel) renderButtonLabel.textContent = "出力中…";
   }
   try {
     const ok = await renderPreviewV2(currentCut, requestId);
@@ -125,7 +128,7 @@ export async function renderPreview(options = {}) {
   } finally {
     if (saveOutput) {
       elements.renderButton.disabled = false;
-      elements.renderButton.textContent = "PNG出力";
+      if (renderButtonLabel) renderButtonLabel.textContent = "PNG静止画";
     }
   }
 }
@@ -136,7 +139,16 @@ function wait(ms) {
   });
 }
 
+// 発話ディレイ (cut.audioDelaySec) で audio.play() を後ろへずらす予約タイマー。
+// stopAudio / カット切替で必ず clear する (= 停止後の resurrect 防止)。
+let _pendingSpeechDelayTimer = null;
+
 function stopAudio() {
+  // 発話ディレイで予約した play() があれば取り消す (停止/カット切替で resurrect 防止)。
+  if (_pendingSpeechDelayTimer) {
+    try { clearTimeout(_pendingSpeechDelayTimer); } catch (_) { /* ignore */ }
+    _pendingSpeechDelayTimer = null;
+  }
   if (state.playbackAudio) {
     try {
       state.playbackAudio.pause();
@@ -2164,6 +2176,8 @@ async function renderPreviewV2(cut, requestId) {
     // 直前へ丸まり、telop が表示されない」を防ぐ。
     rawElapsedSec: previewSec,
   };
+  // R10: カット入りトランジションを active scene に反映 (毎 render 安価)。
+  v2.setActiveSceneTransition?.(cutTransition(cut));
   v2.renderActiveScene(sceneState);
 
   // videoTrack / videoLayer 経路の保険: 初回 render 時点で VideoTexture が前フレームを
@@ -2656,6 +2670,161 @@ function ensureScenePrefetch(cuts, currentIndex) {
   }
 }
 
+// =============================================================================
+// フルライブ境界またぎトランジション (preview)
+//
+// トランジションをカット境界 [境界-D/2, 境界+D/2] にまたがせ、前後カットを半分ずつ
+// シェアして切り替える。窓の間は前カット A と現カット B の両シーンを毎フレーム
+// 描画して合成する (= 口パク/目パチ/モーション/BPM が両方動いたまま切り替わる)。
+//
+//   A-side (前カット A の尾 [dur-D/2, dur]):  A=live, B=先頭フレーム静止, progress 0→0.5
+//   B-side (現カット B の頭 [0, D/2]):        B=live, A=尾を live 延長, progress 0.5→1
+//
+// A-side の B は境界前でまだ始まっていないので「先頭フレーム」を静的テクスチャで
+// 出すのが正 (start で _prepareASideToTex が裏で焼く)。B-side の A はカット尺を
+// 越えても口パク以外 (目パチ/モーション/BPM) を時間関数で延長して live 描画する。
+// =============================================================================
+
+// B-side 用に detach (no-dispose) して保持する前カット A。
+let _straddleFromInst = null;   // SceneInstance (生かしておく A)
+let _straddleFromCtx = null;    // A の render context
+let _straddleForCutId = null;   // この A を from に使う現カット B の id
+// B-side straddle を使うカットの id (overlay フォールバック判定用、窓を抜けても保持)。
+let _bSideCutId = null;
+// A-side 用に裏で焼いた「次カット B の先頭フレーム」テクスチャ。
+let _aSideToTex = null;
+let _aSideForCutId = null;      // 焼き済みの次カット id
+let _aSideExpectedCutId = null; // 現在準備中 (race 検出用)
+
+// カット 1 つを任意 cut-local 秒で描画するための render context を組む。
+// playLiveCutV2 内で既に計算している値の集約 (partner の state 計算に使う)。
+function _buildCutRenderContext(cut, layerData) {
+  const duration = cutDurationSec(cut);
+  const blinkCharIds = (layerData.characters || []).map((c) => c.id).filter((id) => id);
+  const blinkEnabled = layerData.blinkEnabled !== false;
+  return {
+    cutId: cut.id,
+    layerData,
+    duration,
+    timelineOffsetSec: cutStartSec(cut),
+    animationFps: clampCharacterAnimationFps(state.manifest?.config?.characterAnimationFps),
+    blinkEnabled,
+    blinkStartsByChar: blinkEnabled ? generateBlinkStartsByChar(duration, blinkCharIds) : {},
+    blinkAlgorithm: layerData.blinkAlgorithm || "anime",
+    lipSyncEnabled: layerData.lipSyncEnabled !== false,
+    lipSync: layerData.lipSync || {},
+    motionType: layerData.motion?.type || "none",
+    motionSettings: layerData.motion?.settings || {},
+    idleMotion: sceneIdleMotionConfig(),
+    speakerId: layerData.speakerId || null,
+  };
+}
+
+// render context から cut-local 秒の scene state を計算する (tick のインライン計算と同式)。
+// mouthVolume=null なら口パクなし ("default")。partner (前カット延長) は常に null。
+function _computeCutSceneState(ctx, cutLocalSec, { mouthVolume = null } = {}) {
+  const fps = ctx.animationFps;
+  const frameIdx = Math.max(0, Math.floor(cutLocalSec * fps));
+  const quantized = frameIdx / fps;
+  let eyeKeyByChar = null;
+  if (ctx.blinkEnabled) {
+    eyeKeyByChar = {};
+    for (const char of ctx.layerData.characters || []) {
+      if (!char.id || char.blinkEligible === false) continue;
+      const hasHalf = !!char.eyeUrls?.half;
+      const startsForChar = ctx.blinkStartsByChar[char.id] || [];
+      eyeKeyByChar[char.id] = eyeKeyForTime(quantized, startsForChar, fps, ctx.blinkAlgorithm, hasHalf);
+    }
+  }
+  const mouthKey = (ctx.lipSyncEnabled && mouthVolume != null)
+    ? mouthKeyFromVolume(mouthVolume, ctx.lipSync)
+    : "default";
+  let shakeDx = 0;
+  let shakeDy = 0;
+  if (ctx.motionType === "shake_x" || ctx.motionType === "shake_y") {
+    const cfg = ctx.motionType === "shake_x" ? (ctx.motionSettings.shakeX || {}) : (ctx.motionSettings.shakeY || {});
+    const amp = Number(cfg.amplitude || 0);
+    const count = Number(cfg.count || 0);
+    const md = Number(cfg.duration || 0);
+    if (amp > 0 && count > 0 && md > 0 && quantized < md) {
+      const off = amp * Math.sin((2 * Math.PI * count * quantized) / md);
+      if (ctx.motionType === "shake_x") shakeDx = off;
+      else shakeDy = off;
+    }
+  } else if (ctx.motionType === "move") {
+    const mo = computeMoveOffset(ctx.motionSettings.move, quantized);
+    shakeDx = mo.dx;
+    shakeDy = mo.dy;
+  }
+  const idleOffset = ctx.idleMotion
+    ? computeIdleMotionOffset(ctx.idleMotion, ctx.timelineOffsetSec + quantized)
+    : { dx: 0, dy: 0 };
+  const motionOffsetByChar = computePerCharacterMotionOffsets(ctx.layerData.characters, quantized);
+  return {
+    eyeKey: "open",
+    eyeKeyByChar,
+    mouthKey,
+    speakerId: ctx.speakerId,
+    shakeDx,
+    shakeDy,
+    idleDx: idleOffset.dx,
+    idleDy: idleOffset.dy,
+    motionOffsetByChar,
+    elapsedSec: quantized,
+    rawElapsedSec: cutLocalSec,
+  };
+}
+
+// A-side 用: 次カット B の先頭フレームを裏で焼いてテクスチャに保持する。
+// B はサーバ disk キャッシュ済みの bundle から transient build → frame0 を RT 焼き →
+// dispose (RT には焼き済みなので texture は生きる)。video provider は省略 (frame0 の
+// 視覚近似で十分・窓は ~0.25s)。失敗時は A-side を諦めて通常描画にフォールバック。
+async function _prepareASideToTex(nextCut, v2) {
+  _aSideExpectedCutId = nextCut.id;
+  _aSideToTex = null;
+  _aSideForCutId = null;
+  let inst = null;
+  try {
+    const layerData = await fetchSceneBundleV2(nextCut);
+    if (_aSideExpectedCutId !== nextCut.id || !state.isPlaying) return;
+    inst = await v2.buildSceneFromLayerData(layerData, null, null, state.videoLayerDurations, "");
+    if (!inst) return;
+    if (_aSideExpectedCutId !== nextCut.id || !state.isPlaying) { try { inst.dispose?.(); } catch (_) {} return; }
+    const frame0 = _computeCutSceneState(_buildCutRenderContext(nextCut, layerData), 0, { mouthVolume: null });
+    const tex = v2.captureInstanceFrameToTexture(inst, frame0);
+    _aSideToTex = tex || null;
+    _aSideForCutId = nextCut.id;
+  } catch (_e) {
+    _aSideToTex = null;
+    _aSideForCutId = null;
+  } finally {
+    if (inst) { try { inst.dispose?.(); } catch (_) {} }
+  }
+}
+
+// B-side で生かしておいた前カット A を破棄する。
+function _disposeStraddleFrom() {
+  if (_straddleFromInst) {
+    try { _straddleFromInst.dispose?.(); } catch (_) {}
+  }
+  _straddleFromInst = null;
+  _straddleFromCtx = null;
+  _straddleForCutId = null;
+}
+
+// 直前に再生したカットの render context / scene (B-side の from に使う)。
+let _lastPlayedCtx = null;
+
+// 境界またぎ用の全リソースを解放する (停止 / abort / プロジェクト切替時)。
+export function clearStraddleResources() {
+  _disposeStraddleFrom();
+  _bSideCutId = null;
+  _lastPlayedCtx = null;
+  _aSideToTex = null;
+  _aSideForCutId = null;
+  _aSideExpectedCutId = null;
+}
+
 export async function playLiveCutV2(cut, _options = {}) {
   let layerData;
   try {
@@ -2787,6 +2956,26 @@ export async function playLiveCutV2(cut, _options = {}) {
     sceneInstance = v2.getActiveScene ? v2.getActiveScene() : null;
   }
 
+  // 境界またぎ (B-side): このカット B にトランジションがあり、直前カットがあり、
+  // かつ scene を新規 build する (= reuse でない) なら、現在 active な前カット A を
+  // dispose せず detach して保持する。B の頭 D/2 の間、A を live 延長で描いて合成する。
+  const _cutsArrTop = state.scenario?.cuts || [];
+  const _bIdxTop = _cutsArrTop.findIndex((c) => c.id === cut.id);
+  const _trBTop = cutTransition(cut);
+  _disposeStraddleFrom(); // 取りこぼし掃除
+  _bSideCutId = null;
+  if (_trBTop.type !== "none" && _trBTop.durationFrame > 0
+      && _bIdxTop > 0 && !sceneInstance
+      && _lastPlayedCtx && _lastPlayedCtx.cutId === _cutsArrTop[_bIdxTop - 1]?.id) {
+    const activeA = v2.getActiveScene ? v2.getActiveScene() : null;
+    if (activeA && v2.detachActiveSceneNoDispose) {
+      _straddleFromInst = v2.detachActiveSceneNoDispose();
+      _straddleFromCtx = _lastPlayedCtx;
+      _straddleForCutId = cut.id;
+      _bSideCutId = cut.id; // overlay フォールバック抑止 (窓を抜けても保持)
+    }
+  }
+
   // ★ 音声を buildScene より前に発火させる (= カット切替時の「音が一瞬飛ぶ」対策)。
   //   旧実装は buildScene を await した後に audio.play() していたため、buildScene が
   //   重いカット (Windows ANGLE で 300ms+ になることがある) では「カット切替直後に
@@ -2807,11 +2996,32 @@ export async function playLiveCutV2(cut, _options = {}) {
     // useForLipSync な BGM が無ければ、話者音声から口パクを駆動する
     // フォールバック。createMediaElementSource は audio.play() より前で呼ぶ。
     setupSpeakerLipSyncAnalyser(audio);
+    // 発話ディレイ: カット冒頭から audioDelay 秒だけ声を遅らせる。音声の
+    // カット内位置は (cutLocal - audioDelay)。再生位置が delay 前なら play() を
+    // 残り秒数だけ後ろへ予約し、delay を過ぎた所からの開始ならその分進めて即再生。
+    const audioDelay = Math.max(0, Number(cut.audioDelaySec) || 0);
     const initialOffset = Math.max(0, (performance.now() - cutStartWallclockMs) / 1000);
-    if (initialOffset > 0) {
-      try { audio.currentTime = initialOffset; } catch (_) { /* ignore */ }
+    const audioPos = initialOffset - audioDelay;
+    if (_pendingSpeechDelayTimer) {
+      try { clearTimeout(_pendingSpeechDelayTimer); } catch (_) { /* ignore */ }
+      _pendingSpeechDelayTimer = null;
     }
-    audio.play().catch((error) => console.warn("Audio preview failed", error));
+    if (audioPos >= 0) {
+      if (audioPos > 0) {
+        try { audio.currentTime = audioPos; } catch (_) { /* ignore */ }
+      }
+      audio.play().catch((error) => console.warn("Audio preview failed", error));
+    } else {
+      // まだ delay 区間。currentTime=0 のまま、残り (= -audioPos) 秒後に play 予約。
+      const waitMs = Math.round(-audioPos * 1000);
+      const pendingAudio = audio;
+      _pendingSpeechDelayTimer = window.setTimeout(() => {
+        _pendingSpeechDelayTimer = null;
+        // 予約中にカット切替/停止で別音声に差し替わっていたら発火しない。
+        if (!state.isPlaying || state.playbackAudio !== pendingAudio) return;
+        pendingAudio.play().catch((error) => console.warn("Audio preview failed", error));
+      }, waitMs);
+    }
   }
 
   // Phase 3: 事前 build された SceneInstance があれば取り出して使う。
@@ -2886,6 +3096,35 @@ export async function playLiveCutV2(cut, _options = {}) {
   const motionType = layerData.motion?.type || "none";
   const motionSettings = layerData.motion?.settings || {};
   const idleMotion = sceneIdleMotionConfig();
+
+  // 境界またぎ: このカットの render context を記録 (= 次カット B-side の from に使う)。
+  _lastPlayedCtx = {
+    cutId: cut.id,
+    layerData,
+    duration,
+    timelineOffsetSec,
+    animationFps,
+    blinkEnabled,
+    blinkStartsByChar,
+    blinkAlgorithm,
+    lipSyncEnabled,
+    lipSync,
+    motionType,
+    motionSettings,
+    idleMotion,
+    speakerId,
+  };
+  // A-side: 次カットにトランジションがあれば、その先頭フレームを裏で焼いておく
+  // (= このカット A の尾で B が徐々に現れる合成に使う)。
+  const _cutsArrSelf = state.scenario?.cuts || [];
+  const _selfIdx = _cutsArrSelf.findIndex((c) => c.id === cut.id);
+  const _nextCutSelf = _selfIdx >= 0 ? _cutsArrSelf[_selfIdx + 1] : null;
+  const _trNextSelf = _nextCutSelf ? cutTransition(_nextCutSelf) : { type: "none", durationFrame: 0 };
+  if (_trNextSelf.type !== "none" && _trNextSelf.durationFrame > 0 && _nextCutSelf) {
+    _prepareASideToTex(_nextCutSelf, v2);
+  } else {
+    _aSideToTex = null; _aSideForCutId = null; _aSideExpectedCutId = null;
+  }
   // テロップは scene-builder の ORDER_TELOP plane に取り込まれており、
   // sceneSec から active 判定 + canvas2d → CanvasTexture を update() 内で行う。
   // 2D ctx へ毎フレーム塗り直す経路は撤去。
@@ -2960,7 +3199,7 @@ export async function playLiveCutV2(cut, _options = {}) {
         }
 
         const motionOffsetByChar = computePerCharacterMotionOffsets(layerData.characters, quantized);
-        v2.renderActiveScene({
+        const sceneState = {
           eyeKey: "open",
           eyeKeyByChar,
           mouthKey,
@@ -2975,7 +3214,51 @@ export async function playLiveCutV2(cut, _options = {}) {
           // animationFps=12 で project=24 のとき、奇数フレームに乗った telop が
           // 1 frame 遅れて出現する/消えるのを防ぐ。
           rawElapsedSec: clamped,
-        });
+        };
+
+        // ---- 境界またぎトランジション (フルライブ dual-RT 合成) ----
+        // B-side: このカット B の頭 [0, D_B/2]。前カット A を尾から live 延長して from に。
+        // A-side: このカット A の尾 [dur-D_next/2, dur]。次カット B の先頭フレームを to に。
+        // どちらでもなければ通常描画 (+ 先頭カットのみ overlay でホワイトイン等)。
+        let _composited = false;
+        const activeInst = v2.getActiveScene ? v2.getActiveScene() : null;
+        if (_straddleFromInst && _straddleFromCtx && _straddleForCutId === cut.id) {
+          const dB = (_trBTop.durationFrame || 0) / PROJECT_FPS;
+          const halfB = dB / 2;
+          if (dB > 0 && clamped < halfB && activeInst && v2.renderSceneTransitionComposite) {
+            const progress = Math.min(1, 0.5 + clamped / dB); // 0.5→1
+            const aLocal = _straddleFromCtx.duration + clamped; // A を尾から延長 (口パク除く)
+            const fromState = _computeCutSceneState(_straddleFromCtx, aLocal, { mouthVolume: null });
+            _composited = v2.renderSceneTransitionComposite({
+              fromInst: _straddleFromInst, fromState,
+              toInst: activeInst, toState: sceneState,
+              cfg: _trBTop, progress,
+            });
+          }
+          if (clamped >= halfB) _disposeStraddleFrom(); // B-side 窓を抜けたら A を破棄
+        }
+        if (!_composited && _aSideToTex && _aSideForCutId === _nextCutSelf?.id
+            && _trNextSelf.type !== "none" && _trNextSelf.durationFrame > 0) {
+          const dN = _trNextSelf.durationFrame / PROJECT_FPS;
+          const halfN = dN / 2;
+          const aSideStart = duration - halfN;
+          if (clamped > aSideStart && activeInst && v2.renderSceneTransitionComposite) {
+            const progress = Math.max(0, Math.min(0.5, (clamped - aSideStart) / dN)); // 0→0.5
+            _composited = v2.renderSceneTransitionComposite({
+              fromInst: activeInst, fromState: sceneState,
+              toTex: _aSideToTex,
+              cfg: _trNextSelf, progress,
+            });
+          }
+        }
+        if (!_composited) {
+          // 通常描画。このカットにトランジションがあり、かつ B-side straddle を
+          // 使っていない (= 先頭カット、または prev 未再生で seek 開始した場合) は
+          // 従来の overlay でフェードイン表示する。straddle 適用カットは overlay 抑止。
+          const showOverlay = _trBTop.type !== "none" && _bSideCutId !== cut.id;
+          v2.setActiveSceneTransition?.(showOverlay ? _trBTop : null);
+          v2.renderActiveScene(sceneState);
+        }
         if (!firstFrameLogged) {
           firstFrameLogged = true;
           markCutPhase("firstFrame");
@@ -3035,6 +3318,8 @@ export function stopPreviewPlayback(options = {}) {
   // A3: 停止時にも pre-built SceneInstance を捨てる。停止 → 編集 → 再生で
   // 古い prefetch が残ったまま消えない構造を防ぐ。
   clearPrefetchedSceneInstances();
+  // 境界またぎトランジション用の retained 前カット / A-side テクスチャを解放。
+  clearStraddleResources();
   if (state.playbackTimer) {
     window.clearTimeout(state.playbackTimer);
     state.playbackTimer = null;

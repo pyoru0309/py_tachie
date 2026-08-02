@@ -291,8 +291,8 @@ function collectTelopDefaultsConfig() {
       offsetY: Math.max(-40, Math.min(40, Number(elements.telopDefaultDropShadowOffsetY?.value) || 0)),
       opacity: Math.max(0, Math.min(1, Number(elements.telopDefaultDropShadowOpacity?.value) || 0)),
     },
-    // 1/1000 em 単位。step=100 (= 0.1em 刻み) で操作する想定。
-    letterSpacing: Math.max(-500, Math.min(1000, Math.round((Number(elements.telopDefaultLetterSpacing?.value) || 0) / 100) * 100)),
+    // 1/1000 em 単位。step=10 (= 0.01em 刻み) で操作する想定。
+    letterSpacing: Math.max(-500, Math.min(1000, Math.round((Number(elements.telopDefaultLetterSpacing?.value) || 0) / 10) * 10)),
     lineSpacing: Math.max(-500, Math.min(500, Number(elements.telopDefaultLineSpacing?.value) || 0)),
     ...(() => {
       const r = readOpticalKerningRadios(elements.telopDefaultOpticalKerningModeRadios);
@@ -460,8 +460,8 @@ export async function saveConfig() {
       speechPaddingX: Number(elements.speechPaddingX.value),
       speechPaddingY: Number(elements.speechPaddingY.value),
       lineGap: Number(elements.lineGap.value),
-      // 1/1000 em 単位。step=100 (= 0.1em 刻み) で操作する想定。
-      letterSpacing: Math.max(-500, Math.min(1000, Math.round((Number(elements.defaultLetterSpacing?.value) || 0) / 100) * 100)),
+      // 1/1000 em 単位。step=10 (= 0.01em 刻み) で操作する想定。
+      letterSpacing: Math.max(-500, Math.min(1000, Math.round((Number(elements.defaultLetterSpacing?.value) || 0) / 10) * 10)),
       speakerNameFontSize: Number(elements.speakerNameFontSize.value),
       showSpeakerName: elements.defaultShowSpeakerName?.checked ?? true,
       // UI 表示は「暗さ」(0 = 全く暗くしない)。内部 opacity は `1 - darkness` で逆変換する。

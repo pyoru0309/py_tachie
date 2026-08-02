@@ -18,9 +18,15 @@ import {
   initRenderer,
   buildSceneFromLayerData,
   setActiveScene,
+  setActiveSceneTransition,
+  setExportFromFrame,
+  captureActiveSceneToTexture,
   disposeActiveScene,
   renderActiveScene,
   getActiveScene,
+  detachActiveSceneNoDispose,
+  renderSceneTransitionComposite,
+  captureInstanceFrameToTexture,
 } from "/static/js/renderer/index.js";
 import * as THREE from "three";
 import { getRenderer, renderScene } from "/static/js/renderer/core.js";
@@ -401,6 +407,120 @@ async function fetchExportPlan() {
 // renderer の clearColor を (0,0,0,0) にすることで readPixels の alpha=0 が
 // ffmpeg yuva444p10le / rgba にそのまま流れる。
 const TRANSPARENT_ENCODERS = new Set(["prores_4444", "png_video"]);
+
+// R10: 書き出し中、直前カットの最終フレーム (RT capture texture)。次カットの
+// トランジション from-frame に使う。各書き出しセッション開始時に null へリセット。
+let _exportFromTex = null;
+
+// フルライブ境界またぎ (export)。preview と同じ「前後半分ずつシェア」を deterministic
+// に再現する。B-side では前カット A を detach して live 延長描画、A-side では次カット
+// の先頭フレームを焼いて使う。各セッション開始時に clearExportStraddle() でリセット。
+let _exportStraddleFromInst = null;  // B-side で生かす前カット A の SceneInstance
+let _exportStraddleFromRd = null;    // A の render data (state 計算用)
+let _exportStraddleForCutId = null;  // この A を from に使う現カット B の id
+function _disposeExportStraddleFrom() {
+  if (_exportStraddleFromInst) {
+    try { _exportStraddleFromInst.dispose?.(); } catch (_) { /* ignore */ }
+  }
+  _exportStraddleFromInst = null;
+  _exportStraddleFromRd = null;
+  _exportStraddleForCutId = null;
+}
+function clearExportStraddle() {
+  _disposeExportStraddleFrom();
+}
+
+// render data (rd) から frame f の scene state を計算する (renderCutFrames の
+// インライン計算と同式)。withLipSync=false で口パクを止める (= partner 延長用)。
+// f が duration を越えても eyeKey="open" / mouthKey="default" / motion settle に
+// なる (= 前カットの尾の自然な延長)。
+function _computeExportSceneState(rd, f, { withLipSync = true } = {}) {
+  const localElapsedSec = f / rd.fps;
+  const sceneSec = rd.cutStartSec + localElapsedSec;
+  let mouthKey = "default";
+  if (withLipSync && rd.speakerId && rd.lipSyncEnabled && rd.levels && f >= 0 && f < rd.levels.length) {
+    mouthKey = mouthKeyFromVolume(rd.levels[f], rd.lipSyncCfg);
+  }
+  let eyeKeyByChar = null;
+  if (rd.blinkEnabled) {
+    eyeKeyByChar = {};
+    for (const char of rd.layerData.characters || []) {
+      if (!char.id || char.blinkEligible === false) continue;
+      const hasHalf = !!char.eyeUrls?.half;
+      const startsForChar = rd.blinkStartsSecByChar[char.id] || rd.blinkStartsSecFallback;
+      eyeKeyByChar[char.id] = eyeKeyForElapsed(localElapsedSec, startsForChar, rd.animationFps, rd.blinkAlgorithm, hasHalf);
+    }
+  }
+  const shake = computeShakeOffset(rd.motionType, rd.motionSettings, localElapsedSec);
+  const motionOffsetByChar = _computePerCharacterMotionOffsetsForExport(rd.layerData.characters, localElapsedSec);
+  const idle = rd.idleMotion ? computeIdleMotionOffset(rd.idleMotion, sceneSec) : { dx: 0, dy: 0 };
+  return {
+    eyeKey: "open",
+    eyeKeyByChar,
+    mouthKey,
+    speakerId: rd.speakerId,
+    shakeDx: shake.dx,
+    shakeDy: shake.dy,
+    idleDx: idle.dx,
+    idleDy: idle.dy,
+    motionOffsetByChar,
+    elapsedSec: localElapsedSec,
+    animationFps: 12,
+    frameIdx: f,
+  };
+}
+
+// A-side 用: 次カットの先頭フレームを焼いてテクスチャを返す。失敗時は null。
+// build → frame0 capture → dispose (RT に焼き済みなので texture は生きる)。
+async function _prepareExportASideTex(nextCut, projectId, fps) {
+  let inst = null;
+  try {
+    const layerData = await fetchSceneBundle(nextCut, projectId);
+    inst = await buildSceneFromLayerData(layerData, null, null, null);
+    if (!inst) return null;
+    const rd0 = _buildExportRenderData(layerData, fps, Number(layerData.cutStartSec) || 0, Math.max(1, Number(nextCut.durationFrame) || 0), null);
+    const frame0 = _computeExportSceneState(rd0, 0, { withLipSync: false });
+    const tex = captureInstanceFrameToTexture(inst, frame0);
+    return tex || null;
+  } catch (_e) {
+    return null;
+  } finally {
+    if (inst) { try { inst.dispose?.(); } catch (_) {} }
+  }
+}
+
+// per-cut の render data をまとめる (state 計算 + partner 延長で共有)。
+function _buildExportRenderData(layerData, fps, cutStartSec, total, levels) {
+  const blinkStartsSecByChar = {};
+  const rawBlinkByChar = layerData.blinkFramesByChar;
+  if (rawBlinkByChar && typeof rawBlinkByChar === "object") {
+    for (const [cid, arr] of Object.entries(rawBlinkByChar)) {
+      if (!cid || !Array.isArray(arr)) continue;
+      blinkStartsSecByChar[cid] = arr.map((f) => Number(f) / PROJECT_FPS);
+    }
+  }
+  const blinkStartsSecFallback = (Array.isArray(layerData.blinkFrames) ? layerData.blinkFrames : [])
+    .map((f) => Number(f) / PROJECT_FPS);
+  return {
+    layerData,
+    fps,
+    cutStartSec,
+    duration: total,
+    speakerId: layerData.speakerId || null,
+    lipSyncEnabled: layerData.lipSyncEnabled !== false,
+    levels,
+    lipSyncCfg: layerData.lipSync || {},
+    blinkEnabled: layerData.blinkEnabled !== false,
+    blinkStartsSecByChar,
+    blinkStartsSecFallback,
+    animationFps: Number(layerData.characterAnimationFps) || 12,
+    blinkAlgorithm: layerData.blinkAlgorithm || "anime",
+    motionType: layerData.motion?.type || "none",
+    motionSettings: layerData.motion?.settings || {},
+    idleMotion: layerData.idleMotion || null,
+  };
+}
+
 function isTransparentEncoder(encoder) {
   return TRANSPARENT_ENCODERS.has(encoder);
 }
@@ -544,6 +664,7 @@ function _alphaStats(bytes, width, height) {
  */
 async function renderCutFrames({
   cut,
+  nextCut = null,               // 境界またぎ: A-side で次カットの先頭を出すため
   fps,
   width,
   height,
@@ -690,6 +811,13 @@ async function renderCutFrames({
     ctx.cutBuildCount = (ctx.cutBuildCount || 0) + 1;
   }
   setActiveScene(sceneInstance);
+  // R10: カット入りトランジションを書き出しにも反映 (cut.transition は scenario 由来)。
+  // 前カットの最終フレーム (RT capture) を from-frame として供給してから transition 設定。
+  try {
+    setExportFromFrame(_exportFromTex || null);
+    const tr = cut && typeof cut.transition === "object" ? cut.transition : null;
+    setActiveSceneTransition(tr);
+  } catch (_) { /* ignore */ }
 
   if (includeVisualizer && sceneInstance.meshes?.visualizer) {
     try {
@@ -742,6 +870,33 @@ async function renderCutFrames({
   }
 
   const total = Math.max(1, Number(cut.durationFrame) || 0);
+
+  // ---- 境界またぎトランジション (フルライブ dual-RT 合成) のセットアップ ----
+  // rd: このカットの render data (active + partner 延長で共有)。
+  const rd = _buildExportRenderData(layerData, fps, cutStartSec, total, levels);
+  // B-side: 直前カット A が retain されていてこのカット B 用なら、B の頭 D_B/2 で合成。
+  const trB = (cut && typeof cut.transition === "object") ? cut.transition : null;
+  const trBType = trB && trB.type ? String(trB.type) : "none";
+  const trBDurFrames = trB ? Math.max(0, Math.round(Number(trB.durationFrame) || 0)) : 0;
+  const bSideActive = !transparent && _exportStraddleFromInst && _exportStraddleFromRd
+    && _exportStraddleForCutId === cut.id && trBType !== "none" && trBDurFrames > 0;
+  const bSideHalfFrames = bSideActive ? Math.floor(trBDurFrames / 2) : 0;
+  // A-side: 次カットにトランジションがあれば、その先頭フレームを焼いて A の尾で出す。
+  const trNext = (nextCut && typeof nextCut.transition === "object") ? nextCut.transition : null;
+  const trNextType = trNext && trNext.type ? String(trNext.type) : "none";
+  const trNextDurFrames = trNext ? Math.max(0, Math.round(Number(trNext.durationFrame) || 0)) : 0;
+  let aSideTex = null;
+  let aSideStartFrame = total;
+  if (!transparent && nextCut && trNextType !== "none" && trNextDurFrames > 0) {
+    aSideTex = await _prepareExportASideTex(nextCut, projectId, fps);
+    aSideStartFrame = total - Math.floor(trNextDurFrames / 2);
+  }
+  // 先頭カット (前カット無しの単段フェードイン) は overlay 経路を使う。straddle が
+  // 効く (B-side) ときは overlay を出さない。
+  if (bSideActive) {
+    try { setActiveSceneTransition(null); } catch (_) { /* ignore */ }
+  }
+
   let rendered = 0;
   for (let f = 0; f < total; f++) {
     if (shouldAbort && shouldAbort()) {
@@ -773,69 +928,66 @@ async function renderCutFrames({
       }
     }
 
-    // mouthKey: speaker かつ levels あれば levels[f] から、なければ "default"
-    // (= カット選択の口)。lipSync OFF のときも "default"。
-    let mouthKey = "default";
-    if (speakerId && lipSyncEnabled && levels && f < levels.length) {
-      mouthKey = mouthKeyFromVolume(levels[f], lipSyncCfg);
-    }
-    // eyeKey: blink 有効なら blinkStartsSec で計算。均等方式は per-char で
-    // 「中目あり/なし」によりパターン長が変わるため、キャラ単位に解決して
-    // eyeKeyByChar として渡す。
-    let eyeKeyByChar = null;
-    if (blinkEnabled) {
-      eyeKeyByChar = {};
-      for (const char of layerData.characters || []) {
-        if (!char.id || char.blinkEligible === false) continue;
-        const hasHalf = !!char.eyeUrls?.half;
-        // per-char schedule があればそれを優先 (== キャラ間で同期しない)。
-        // 無ければ旧挙動 (cut 全体で 1 本) にフォールバック。
-        const startsForChar = blinkStartsSecByChar[char.id] || blinkStartsSecFallback;
-        eyeKeyByChar[char.id] = eyeKeyForElapsed(
-          localElapsedSec, startsForChar, animationFps, blinkAlgorithm, hasHalf,
-        );
-      }
-    }
-    // shake / move / zoom: M-2 で per-character 化。各キャラの character.motion から
-    // motionOffsetByChar を計算 (= scene global の旧経路は server normalize で
-    // 話者キャラへ migrate 済みなのでここではほぼ no-op)。
-    const shake = computeShakeOffset(motionType, motionSettings, localElapsedSec);
-    const motionOffsetByChar = _computePerCharacterMotionOffsetsForExport(
-      layerData.characters, localElapsedSec,
-    );
-    // idle (呼吸 / BPM bob): scene 内通算秒 (= sceneSec) で計算することで、
-    // シーン跨ぎカットでも sin の位相が連続する。
-    const idle = idleMotion
-      ? computeIdleMotionOffset(idleMotion, sceneSec)
-      : { dx: 0, dy: 0 };
+    // このフレームの scene state (active cut, 口パクあり)。
+    const sceneState = _computeExportSceneState(rd, f, { withLipSync: true });
 
     // GL render (= scene.update の per-frame JS: telop refresh / per-char texture /
     // motion 計算 + draw call 発行) の壁時計時間を累積する。律速診断用。WebGL は
     // deferred なので実 GPU 実行は encode (VideoFrame 化の同期点) に乗る = glRenderMs が
     // 大なら per-frame JS 律速、小さいのに fps 低なら GPU/encode 律速、と読める。
     const _tGl = performance.now();
-    renderActiveScene({
-      eyeKey: "open",
-      eyeKeyByChar,
-      mouthKey,
-      speakerId,
-      shakeDx: shake.dx,
-      shakeDy: shake.dy,
-      idleDx: idle.dx,
-      idleDy: idle.dy,
-      motionOffsetByChar,
-      elapsedSec: localElapsedSec,
-      animationFps: 12,
-      frameIdx: f,
-    });
+    // ---- 境界またぎ合成 (preview と同じ式) ----
+    let _composited = false;
+    const activeInst = getActiveScene();
+    if (bSideActive && f < bSideHalfFrames && activeInst) {
+      // B-side: B=live, A=尾を live 延長, progress 0.5→1
+      const progress = Math.min(1, 0.5 + f / trBDurFrames);
+      const aLocalFrame = _exportStraddleFromRd.duration + f;
+      const fromState = _computeExportSceneState(_exportStraddleFromRd, aLocalFrame, { withLipSync: false });
+      _composited = renderSceneTransitionComposite({
+        fromInst: _exportStraddleFromInst, fromState,
+        toInst: activeInst, toState: sceneState,
+        cfg: trB, progress,
+      });
+    }
+    if (!_composited && aSideTex && f >= aSideStartFrame && activeInst) {
+      // A-side: A=live, B=先頭フレーム静止, progress 0→0.5
+      const progress = Math.max(0, Math.min(0.5, (f - aSideStartFrame) / trNextDurFrames));
+      _composited = renderSceneTransitionComposite({
+        fromInst: activeInst, fromState: sceneState,
+        toTex: aSideTex,
+        cfg: trNext, progress,
+      });
+    }
+    if (!_composited) {
+      renderActiveScene(sceneState);
+    }
     if (ctx) ctx.glRenderMs = (ctx.glRenderMs || 0) + (performance.now() - _tGl);
     await _readbackAndSend(readback, sender, vflipMode, width, height, ctx);
     rendered += 1;
     ctx.onCutFrameSent?.();
   }
+  // このカット B の B-side で使った前カット A はもう不要 → dispose。
+  if (_exportStraddleForCutId === cut.id) _disposeExportStraddleFrom();
+
+  // R10: このカットの最終フレームを RT へ焼いて、次カットのトランジション from-frame に。
+  try { _exportFromTex = captureActiveSceneToTexture(width, height); } catch (_) { _exportFromTex = null; }
+
+  // 境界またぎ: 次カットにトランジションがあれば、このカット A を dispose せず detach
+  // して retain する。次カットの renderCutFrames が B-side で live 延長描画してから破棄。
+  if (!transparent && nextCut && trNextType !== "none" && trNextDurFrames > 0) {
+    const a = detachActiveSceneNoDispose();
+    if (a) {
+      _exportStraddleFromInst = a;
+      _exportStraddleFromRd = rd;
+      _exportStraddleForCutId = nextCut.id;
+    }
+  }
+
   // 注意: ここで disposeActiveScene() しない。次のカット rebuild 時に setActiveScene
   // が古い instance を dispose する。今 dispose すると次の renderActiveScene までの
-  // PBO ring fetch (前カットの絵) が壊れる。
+  // PBO ring fetch (前カットの絵) が壊れる。retain した場合は active=null になるので
+  // 次カットの setActiveScene は何も dispose しない (retain した A は B-side 後に破棄)。
 
   // per-cut で内部 init した videoLayer provider はここで必ず dispose。
   // (provider が呼び出し側から渡された場合は呼び出し側責任なので touch しない)
@@ -1010,6 +1162,10 @@ export async function runExportSession({
     });
   }
   // 2) cut の duration を override する (= UI で短縮テスト可能)
+  // R10: 単一カット書き出しは前カット無し → from-frame は null。
+  _exportFromTex = null;
+  setExportFromFrame(null);
+  clearExportStraddle();
   const cutForLoop = cutFrames === Number(cut.durationFrame)
     ? cut
     : { ...cut, durationFrame: cutFrames };
@@ -1049,6 +1205,7 @@ export async function runExportSession({
   const producedFrames = frameEncoder ? frameCtx.globalFrameIdx : sender.framesSent;
   const browserFps = sender.framesSent / Math.max(elapsedSec, 1e-6);
 
+  clearExportStraddle();
   disposeActiveScene();
 
   onLog(
@@ -1197,6 +1354,11 @@ export async function runProjectExportSession({
     });
   }
 
+  // R10: 書き出し開始時に from-frame をリセット (先頭カットは前カット無し)。
+  _exportFromTex = null;
+  setExportFromFrame(null);
+  clearExportStraddle();
+
   // シナリオ scenes / cuts を plan の順番で参照する。scenario 入力との突合は
   // scenes[].cuts[] の id ベースで取る (フィールド配置が一致する前提)。
   const scenarioScenes = scenario.scenes || [];
@@ -1343,8 +1505,19 @@ export async function runProjectExportSession({
         ...scenarioCut,
         durationFrame: planCut.durationFrame,
       };
+      // 境界またぎ: 次カットが「隙間なく」続くときだけ next を渡す (gap を挟む
+      // ときは隣接でないので straddle しない)。
+      const nextPlanCut = (cIdx + 1 < planScene.cuts.length) ? planScene.cuts[cIdx + 1] : null;
+      const nextContiguous = !!nextPlanCut
+        && Number(nextPlanCut.startFrame) === sceneFrameIdx + planCut.durationFrame;
+      const nextScenarioCut = nextContiguous
+        ? ((scenarioScene.cuts || [])[cIdx + 1]
+           || (scenarioScene.cuts || []).find((c) => c.id === nextPlanCut.id)
+           || null)
+        : null;
       await renderCutFrames({
         cut: cutForLoop,
+        nextCut: nextScenarioCut,
         fps, width, height, vflipMode,
         includeVisualizer, includeVideoTrack, transparent,
         readback, sender, ctx: frameCtx, onLog, shouldAbort,
@@ -1410,6 +1583,7 @@ export async function runProjectExportSession({
   const producedFrames = frameEncoder ? frameCtx.globalFrameIdx : sender.framesSent;
   const browserFps = sender.framesSent / Math.max(elapsedSec, 1e-6);
 
+  clearExportStraddle();
   disposeActiveScene();
 
   onLog(

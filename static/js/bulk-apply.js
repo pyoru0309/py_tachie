@@ -30,6 +30,8 @@ export const TELOP_DEFAULT_LABELS = {
   outlineColor: "アウトライン色",
   letterSpacing: "文字間",
   lineSpacing: "行間",
+  writingMode: "書字方向",
+  align: "文字揃え",
   // 仮想キー: enable + highQuality をペアで反映する (dialog.js 側で特別扱い)。
   opticalKerning: "オプティカルカーニング",
   glow: "光彩",

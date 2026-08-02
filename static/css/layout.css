@@ -3,13 +3,13 @@
 .app-shell {
   display: grid;
   grid-template-columns: minmax(520px, 1fr) minmax(420px, 680px);
-  /* timeline-dock の内訳: header(38 ボタン+toolbar) + cut-list(~84) + timeline-scroll(canvas 186 + ボーダー 2 + 横スクロールバー 14 = 202) ≒ 324px。
-     dock の padding(12+14=26) と gap(8*2=16) で +42px 見て 366px。
-     2026-05-17 SE / 動画レイヤー帯を 24px → 36px (telop と同じ太さ) に揃えたので
-     352 → 376。
-     ※ timeline-scroll の flex-basis (202px) と組で機能する。両方を上げないと
-        動画レイヤー帯が overflow:hidden で切れる / 逆に余白が出る。 */
-  grid-template-rows: minmax(0, 1fr) 376px;
+  /* timeline-dock の内訳: header(38 ボタン+toolbar) + cut-list(~84) + timeline-scroll。
+     2026-06 (v0.3): カットを 10px ストリップ → 36px の full レーン化 (R3) したため
+     既定キャンバスは ruler22+wave46+cut36+telop36+se36+vl36 = 212px。ボーダー2 +
+     横スクロールバー14 = 228px。レーン追加 (R2) 時はこの領域内で縦スクロールする。
+     2026-06 (v0.3) カット一覧カード帯を撤去 (R3完全統合) したぶん圧縮:
+     header(40) + timeline-scroll(228) + padding(26) + gap(8) ≒ 302 → 310px。 */
+  grid-template-rows: minmax(0, 1fr) 310px;
   height: 100vh;
   overflow: hidden;
   background: var(--bg);
@@ -398,7 +398,9 @@
 }
 
 .cut-list {
-  display: flex;
+  /* R3: カットはタイムラインのカットレーンへ完全統合したため、旧カット一覧カード帯は
+     非表示にする (renderCutList は無害に走り続けるが視覚的に撤去)。 */
+  display: none;
   align-items: flex-start;
   gap: 10px;
   /* カットが増えても dock の縦予算 (≒ 330/360px) を食い潰さないよう、横スクロールバー
@@ -585,10 +587,12 @@
 .timeline-scroll {
   position: relative;
   width: 100%;
-  flex: 0 1 202px;
+  /* R2: 既定はカット+各1レーンぶん (≒228px)。timeline-container を満たすよう grow し、
+     内容が短いときは余白も canvas (surface) で塗る。レーン追加で溢れたら縦スクロール。 */
+  flex: 1 1 228px;
   min-height: 60px;
   overflow-x: scroll;
-  overflow-y: hidden;
+  overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
@@ -630,7 +634,12 @@
 }
 
 .timeline-spacer {
-  position: relative;
+  /* R2: 横 (width=contentW) + 縦 (height=contentH) スクロール範囲を作る。
+     absolute にして normal flow から外し、sticky canvas を下へ押し下げないようにする
+     (in-flow だと縦スクロール無しのとき canvas が spacer の下に流れて巨大な空白になる)。 */
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 1px;
   height: 1px;
   visibility: hidden;
@@ -642,8 +651,6 @@
   left: 0;
   top: 0;
   display: block;
-  height: 100%;
-  margin-top: -1px;
   outline: none;
   cursor: default;
   user-select: none;

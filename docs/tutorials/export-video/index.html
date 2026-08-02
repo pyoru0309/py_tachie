@@ -27,7 +27,7 @@
     
     
       
-        <title>PNG / 動画を書き出す - 立ち絵システム ユーザーガイド</title>
+        <title>PNG / 動画 / 字幕を書き出す - 立ち絵システム ユーザーガイド</title>
       
     
     
@@ -119,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              PNG / 動画を書き出す
+              PNG / 動画 / 字幕を書き出す
             
           </span>
         </div>
@@ -437,7 +437,7 @@
   <span class="md-ellipsis">
     
   
-    PNG / 動画を書き出す
+    PNG / 動画 / 字幕を書き出す
   
 
     
@@ -455,7 +455,7 @@
   <span class="md-ellipsis">
     
   
-    PNG / 動画を書き出す
+    PNG / 動画 / 字幕を書き出す
   
 
     
@@ -541,6 +541,17 @@
     <span class="md-ellipsis">
       
         書き出しに失敗した場合
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#srt-vtt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        字幕データ (SRT / VTT) を書き出す
       
     </span>
   </a>
@@ -1130,6 +1141,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#srt-vtt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        字幕データ (SRT / VTT) を書き出す
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1203,18 +1225,46 @@
                 
                   
 
-<h1 id="png">PNG / 動画を書き出す<a class="headerlink" href="#png" title="Permanent link">&para;</a></h1>
-<p>編集したカットは、静止画として PNG、シナリオ全体として動画 (MP4 / MOV) に書き出せます。</p>
+<h1 id="png">PNG / 動画 / 字幕を書き出す<a class="headerlink" href="#png" title="Permanent link">&para;</a></h1>
+<p>編集した内容は、静止画 (PNG)、シナリオ全体の動画 (MP4 / MOV)、字幕データ (SRT / VTT) に書き出せます。
+書き出しはすべてヘッダーの <code>エクスポート ▼</code> プルダウンからおこない、出力先は共通で <code>projects/&lt;project_id&gt;/outputs/</code> です。</p>
+<p><code>エクスポート ▼</code> の項目:</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PNG静止画</td>
+<td>選択中カットを 1920×1080 PNG で保存</td>
+</tr>
+<tr>
+<td>動画</td>
+<td>シナリオ全体を動画として書き出す (書き出しダイアログを開く)</td>
+</tr>
+<tr>
+<td>テロップデータ (SRT/VTT)</td>
+<td>画面上のテロップを字幕ファイルとして SRT・VTT 同時出力</td>
+</tr>
+<tr>
+<td>セリフデータ (SRT/VTT)</td>
+<td>キャラのセリフを字幕ファイルとして SRT・VTT 同時出力 (話者名付き)</td>
+</tr>
+</tbody>
+</table>
 <h2 id="png_1">PNG 出力<a class="headerlink" href="#png_1" title="Permanent link">&para;</a></h2>
 <ol>
 <li>出力したいカットをタイムラインで選択します。</li>
 <li>プレビューが意図した見た目になっていることを確認します。</li>
-<li>ヘッダーの <code>PNG出力</code> を押します。</li>
+<li>ヘッダーの <code>エクスポート ▼</code> → <code>PNG静止画</code> を押します。</li>
 </ol>
 <p>PNG は <code>projects/&lt;project_id&gt;/outputs/render_&lt;timestamp&gt;.png</code> に保存されます (WebGL canvas の snapshot)。
 背景なしの透過 PNG として書き出したい場合は、編集パネルでカットの背景をクリアしてから書き出してください。</p>
 <h2 id="_1">動画書き出しダイアログ<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
-<p>ヘッダーの <code>MP4出力</code> を押すと書き出しダイアログが開きます。</p>
+<p>ヘッダーの <code>エクスポート ▼</code> → <code>動画</code> を押すと書き出しダイアログが開きます。</p>
 <ul>
 <li><strong>プリセット</strong>: 内蔵プリセットから選びます。表は次節に。</li>
 <li><strong>エンコーダ</strong>: HW エンコーダ (NVENC / VideoToolbox) が利用可能な環境では alternate として選択肢に並びます。利用不可なものは disabled で表示されます。</li>
@@ -1301,6 +1351,47 @@
 <li>メモリ不足 (<code>Killed</code> / OOM) になる場合は、長尺のシーンを複数シーンに分割してください (v2 GL → ffmpeg ワンパス書き出しのため、ブラウザの WebGL コンテキストと ffmpeg プロセスが主なメモリ消費源)。</li>
 <li>HW エンコーダで失敗するときは、ffmpeg のビルドにそのエンコーダが含まれているかを <code>ffmpeg -encoders | grep nvenc</code> などで確認してください。</li>
 </ul>
+<h2 id="srt-vtt">字幕データ (SRT / VTT) を書き出す<a class="headerlink" href="#srt-vtt" title="Permanent link">&para;</a></h2>
+<p>テロップ (画面上のキャプション) とセリフ (キャラの発話) を、それぞれ字幕ファイルとして書き出せます。
+<code>エクスポート ▼</code> から選ぶと、<strong>SRT と VTT を同時に</strong> <code>projects/&lt;project_id&gt;/outputs/</code> へ出力します (どちらも UTF-8)。</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>出力ファイル</th>
+<th>元データ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>テロップデータ (SRT/VTT)</td>
+<td><code>telop_&lt;timestamp&gt;.srt</code> / <code>telop_&lt;timestamp&gt;.vtt</code></td>
+<td>シーンのテロップ (<code>telops</code>)</td>
+</tr>
+<tr>
+<td>セリフデータ (SRT/VTT)</td>
+<td><code>serif_&lt;timestamp&gt;.srt</code> / <code>serif_&lt;timestamp&gt;.vtt</code></td>
+<td>各カットのセリフ (<code>state.text</code>)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>時刻</strong>は各要素の開始フレーム / 表示フレーム (プロジェクト 24fps 基準) から算出します。テロップはタイムライン上の配置位置、セリフはカットの並び順にもとづく通し時刻です。</li>
+<li><strong>本文が空</strong>のテロップ / カットは字幕として書き出されません。書き出せる行が 1 件も無いときはファイルを作らず、その旨を通知します。</li>
+<li><strong>セリフの話者名</strong> (ボイスタグ) は、そのカットに登場するキャラの表示名から自動付与されます。VTT では <code>&lt;v 話者名&gt;本文</code>、SRT では行頭に <code>話者名：本文</code> の形で入ります (テロップには話者名は付きません)。</li>
+<li>VTT には文字スタイルや表示位置の情報は含めず、本文とボイスタグだけを書き出します (字幕編集ソフト / 動画サイトへの取り込みを想定)。</li>
+</ul>
+<p>出力例 (セリフデータ):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>1
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>00:00:04,000 --&gt; 00:00:13,125
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>モカ：こんにちは、宮舞モカです。今回は…
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>WEBVTT
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>00:00:04.000 --&gt; 00:00:13.125
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>&lt;v モカ&gt;こんにちは、宮舞モカです。今回は…
+</span></code></pre></div>
+<p><strong>セリフの一覧を加工して取り込みたい場合</strong>: タイミング付きの字幕ではなく、話者・音声・尺つきのセリフ台本を編集して読み込み直したいときは、<code>全体設定</code> の YAML 取り込み (セリフ書き出し互換フォーマット) を使ってください。SRT / VTT はあくまで字幕としての書き出し専用です。</p>
 <h2 id="_5">既存出力の管理<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p><code>設定</code> → <code>出力ファイル一覧</code> から、過去の書き出しファイルを一覧 / 個別削除 / 全削除できます。
 プロジェクトの <code>outputs/</code> を直接掃除しても問題ありません。</p>

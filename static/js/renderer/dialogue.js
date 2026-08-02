@@ -23,7 +23,8 @@
 import * as THREE from "three";
 import { fontFamilyCssStack, resolveFontWeightCss } from "../font.js";
 import { hexToRgba } from "../utils.js";
-import { layoutTextRun, computeOpticalMedianGapForLines } from "./text-layout.js";
+import { layoutTextRun, computeOpticalMedianGapForLines, sliceCharKerningByWrappedLines } from "./text-layout.js";
+import { relayoutDialogue } from "./dialogue-relayout.js";
 
 export const DIALOGUE_CANVAS_WIDTH = 1920;
 export const DIALOGUE_CANVAS_HEIGHT = 1080;
@@ -51,6 +52,8 @@ function drawTextAtBaseline(ctx, text, x, baselineY, options) {
     fontSpec = null,
     fontSize = 0,
     medianGapOverride = null,
+    // R8: この行の個別文字間 ({inLineGapIndex: delta})。
+    charKerning = null,
   } = options;
   ctx.textBaseline = "alphabetic";
   const useStroke = outlineWidth > 0 && strokeStyle;
@@ -64,17 +67,19 @@ function drawTextAtBaseline(ctx, text, x, baselineY, options) {
 
   const lsPx = Number(letterSpacing) || 0;
 
-  // optical kerning ON: layoutTextRun の glyph 座標で 1 文字ずつ描く。
-  // ctx.font は呼び出し側 (drawDialogueOnCanvas) で fontSpec に揃えてある。
-  if (opticalKerning) {
+  // optical kerning ON、または個別文字間がある行は layoutTextRun の glyph 座標で
+  // 1 文字ずつ描く (optical OFF + charKerning のみでも run layout 経路を使う)。
+  const hasCharKerning = charKerning && Object.keys(charKerning).length > 0;
+  if (opticalKerning || hasCharKerning) {
     const run = layoutTextRun(ctx, text, {
       fontSpec,
       fontSize,
       letterSpacing: lsPx,
-      opticalKerning: true,
+      opticalKerning,
       opticalKerningHighQuality,
       outlineWidth,
       medianGapOverride,
+      charKerning,
     });
     for (const g of run.glyphs) {
       if (g.drawable === false) continue;  // 空白トークンは描画しない (advance だけ進む)
@@ -112,7 +117,7 @@ function drawTextAtBaseline(ctx, text, x, baselineY, options) {
 // optical kerning ON のとき、Pillow が決めた行内 x を layoutTextRun の新しい
 // 行幅で引き直す。speaker は現状 letter_spacing 適用外で 1 行 1 行も短いので
 // 中央寄せの再計算は不要 (左寄せ固定)。
-function recomputeLineX(ctx, line, layout, medianGapOverride = null) {
+function recomputeLineX(ctx, line, layout, medianGapOverride = null, charKerning = null) {
   const align = String(layout.textAlign || "left").toLowerCase();
   const fontSize = Number(layout.fontSize) || 0;
   const lsPx = Number(layout.letterSpacing) || 0;
@@ -123,10 +128,11 @@ function recomputeLineX(ctx, line, layout, medianGapOverride = null) {
     fontSpec,
     fontSize,
     letterSpacing: lsPx,
-    opticalKerning: true,
+    opticalKerning: !!layout.enableOpticalKerning,
     opticalKerningHighQuality: !!layout.opticalKerningHighQuality,
     outlineWidth: Number(layout.outlineWidth) || 0,
     medianGapOverride,
+    charKerning,
   }).width;
   if (!inner) return { x: line.x, width: newW };
   const left = Number(inner.left) || 0;
@@ -240,6 +246,11 @@ export function drawDialogueOnCanvas(canvas, layout, overlayImage = null) {
     ctx.drawImage(overlayImage, 0, 0, canvas.width, canvas.height);
   }
 
+  // R8: オプティカル/個別字間が効くカットは、枠 (box) を保持したままその枠幅で
+  // 再折り返し + 縦再配置して、右余り/はみ出しを解消する (詰めもフィット)。
+  const bodyFontSpec = fontSpec(layout);
+  layout = relayoutDialogue(ctx, layout, bodyFontSpec);
+
   if (layout.speaker) {
     const sp = layout.speaker;
     const speakerFill = hexToRgba(layout.textColor || "#FFFFFF", (layout.speakerOpacity ?? 230) / 255);
@@ -265,7 +276,7 @@ export function drawDialogueOnCanvas(canvas, layout, overlayImage = null) {
     : null;
   const useOptical = !!layout.enableOpticalKerning;
   const useHQ = !!layout.opticalKerningHighQuality;
-  const bodyFontSpec = fontSpec(layout);
+  // bodyFontSpec は冒頭の relayout 用に算出済み (再利用)。
 
   // セリフ本文の glow / dropShadow。テロップと同じ「silhouette + tint + blur」方式。
   // 本文文字 (枠 / overlay 画像 / speaker name は対象外) のシルエットを別 canvas に
@@ -312,11 +323,20 @@ export function drawDialogueOnCanvas(canvas, layout, overlayImage = null) {
       opticalKerning: useOptical, opticalKerningHighQuality: useHQ,
     },
   );
-  for (const line of layout.textLines || []) {
+  // R8: 個別文字間。生テキスト + 行テキストから行ごとのカーニングをスライスする。
+  const dlgLines = (layout.textLines || []).map((l) => l.text || "");
+  const lineCharKerning = (layout.charKerning && Object.keys(layout.charKerning).length > 0)
+    ? sliceCharKerningByWrappedLines(layout.charKerning, layout.rawText || "", dlgLines)
+    : null;
+  const hasCharKerning = !!(lineCharKerning && lineCharKerning.some((m) => m && Object.keys(m).length > 0));
+  const textLinesArr = layout.textLines || [];
+  for (let i = 0; i < textLinesArr.length; i += 1) {
+    const line = textLinesArr[i];
+    const lineCk = lineCharKerning ? lineCharKerning[i] : null;
     let drawX = line.x;
-    if (useOptical) {
-      // align の引き直し (新しい行幅で center/right を再計算)。
-      const recomputed = recomputeLineX(ctx, line, layout, bodyMedianGap);
+    // optical OR 個別文字間がある行は、新しい行幅で center/right を引き直す。
+    if (useOptical || (lineCk && Object.keys(lineCk).length > 0)) {
+      const recomputed = recomputeLineX(ctx, line, layout, bodyMedianGap, lineCk);
       drawX = recomputed.x;
     }
     drawTextAtBaseline(ctx, line.text || "", drawX, line.baselineY, {
@@ -329,6 +349,7 @@ export function drawDialogueOnCanvas(canvas, layout, overlayImage = null) {
       fontSpec: bodyFontSpec,
       fontSize: layout.fontSize || 0,
       medianGapOverride: bodyMedianGap,
+      charKerning: lineCk,
     });
   }
   ctx.restore();

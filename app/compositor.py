@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import os
 import textwrap
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -104,6 +104,10 @@ class RenderRequest:
     speech_padding_y: int
     line_gap: int
     letter_spacing: float = 0.0
+    # R8: 個別文字間カーニング。生テキストの gap index (str) → delta(1/1000em)。
+    # v2 (Canvas2D) 経路で layoutTextRun が行ごとに適用する。レイアウト出力にそのまま
+    # 同梱し、クライアント側で行スライスする (サーバ描画 v1 では未使用)。
+    char_kerning: dict = field(default_factory=dict)
     # オプティカルカーニング (左右 ink ベアリング + 日本語 punctuation 係数 → letter_spacing 一律加算)。
     # Pillow 経路 (v1) では現状未実装、Canvas2D (v2) 経路で layoutTextRun が読む。
     # textDefaults から流入し、cut 単位の textStyle には保存されない。
@@ -161,7 +165,12 @@ def dim_character(character: Image.Image, opacity: float) -> Image.Image:
 def existing_font_path(candidate: str) -> Path | None:
     path = Path(candidate).expanduser()
     if not path.is_absolute():
-        path = Path.cwd() / path
+        # 相対パス (assets/... / projects/...) は PROJECT_ROOT 基準。CWD 基準に
+        # すると、リポジトリルート以外から起動したとき候補が全滅して OS フォント
+        # へ黙ってフォールバックし、canvas 描画とレイアウト計算がずれる。
+        from .paths import PROJECT_ROOT
+
+        path = PROJECT_ROOT / path
     return path if path.exists() else None
 
 
@@ -178,6 +187,25 @@ def paths_for_weight(font_item: dict[str, Any], weight: str) -> list[str]:
     return font_item.get("paths", [])
 
 
+def _system_font(family: str, weight: str, size: int) -> ImageFont.FreeTypeFont | None:
+    """PC インストール済みフォント (sys_*) を絶対パス + TTC index で開く。"""
+    try:
+        from .system_fonts import resolve_face
+
+        face = resolve_face(family, weight)
+    except Exception:  # noqa: BLE001
+        return None
+    if not face:
+        return None
+    path, index = face
+    try:
+        if index >= 0:
+            return ImageFont.truetype(path, size=size, index=index)
+        return ImageFont.truetype(path, size=size)
+    except OSError:
+        return None
+
+
 def get_font(
     size: int,
     family: str,
@@ -191,10 +219,21 @@ def get_font(
                 candidates.extend(paths_for_weight(item, weight))
                 break
         if not candidates:
+            system_font = _system_font(family, weight, size)
+            if system_font is not None:
+                return system_font
+        if not candidates:
             for item in config.get("fonts", []):
                 if item.get("id") == config.get("defaultFont"):
                     candidates.extend(paths_for_weight(item, config.get("defaultFontWeight", "regular")))
                     break
+        if not candidates:
+            # defaultFont 自体が PC フォント (sys_*) のケース
+            system_font = _system_font(
+                str(config.get("defaultFont") or ""), str(config.get("defaultFontWeight") or "regular"), size
+            )
+            if system_font is not None:
+                return system_font
 
     candidates.extend(
         [
@@ -231,15 +270,20 @@ LINE_END_FORBIDDEN = set(
 )
 
 
-def wrap_text(text: str, font: ImageFont.ImageFont, max_width: int, max_lines: int) -> list[str]:
+def wrap_text(
+    text: str,
+    font: ImageFont.ImageFont,
+    max_width: int,
+    max_lines: int,
+    letter_spacing: float = 0.0,
+) -> list[str]:
     if not text:
         return [""]
 
-    draw = ImageDraw.Draw(Image.new("RGB", (1, 1)))
-
     def fits(s: str) -> bool:
-        bbox = draw.textbbox((0, 0), s, font=font)
-        return (bbox[2] - bbox[0]) <= max_width
+        # 実描画幅 (letter_spacing 込み) で判定。枠を先に決めてこの幅で折り返すことで、
+        # letterSpacing 増減で右がはみ出す/余る現象を防ぐ。
+        return measure_text_width(font, s, letter_spacing) <= max_width
 
     lines: list[str] = []
     for paragraph in text.splitlines() or [text]:
@@ -369,7 +413,13 @@ def clamp_rect(left: int, top: int, right: int, bottom: int) -> tuple[int, int, 
 
 
 def dialogue_box_rect(request: RenderRequest, box_height: int | None = None) -> tuple[int, int, int, int]:
-    box_height = box_height or (250 if request.text_lines == 1 else 310)
+    # 既定高さは段数連動 (1段=250, 以降+60/段: 2段=310, 3段=370, 4段=430)。
+    # 実際の描画では compute_dialogue_layout が dynamic_box_height を渡すため、
+    # この既定値は width 算出用の初回呼び出し (height は未使用) のフォールバック。
+    if box_height is None:
+        lines = max(1, int(request.text_lines or 1))
+        box_height = 250 if lines == 1 else 250 + (lines - 1) * 60
+    box_height = box_height or 250
     offset_x = max(0, request.speech_offset_x)
     offset_y = max(0, request.speech_offset_y)
     side_width = 720
@@ -544,8 +594,19 @@ def compute_dialogue_layout(
     text_padding_y = max(0, request.speech_padding_y)
     initial_left, _it, initial_right, _ib = dialogue_box_rect(request)
     initial_width = initial_right - initial_left
-    max_text_width = max(120, initial_width - text_padding_x * 2)
-    lines = wrap_text(request.text, font, max_text_width, request.text_lines)
+    # 枠ありは内側パディング (text_padding_x×2) を差し引いた幅で折り返す。
+    # 枠なしは「枠の内側」という概念が無いので、配置エリア全幅を使う。
+    # (R9) これを差し引いたまま左端に padding を足さず左寄せすると、右側だけに
+    #      padding 相当の余白が残り「枠非表示時に右余白が過剰」になっていた。
+    if request.show_speech_box:
+        max_text_width = max(120, initial_width - text_padding_x * 2)
+    else:
+        max_text_width = max(120, initial_width)
+    # 折り返しは「実際に描画される幅」(letter_spacing 込み) で判定する。これをしないと
+    # letterSpacing をプラスにすると枠からはみ出し、マイナス/詰めにすると右が余る
+    # (折り返し点が実描画とずれる) ため、枠を先に決めてその幅で wrap する。
+    letter_spacing = float(request.letter_spacing or 0.0)
+    lines = wrap_text(request.text, font, max_text_width, request.text_lines, letter_spacing)
     speaker_name = request.speaker_name.strip() if request.show_speaker_name else ""
     line_gap = max(0, request.line_gap)
     ascent, descent = font.getmetrics() if hasattr(font, "getmetrics") else (request.font_size, request.font_size // 4)
@@ -574,8 +635,7 @@ def compute_dialogue_layout(
     else:
         widest_text = 1
         for line in lines:
-            bbox = measure.textbbox((0, 0), line or " ", font=font)
-            widest_text = max(widest_text, bbox[2] - bbox[0])
+            widest_text = max(widest_text, measure_text_width(font, line or " ", letter_spacing))
         total_body_height = total_text_height + speaker_height + speaker_gap
         body_left, body_top = text_body_anchor(request, widest_text, total_body_height)
         body_left = max(0, min(CANVAS_SIZE[0] - widest_text, body_left))
@@ -588,7 +648,6 @@ def compute_dialogue_layout(
         )
         baseline = body_top + speaker_height + speaker_gap + ascent
 
-    letter_spacing = float(request.letter_spacing or 0.0)
     text_lines_layout: list[dict[str, Any]] = []
     for index, line in enumerate(lines):
         text_width = measure_text_width(font, line or " ", letter_spacing)
@@ -661,6 +720,23 @@ def compute_dialogue_layout(
             "fontSize": int(request.speaker_name_font_size),
         } if speaker_pos else None,
         "textLines": text_lines_layout,
+        # R8: 個別文字間カーニング。生テキスト + gap マップをそのまま渡し、
+        # クライアント (dialogue.js) が行ごとにスライスして layoutTextRun に適用する。
+        "charKerning": request.char_kerning if isinstance(request.char_kerning, dict) else {},
+        "rawText": str(request.text or ""),
+        # R8(追加): クライアント側でオプティカル/個別字間込みの再折り返し + 縦再配置を
+        # 行うためのスカラー群。ボックス矩形 (box) はサーバ値を保持するので塗り/枠とは
+        # 不整合しない。再折り返しはボックス内に縦中央寄せで収め直すだけ。
+        "maxTextWidth": int(max_text_width),
+        "maxLines": int(request.text_lines or 1),
+        "padX": int(text_padding_x),
+        "padY": int(text_padding_y),
+        "offsetX": int(max(0, request.speech_offset_x)),
+        "offsetY": int(max(0, request.speech_offset_y)),
+        "speechPlacement": str(request.speech_placement or "bottom"),
+        "speakerHeight": int(speaker_height),
+        "speakerGap": int(speaker_gap),
+        "speakerAscent": int(speaker_ascent),
         # 行内 align 再計算用 (JS 側 layoutTextRun が optical kerning ON のとき
         # 各行幅を再計測して center/right 揃えを引き直すために使う)。
         # textBoxInner.left/right は「行頭/行末として許容される x 範囲」、
@@ -1060,6 +1136,7 @@ def request_from_payload(
             (float(text_style.get("letterSpacing", 0) or 0) / 1000.0)
             * float(text_style.get("fontSize", 54) or 54)
         ),
+        char_kerning=(text_style.get("charKerning") if isinstance(text_style.get("charKerning"), dict) else {}),
         enable_optical_kerning=bool(
             text_defaults.get("enableOpticalKerning", text_style.get("enableOpticalKerning", False))
         ),

@@ -190,3 +190,194 @@ def generate_export_text(
         "telopCount": len(telops),
         "exportDir": str(export_dir),
     }
+
+
+# ===========================================================================
+# 字幕 (SRT / VTT) 書き出し
+#
+# テロップ (画面上のキャプション) とセリフ (キャラの発話) を、それぞれ SRT と
+# VTT の 2 形式で outputs/ に同時出力する。
+#   - テロップ: telop.startFrame / durationFrame から絶対時刻を計算。
+#   - セリフ:   cut.startFrame / durationFrame から絶対時刻を計算 (連番なので
+#              startFrame が欠けていても累積フレームでフォールバックする)。
+#   - 話者名:   cut.state.characters[] のうち speakerCharacterId 一致要素の name。
+#              VTT では <v 話者名>、SRT では行頭「話者名：」として付与する。
+# VTT はスタイル/配置情報を含めず、本文と最小限のボイスタグのみ (要件どおり)。
+# 文字コードは両形式とも UTF-8。
+# ===========================================================================
+
+
+def _format_timestamp(seconds: float, sep: str) -> str:
+    """秒を `HH:MM:SS<sep>mmm` に整形する。SRT は sep=',' / VTT は sep='.'。"""
+    total_ms = int(round(max(0.0, float(seconds)) * 1000))
+    hours = total_ms // 3_600_000
+    minutes = (total_ms % 3_600_000) // 60_000
+    secs = (total_ms % 60_000) // 1000
+    millis = total_ms % 1000
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}{sep}{millis:03d}"
+
+
+def _escape_vtt_text(text: str) -> str:
+    """VTT キュー本文用に & < > をエスケープ (ボイスタグ markup は別途組み立て)。"""
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
+def _resolve_speaker_name(cut_state: dict[str, Any], speaker_id: str) -> str:
+    """cut の state.characters から speaker (character_XXXX) の表示名を引く。"""
+    if not speaker_id or not isinstance(cut_state, dict):
+        return ""
+    chars = cut_state.get("characters")
+    if not isinstance(chars, list):
+        return ""
+    live = next((c for c in chars if isinstance(c, dict) and c.get("id") == speaker_id), None)
+    if not live:
+        return ""
+    return str(live.get("name") or "").strip()
+
+
+def _collect_subtitle_entries(scenario: dict[str, Any], kind: str) -> list[dict[str, Any]]:
+    """kind ('telop' | 'serif') に応じて {start, end, text, speaker} の一覧を作る。
+
+    - text が空 (または表示尺 0) の要素は字幕として無意味なので除外する。
+    - start 昇順に並べる (SRT/VTT のキュー番号を素直に振るため)。
+    """
+    if isinstance(scenario.get("scenes"), list) and scenario["scenes"]:
+        scene = scenario["scenes"][0]
+        cuts = scene.get("cuts") or []
+        telops = scene.get("telops") or []
+    else:
+        cuts = scenario.get("cuts") or []
+        telops = []
+
+    entries: list[dict[str, Any]] = []
+    if kind == "telop":
+        for telop in telops:
+            if not isinstance(telop, dict):
+                continue
+            text = str(telop.get("text") or "").strip()
+            if not text:
+                continue
+            start = (
+                frames_to_sec(telop.get("startFrame"))
+                if telop.get("startFrame") is not None
+                else float(telop.get("startSec") or 0)
+            )
+            duration = (
+                frames_to_sec(telop.get("durationFrame"))
+                if telop.get("durationFrame") is not None
+                else float(telop.get("duration") or 0)
+            )
+            end = start + duration
+            if end <= start:
+                continue
+            entries.append({"start": start, "end": end, "text": text, "speaker": ""})
+    else:  # serif
+        acc_frame = 0
+        for cut in cuts:
+            if not isinstance(cut, dict):
+                continue
+            duration_frame = int(cut.get("durationFrame") or 0)
+            start_frame = cut.get("startFrame")
+            start_frame = int(start_frame) if start_frame is not None else acc_frame
+            end_frame = start_frame + duration_frame
+            acc_frame = end_frame  # 次カットの startFrame 欠落時のフォールバック
+            state = cut.get("state") or {}
+            text = str(state.get("text") or "").strip()
+            if not text:
+                continue
+            start = frames_to_sec(start_frame)
+            end = frames_to_sec(end_frame)
+            if end <= start:
+                continue
+            speaker = _resolve_speaker_name(state, str(state.get("speakerCharacterId") or ""))
+            entries.append({"start": start, "end": end, "text": text, "speaker": speaker})
+
+    entries.sort(key=lambda e: e["start"])
+    return entries
+
+
+def _render_srt(entries: list[dict[str, Any]]) -> str:
+    blocks: list[str] = []
+    for index, entry in enumerate(entries, start=1):
+        start = _format_timestamp(entry["start"], ",")
+        end = _format_timestamp(entry["end"], ",")
+        text = entry["text"]
+        speaker = entry.get("speaker") or ""
+        body = f"{speaker}：{text}" if speaker else text
+        blocks.append(f"{index}\n{start} --> {end}\n{body}")
+    return "\n\n".join(blocks) + ("\n" if blocks else "")
+
+
+def _render_vtt(entries: list[dict[str, Any]]) -> str:
+    blocks: list[str] = ["WEBVTT"]
+    for entry in entries:
+        start = _format_timestamp(entry["start"], ".")
+        end = _format_timestamp(entry["end"], ".")
+        text = _escape_vtt_text(entry["text"])
+        speaker = entry.get("speaker") or ""
+        if speaker:
+            # ボイスタグ内は '>' だけ避ければよい (markup と衝突するため)
+            body = f"<v {speaker.replace('>', '')}>{text}"
+        else:
+            body = text
+        blocks.append(f"{start} --> {end}\n{body}")
+    return "\n\n".join(blocks) + "\n"
+
+
+def generate_subtitles(
+    payload: dict[str, Any] | None,
+    ctx: ProjectContext,
+    kind: str,
+) -> dict[str, Any]:
+    """テロップ / セリフを SRT と VTT で outputs/ に同時書き出しする。
+
+    ``kind`` は 'telop' か 'serif'。返り値の path は render-png と同じ
+    ``/project-outputs/{id}/{name}`` 形式。
+    """
+    if kind not in ("telop", "serif"):
+        raise ValueError(f"unknown subtitle kind: {kind!r}")
+
+    scenario = payload.get("scenario") if isinstance(payload, dict) else None
+    if not isinstance(scenario, dict):
+        if ctx.scenario_path.exists():
+            with ctx.scenario_path.open("r", encoding="utf-8") as handle:
+                scenario = json.load(handle)
+        else:
+            scenario = {}
+
+    entries = _collect_subtitle_entries(scenario, kind)
+    if not entries:
+        # 空ファイルで outputs を汚さない。呼び出し側は count==0 で警告表示する。
+        return {
+            "kind": kind,
+            "srt": None,
+            "vtt": None,
+            "srtName": None,
+            "vttName": None,
+            "count": 0,
+            "outputDir": str(ctx.output_dir),
+        }
+
+    srt_text = _render_srt(entries)
+    vtt_text = _render_vtt(entries)
+
+    ctx.output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    srt_name = f"{kind}_{timestamp}.srt"
+    vtt_name = f"{kind}_{timestamp}.vtt"
+    (ctx.output_dir / srt_name).write_text(srt_text, encoding="utf-8")
+    (ctx.output_dir / vtt_name).write_text(vtt_text, encoding="utf-8")
+
+    return {
+        "kind": kind,
+        "srt": f"/project-outputs/{ctx.id}/{srt_name}",
+        "vtt": f"/project-outputs/{ctx.id}/{vtt_name}",
+        "srtName": srt_name,
+        "vttName": vtt_name,
+        "count": len(entries),
+        "outputDir": str(ctx.output_dir),
+    }

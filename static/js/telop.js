@@ -28,6 +28,7 @@ import {
 } from "./font.js";
 import { renderTelopTrack, findTelopById } from "./timeline.js";
 import { drawTextClipsOnCanvas } from "./renderer/text-clip-draw.js";
+import { shiftCharKerningForEdit } from "./renderer/text-layout.js";
 import { appendTextMotionSections } from "./text-motion.js";
 
 // per-telop オプティカルカーニング: style の enableOpticalKerning(null=継承) +
@@ -53,7 +54,15 @@ let deps = {
   applyEditorTargetView: () => {},
   applyTelopDefaultsToAllTelops: async () => {},
   promptBulkApply: async () => ({ confirmed: false, selectedKeys: new Set() }),
+  promptApplyScope: async () => "all",
 };
+
+// R1: 選択中テロップ ID の集合 (複数選択 Set 優先 / 単一選択 ID 代用)。
+function selectedTelopIdSetLocal() {
+  if (state.selectedTelopIds && state.selectedTelopIds.size > 0) return new Set(state.selectedTelopIds);
+  if (state.selectedTelopId) return new Set([state.selectedTelopId]);
+  return new Set();
+}
 
 export function bindTelop(injectedDeps) {
   deps = { ...deps, ...injectedDeps };
@@ -446,8 +455,8 @@ export function renderTelopEditor() {
   const applyAllButton = document.createElement("button");
   applyAllButton.type = "button";
   applyAllButton.className = "compact-action-button";
-  applyAllButton.innerHTML = buttonMarkup("done_all", "全テロップに反映");
-  applyAllButton.title = "このテロップのスタイル（書体・色・アウトライン・光彩・ドロップシャドウ）を、シーン内のすべてのテロップに反映します";
+  applyAllButton.innerHTML = buttonMarkup("done_all", "テロップに一括反映");
+  applyAllButton.title = "このテロップのスタイル（書体・色・アウトライン・光彩・ドロップシャドウ）を一括反映します。複数選択時は「全部 / 選択中のみ」を選べます";
   applyAllButton.addEventListener("click", async (event) => {
     event.preventDefault();
     const sourceTelop = findTelopById(telopId);
@@ -463,6 +472,10 @@ export function renderTelopEditor() {
       outlineColor: style.outlineColor,
       letterSpacing: style.letterSpacing ?? 0,
       lineSpacing: style.lineSpacing ?? 0,
+      writingMode: String(style.writingMode || "horizontal"),
+      align: ["left", "center", "right"].includes(String(style.align || "center").toLowerCase())
+        ? String(style.align || "center").toLowerCase()
+        : "center",
       // 仮想キー: "inherit" or { enable, highQuality }。dialog.js が両 style キーへ展開。
       opticalKerning: (style.enableOpticalKerning == null)
         ? "inherit"
@@ -485,12 +498,21 @@ export function renderTelopEditor() {
       fullDiff.effectParams = JSON.parse(JSON.stringify(sourceTelop.effectParams || {}));
     }
     const scene = deps.activeScene();
-    // 反映候補 = 同じ kind かつ自分以外
+    // R1: 複数テロップ選択時は適用範囲を尋ねる。
+    const selectedIds = selectedTelopIdSetLocal();
+    let scopeIds = null; // null = 全件 (同 kind)、Set = 選択中のみ
+    if (selectedIds.size >= 2) {
+      const choice = await deps.promptApplyScope({ kind: "テロップ", selectedCount: selectedIds.size });
+      if (!choice) return; // キャンセル
+      if (choice === "selected") scopeIds = selectedIds;
+    }
+    // 反映候補 = 同じ kind かつ自分以外 (スコープ指定時はその集合内)。
     const candidateCount = (scene?.telops || []).filter(
-      (t) => t && t.id !== telopId && String(t.kind || "caption") === sourceKind,
+      (t) => t && t.id !== telopId && String(t.kind || "caption") === sourceKind
+        && (!scopeIds || scopeIds.has(t.id)),
     ).length;
     if (candidateCount === 0) {
-      showToast(`他の${sourceKind === "mv_text" ? "MV 文字" : "通常テロップ"}はありません`);
+      showToast(`対象の${sourceKind === "mv_text" ? "MV 文字" : "通常テロップ"}はありません`);
       return;
     }
     const items = [
@@ -502,6 +524,15 @@ export function renderTelopEditor() {
       { key: "outlineColor", label: "アウトライン色", valueText: fullDiff.outlineColor },
       { key: "letterSpacing", label: "文字間", valueText: `${fullDiff.letterSpacing} (1/1000em)` },
       { key: "lineSpacing", label: "行間", valueText: `${fullDiff.lineSpacing}px` },
+      { key: "writingMode", label: "書字方向", valueText: fullDiff.writingMode === "vertical" ? "縦書き" : "横書き" },
+      {
+        key: "align",
+        label: "文字揃え",
+        // 縦書きソースは 上/中央/下 のラベルで見せる (値は left/center/right のまま)
+        valueText: fullDiff.writingMode === "vertical"
+          ? (fullDiff.align === "left" ? "上揃え" : fullDiff.align === "right" ? "下揃え" : "中央")
+          : (fullDiff.align === "left" ? "左揃え" : fullDiff.align === "right" ? "右揃え" : "中央"),
+      },
       {
         key: "opticalKerning",
         label: "オプティカルカーニング",
@@ -524,9 +555,13 @@ export function renderTelopEditor() {
         label: "表示位置",
         valueText: fullDiff.position === "custom"
           ? `座標指定 (${fullDiff.x ?? "?"}, ${fullDiff.y ?? "?"})`
-          : (fullDiff.position === "top" ? "上"
-            : fullDiff.position === "center" ? "中央"
-            : fullDiff.position === "bottom" ? "下" : fullDiff.position),
+          : fullDiff.writingMode === "vertical"
+            ? (fullDiff.position === "top" ? "右"
+              : fullDiff.position === "center" ? "中央"
+              : fullDiff.position === "bottom" ? "左" : fullDiff.position)
+            : (fullDiff.position === "top" ? "上"
+              : fullDiff.position === "center" ? "中央"
+              : fullDiff.position === "bottom" ? "下" : fullDiff.position),
       },
     ];
     // position=custom のときだけ x/y を個別反映項目として出す (それ以外は無効値)。
@@ -556,7 +591,7 @@ export function renderTelopEditor() {
     const filteredDiff = { __sourceKind: sourceKind };
     for (const k of result.selectedKeys) filteredDiff[k] = fullDiff[k];
     try {
-      await deps.applyTelopDefaultsToAllTelops(filteredDiff);
+      await deps.applyTelopDefaultsToAllTelops(filteredDiff, { ids: scopeIds });
     } catch (error) {
       console.error(error);
       showToast("テロップへの反映に失敗しました", "error");
@@ -590,8 +625,29 @@ export function renderTelopEditor() {
   textArea.rows = 4;
   textArea.value = telop.text || "";
   textArea.placeholder = "テロップ本文";
+  // R8: 個別文字間カーニングのキーを編集に追従させるため直前テキストを保持。
+  let prevTelopText = telop.text || "";
   textArea.addEventListener("input", () => {
-    editTelop((t) => { t.text = textArea.value; });
+    const newText = textArea.value;
+    // 挿入/削除位置を共通接頭/接尾から推定して charKerning キーをシフトする。
+    const oldArr = Array.from(prevTelopText);
+    const newArr = Array.from(newText);
+    let p = 0;
+    while (p < oldArr.length && p < newArr.length && oldArr[p] === newArr[p]) p += 1;
+    let s = 0;
+    while (s < oldArr.length - p && s < newArr.length - p
+      && oldArr[oldArr.length - 1 - s] === newArr[newArr.length - 1 - s]) s += 1;
+    const removed = oldArr.length - p - s;
+    const inserted = newArr.length - p - s;
+    editTelop((t) => {
+      t.text = newText;
+      if (t.style && t.style.charKerning && (removed || inserted)) {
+        const shifted = shiftCharKerningForEdit(t.style.charKerning, p, removed, inserted);
+        if (Object.keys(shifted).length > 0) t.style.charKerning = shifted;
+        else delete t.style.charKerning;
+      }
+    });
+    prevTelopText = newText;
     deps.scheduleScenarioSave();
     deps.renderPreview();
     renderTelopTrack();
@@ -638,12 +694,21 @@ export function renderTelopEditor() {
   for (const value of ["top", "center", "bottom", "custom"]) {
     const opt = document.createElement("option");
     opt.value = value;
-    opt.textContent = value === "top" ? "上"
-      : value === "center" ? "中央"
-      : value === "bottom" ? "下"
-      : "座標指定";
     positionSelect.append(opt);
   }
+  // 縦書きでは「位置」= 行 (カラム) を置き始める側 = ブロックの X になる。
+  // 日本語縦書きは右から左へ行が進むので top=右 / bottom=左 と読み替える
+  // (値は共通の top/center/bottom のまま保存し、横書きへ戻しても崩れない)。
+  const POSITION_LABELS_H = { top: "上", center: "中央", bottom: "下", custom: "座標指定" };
+  const POSITION_LABELS_V = { top: "右", center: "中央", bottom: "左", custom: "座標指定" };
+  const refreshPositionLabels = () => {
+    const vertical = String(telop.style?.writingMode || "horizontal") === "vertical";
+    const labels = vertical ? POSITION_LABELS_V : POSITION_LABELS_H;
+    for (const opt of positionSelect.options) {
+      opt.textContent = labels[opt.value] || opt.value;
+    }
+  };
+  refreshPositionLabels();
   positionSelect.value = telop.position || "bottom";
   const posLabel = document.createElement("label");
   posLabel.append("位置", positionSelect);
@@ -796,10 +861,20 @@ export function renderTelopEditor() {
   rowSpacing.className = "inline-fields";
 
   const alignSelect = document.createElement("select");
-  for (const [value, label] of [["left", "左揃え"], ["center", "中央"], ["right", "右揃え"]]) {
+  // 縦書きでは「揃え」の意味が縦方向 (上/中央/下) になるのでラベルを切替える。
+  // 値は共通で left/center/right のまま保存する (横書きへ戻しても崩れない)。
+  const ALIGN_LABELS_H = { left: "左揃え", center: "中央", right: "右揃え" };
+  const ALIGN_LABELS_V = { left: "上揃え", center: "中央", right: "下揃え" };
+  const refreshAlignLabels = () => {
+    const vertical = String(telop.style?.writingMode || "horizontal") === "vertical";
+    const labels = vertical ? ALIGN_LABELS_V : ALIGN_LABELS_H;
+    for (const opt of alignSelect.options) {
+      opt.textContent = labels[opt.value] || opt.value;
+    }
+  };
+  for (const value of ["left", "center", "right"]) {
     const opt = document.createElement("option");
     opt.value = value;
-    opt.textContent = label;
     alignSelect.append(opt);
   }
   const initialAlign = String(telop.style?.align || "center").toLowerCase();
@@ -814,25 +889,132 @@ export function renderTelopEditor() {
     deps.scheduleScenarioSave();
     deps.renderPreview();
   });
+
+  // 書字方向 (横書き / 縦書き)。縦書きは行 = カラム (右→左)、句読点・括弧・
+  // 長音などはフォントの GSUB vert 字形 (無ければ回転/シフト近似) で描かれる。
+  const writingModeSelect = document.createElement("select");
+  for (const [value, label] of [["horizontal", "横書き"], ["vertical", "縦書き"]]) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    writingModeSelect.append(opt);
+  }
+  writingModeSelect.value =
+    String(telop.style?.writingMode || "horizontal") === "vertical" ? "vertical" : "horizontal";
+  const writingModeLabel = document.createElement("label");
+  writingModeLabel.append("書字方向", writingModeSelect);
+  writingModeSelect.addEventListener("change", () => {
+    editTelopStyle((style) => {
+      style.writingMode = writingModeSelect.value === "vertical" ? "vertical" : "horizontal";
+    });
+    refreshAlignLabels();
+    refreshPositionLabels();
+    deps.scheduleScenarioSave();
+    deps.renderPreview();
+    if (writingModeSelect.value === "vertical") {
+      // GSUB vert グリフの取得完了後にもう一度描き直す (取得前はフォールバック字形)。
+      import("./renderer/text-vertical.js")
+        .then((m) => m.ensureVerticalGlyphsForTelops([telop]))
+        .then(() => deps.renderPreview())
+        .catch(() => {});
+    }
+  });
+  rowSpacing.append(writingModeLabel);
+  refreshAlignLabels();
   rowSpacing.append(alignLabel);
 
   const lsInput = document.createElement("input");
   lsInput.type = "number";
   lsInput.min = "-500";
   lsInput.max = "1000";
-  lsInput.step = "100";
+  lsInput.step = "10";
   lsInput.value = Number(telop.style?.letterSpacing ?? 0);
   const lsLabel = document.createElement("label");
   lsLabel.append("文字間 (1/1000em)", lsInput);
   lsInput.addEventListener("change", () => {
     editTelopStyle((style) => {
       // 1/1000 em 単位。100 単位刻み (= 0.1em ずつ) でスナップ。
-      style.letterSpacing = Math.max(-500, Math.min(1000, Math.round((Number(lsInput.value) || 0) / 100) * 100));
+      style.letterSpacing = Math.max(-500, Math.min(1000, Math.round((Number(lsInput.value) || 0) / 10) * 10));
     });
     deps.scheduleScenarioSave();
     deps.renderPreview();
   });
   rowSpacing.append(lsLabel);
+
+  // R8: 個別文字間カーニング。本文のカーソル位置 (= どの文字間か) を判定して
+  // その 1 箇所だけ正負調整する。全体字間 (上の 文字間) とは独立。一括適用の対象外。
+  const indivWrap = document.createElement("div");
+  indivWrap.className = "indiv-kerning-row";
+  const indivTitle = document.createElement("span");
+  indivTitle.className = "indiv-kerning-title";
+  indivTitle.textContent = "個別字間";
+  const indivMinus = document.createElement("button");
+  indivMinus.type = "button";
+  indivMinus.className = "compact-action-button";
+  indivMinus.textContent = "−100";
+  const indivMinus10 = document.createElement("button");
+  indivMinus10.type = "button";
+  indivMinus10.className = "compact-action-button";
+  indivMinus10.textContent = "−10";
+  const indivPlus10 = document.createElement("button");
+  indivPlus10.type = "button";
+  indivPlus10.className = "compact-action-button";
+  indivPlus10.textContent = "＋10";
+  const indivPlus = document.createElement("button");
+  indivPlus.type = "button";
+  indivPlus.className = "compact-action-button";
+  indivPlus.textContent = "＋100";
+  const indivReset = document.createElement("button");
+  indivReset.type = "button";
+  indivReset.className = "compact-action-button";
+  indivReset.textContent = "リセット";
+  const indivReadout = document.createElement("span");
+  indivReadout.className = "indiv-kerning-readout";
+  // カーソル位置 → gap index (code-point 基準, 改行も 1 文字)。境界なら -1。
+  const gapAtCursor = () => {
+    const pos = textArea.selectionStart ?? 0;
+    const before = Array.from(textArea.value.slice(0, pos)).length;
+    const total = Array.from(textArea.value).length;
+    const gap = before - 1;
+    return gap >= 0 && gap <= total - 2 ? gap : -1;
+  };
+  const refreshIndivReadout = () => {
+    const gap = gapAtCursor();
+    if (gap < 0) {
+      indivReadout.textContent = "文字と文字の間にカーソルを置いてください";
+      return;
+    }
+    const cur = Number(telop.style?.charKerning?.[gap]) || 0;
+    indivReadout.textContent = `${gap + 1}↔${gap + 2} 文字目: ${cur} (1/1000em)`;
+  };
+  const applyIndiv = (delta, absolute = null) => {
+    const gap = gapAtCursor();
+    if (gap < 0) { showToast("文字と文字の間にカーソルを置いてください"); return; }
+    editTelopStyle((style) => {
+      const ck = { ...(style.charKerning || {}) };
+      const next = absolute != null ? 0 : Math.max(-2000, Math.min(2000, (Number(ck[gap]) || 0) + delta));
+      if (next === 0) delete ck[gap];
+      else ck[gap] = next;
+      if (Object.keys(ck).length > 0) style.charKerning = ck;
+      else delete style.charKerning;
+    });
+    deps.scheduleScenarioSave();
+    deps.renderPreview();
+    renderTelopTrack();
+    refreshIndivReadout();
+  };
+  indivMinus.addEventListener("click", () => applyIndiv(-100));
+  indivMinus10.addEventListener("click", () => applyIndiv(-10));
+  indivPlus10.addEventListener("click", () => applyIndiv(10));
+  indivPlus.addEventListener("click", () => applyIndiv(100));
+  indivReset.addEventListener("click", () => applyIndiv(0, 0));
+  textArea.addEventListener("keyup", refreshIndivReadout);
+  textArea.addEventListener("click", refreshIndivReadout);
+  textArea.addEventListener("select", refreshIndivReadout);
+  refreshIndivReadout();
+  indivWrap.append(indivTitle, indivMinus, indivMinus10, indivPlus10, indivPlus, indivReset, indivReadout);
+  // セリフと同じく本文テキスト枠の直下に配置する (文字間の隣だとレイアウトが崩れるため)。
+  textArea.insertAdjacentElement("afterend", indivWrap);
 
   const spInput = document.createElement("input");
   spInput.type = "number";

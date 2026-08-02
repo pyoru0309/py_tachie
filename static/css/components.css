@@ -1154,6 +1154,76 @@ dialog::backdrop {
   background: var(--color-bg-subtle, rgba(0, 0, 0, 0.02));
 }
 
+/* R8: 個別文字間カーニングのコントロール行 */
+.indiv-kerning-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  margin-top: 4px;
+}
+.indiv-kerning-row .indiv-kerning-title {
+  font-size: 0.85em;
+  color: var(--fg-muted, #667085);
+  flex: 0 0 auto;
+}
+.indiv-kerning-row .indiv-kerning-readout {
+  font-size: 0.8em;
+  color: var(--fg-muted, #667085);
+  flex: 1 1 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+/* R1/R5: 適用範囲スコープ選択ダイアログ */
+.apply-scope-dialog {
+  border: 1px solid var(--border, #d0d5dd);
+  border-radius: 12px;
+  padding: 20px 22px;
+  max-width: 420px;
+  background: var(--surface-1, #fff);
+  color: var(--text, inherit);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.apply-scope-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.apply-scope-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 1.1em;
+}
+
+.apply-scope-dialog .apply-scope-desc {
+  margin: 0 0 16px;
+  color: var(--text-muted, #667085);
+  font-size: 0.92em;
+}
+
+.apply-scope-dialog .apply-scope-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.apply-scope-dialog .apply-scope-actions button {
+  width: 100%;
+}
+
+/* R11: 現在のバージョン表示 */
+.current-version {
+  margin: 4px 0 12px;
+  font-size: 0.92em;
+  color: var(--text-muted, #667085);
+}
+
+.current-version .current-version-value {
+  font-weight: 600;
+  color: var(--text, inherit);
+  font-variant-numeric: tabular-nums;
+}
+
 .update-options {
   display: flex;
   flex-direction: column;

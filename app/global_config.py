@@ -221,6 +221,12 @@ def default_global_config() -> dict[str, Any]:
         # キーは PROJECT_ROOT からの POSIX 相対パス、値は fontWeights の id。
         # 通常は OS/2.usWeightClass で十分なので空のままで OK。
         "fontWeightOverrides": {},
+        # PC にインストール済みのフォント (Adobe Fonts のような仮想インストール
+        # を含む) をフォント一覧に載せるか。False にするとアセット内フォント
+        # (assets/fonts/ と projects/<id>/assets/fonts/) だけになる。
+        "systemFonts": {
+            "enabled": True,
+        },
         # 音声合成 (VOICEVOX / Voicepeak) 連携。空欄なら OS 別のデフォルトパスを
         # 自動検出する。voicevoxBaseUrl 空欄時は http://127.0.0.1:50021 を使う。
         "tts": {
@@ -343,6 +349,9 @@ def load_global_config() -> dict[str, Any]:
             if k and v:
                 cleaned[k] = v
         config["fontWeightOverrides"] = cleaned
+    system_fonts_in = data.get("systemFonts") if isinstance(data.get("systemFonts"), dict) else {}
+    if "enabled" in system_fonts_in:
+        config["systemFonts"]["enabled"] = bool(system_fonts_in["enabled"])
     tts_in = data.get("tts") if isinstance(data.get("tts"), dict) else {}
     tts_out = config["tts"]
     for key in ("voicevoxAppPath", "voicevoxBaseUrl", "voicepeakBinPath"):
@@ -478,6 +487,9 @@ def save_global_config(payload: dict[str, Any]) -> dict[str, Any]:
                 if k and v:
                     cleaned[k] = v
             config["fontWeightOverrides"] = cleaned
+        system_fonts_in = payload.get("systemFonts") if isinstance(payload.get("systemFonts"), dict) else None
+        if system_fonts_in is not None and "enabled" in system_fonts_in:
+            config.setdefault("systemFonts", {})["enabled"] = bool(system_fonts_in["enabled"])
         tts_in = payload.get("tts") if isinstance(payload.get("tts"), dict) else None
         if tts_in is not None:
             tts_out = config.setdefault("tts", {

@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { drawCaptionClip, releaseTextScratch } from "./text-core.js";
+import { verticalGlyphsEpoch } from "./text-vertical.js";
 import { getEffectPreset, resolveRuntimeFlags } from "./text-effects.js";
 import { PROJECT_FPS } from "../timecode.js";
 // 副作用登録: プリセットを全部読み込む。
@@ -290,6 +291,11 @@ function _staticClipFingerprint(clip) {
     s.enableOpticalKerning ? 1 : 0,
     s.opticalKerningHighQuality ? 1 : 0,
     s.rotation ?? 0,
+    // ★ 縦書き: モード自体と、GSUB vert グリフの取得完了 (epoch) の両方で
+    //   焼き直す (取得前はフォールバック字形で焼かれているため)。
+    s.writingMode === "vertical" ? `v${verticalGlyphsEpoch()}` : "",
+    // ★ R8: 個別文字間カーニング (fingerprint 漏れがあると編集が反映されない)
+    s.charKerning ? JSON.stringify(s.charKerning) : "",
     s.glow ? `g${s.glow.enabled ? 1 : 0}:${s.glow.color}:${s.glow.blurPx}:${s.glow.opacity}:${s.glow.intensity ?? 1}` : "",
     s.dropShadow ? `d${s.dropShadow.enabled ? 1 : 0}:${s.dropShadow.color}:${s.dropShadow.blurPx}:${s.dropShadow.offsetX}:${s.dropShadow.offsetY}:${s.dropShadow.opacity}:${s.dropShadow.intensity ?? 1}` : "",
     // ★ 静的 effect / animation も見た目に影響するため含める。

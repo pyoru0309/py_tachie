@@ -122,7 +122,7 @@ from .assets import (
     valid_image_asset_path,
     valid_manifest_items,
 )
-from .export_text import generate_export_text, yaml_quote
+from .export_text import generate_export_text, generate_subtitles, yaml_quote
 from .export_video import (
     audio_duration_seconds,
     audio_volume_by_frame,
@@ -257,6 +257,7 @@ from . import runtime_health  # noqa: E402
 
 # デフォルトフォント (Noto Sans JP) のインストール。詳細は app/fonts.py。
 from . import fonts as fonts_mod  # noqa: E402
+from . import system_fonts as system_fonts_mod  # noqa: E402
 
 # プロジェクト ZIP 入出力 (archive / import)。詳細は app/project_archive.py / project_import.py。
 from . import project_archive as project_archive_mod  # noqa: E402
@@ -471,6 +472,13 @@ def startup() -> None:
         ctx = current_project()
         ensure_manifest(ctx)
         ensure_config(ctx)
+    # PC インストール済みフォントの列挙 (Adobe Fonts 等の仮想インストール含む)。
+    # 初回はフルパース (数百 ms〜数秒) なのでバックグラウンドで行い、完了後の
+    # manifest 取得からフォント一覧に載る。2 回目以降はディスクキャッシュ即読み。
+    try:
+        system_fonts_mod.start_background_scan()
+    except Exception as exc:  # noqa: BLE001
+        app_logger("startup").warning("system font scan start failed: %s", exc)
     # キャッシュ自動間引き (mtime 古いものを削除)。長期に触っていない
     # `cache/preview/` / `cache/lipsync/` / `cache/clean_pcm/` を間引く。
     # 既定 6 時間。今 active project の token は最近 touch されているので
@@ -938,6 +946,20 @@ def export_text(payload: dict[str, Any] | None = None) -> dict[str, Any]:
     return generate_export_text(payload, ctx, manifest_characters=manifest_characters)
 
 
+@app.post("/api/export/subtitles")
+def export_subtitles(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """テロップ / セリフを SRT + VTT で outputs/ に同時書き出しする。
+
+    payload = {"scenario": <現在編集中のシナリオ>, "kind": "telop" | "serif"}。
+    話者名は cut.state.characters[] から直接引くため manifest は不要。
+    """
+    ctx = current_project()
+    kind = str((payload or {}).get("kind") or "").strip()
+    if kind not in ("telop", "serif"):
+        raise HTTPException(status_code=400, detail="kind must be 'telop' or 'serif'")
+    return generate_subtitles(payload, ctx, kind)
+
+
 @app.delete("/api/projects/{project_id}")
 def delete_project(project_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     ctx = project_context(project_id)
@@ -982,11 +1004,39 @@ def get_manifest() -> dict[str, Any]:
 def _manifest_for_ctx(ctx) -> dict[str, Any]:
     config = ensure_config(ctx)
     manifest = apply_config_defaults(ensure_manifest(ctx), config)
-    manifest["config"] = _filter_missing_font_candidates(json.loads(json.dumps(config)))
+    config_out = _filter_missing_font_candidates(json.loads(json.dumps(config)))
+    _append_system_fonts(config_out)
+    manifest["config"] = config_out
     manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
     manifest["project"] = read_project_file(ctx)
     manifest["projectId"] = ctx.id
     return manifest
+
+
+def _append_system_fonts(config: dict[str, Any]) -> None:
+    """PC インストール済みフォントを manifest の fonts 末尾に追記する (非永続)。
+
+    永続 config (config.json) には書かない: 実ファイルパスがマシン固有で、
+    プロジェクトを別 PC に持って行ったとき壊れるため。アセット内フォントと
+    表示名が衝突した場合は「（PC）」を付けて区別する。
+    """
+    try:
+        entries = system_fonts_mod.manifest_entries()
+    except Exception:  # noqa: BLE001
+        return
+    if not entries:
+        return
+    fonts = config.setdefault("fonts", [])
+    existing_ids = {font.get("id") for font in fonts}
+    existing_names = {normalized_font_family_name(str(font.get("name", ""))) for font in fonts}
+    for entry in entries:
+        if entry.get("id") in existing_ids:
+            continue
+        item = dict(entry)
+        if normalized_font_family_name(str(item.get("name", ""))) in existing_names:
+            item["name"] = f"{item['name']}（PC）"
+        fonts.append(item)
+        existing_ids.add(item["id"])
 
 
 @app.get("/api/projects/{project_id}/manifest")
@@ -4361,12 +4411,15 @@ def title_editor_manifest() -> dict[str, Any]:
                 cfg = json.load(fp)
         except Exception:
             cfg = {}
-    return {
+    result = {
         "fonts": cfg.get("fonts", []),
         "fontWeights": cfg.get("fontWeights", []),
         "defaultFont": cfg.get("defaultFont", ""),
         "defaultFontWeight": cfg.get("defaultFontWeight", "regular"),
     }
+    # タイトル組版でも PC インストール済みフォントを選べるようにする
+    _append_system_fonts(result)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -4512,6 +4565,63 @@ def fonts_scan_detail_endpoint() -> dict[str, Any]:
     }
 
 
+@app.get("/api/system-fonts")
+def system_fonts_status_endpoint() -> dict[str, Any]:
+    """PC インストール済みフォントのスキャン状態。idle ならスキャンを蹴る。"""
+    payload = system_fonts_mod.status_payload()
+    if payload["enabled"] and payload["status"] == "idle":
+        system_fonts_mod.start_background_scan()
+        payload = system_fonts_mod.status_payload()
+    return payload
+
+
+@app.post("/api/system-fonts/rescan")
+def system_fonts_rescan_endpoint() -> dict[str, Any]:
+    """PC フォントの強制再スキャン (同期)。Adobe Fonts のアクティベート直後などに使う。"""
+    return system_fonts_mod.run_scan(force=True)
+
+
+@app.post("/api/fonts/vertical-glyphs")
+def fonts_vertical_glyphs_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
+    """縦書きテロップ用: フォントの GSUB `vert` 代替グリフ (SVG path) を返す。
+
+    payload: {projectId?, fontFamily, fontWeight, chars}
+    アセット内フォントは config の weights から、PC フォント (sys_*) は
+    system_fonts カタログから実ファイルを解決する。
+    """
+    from .compositor import existing_font_path, paths_for_weight
+    from .vertical_text import vertical_glyph_payload
+
+    family = str(payload.get("fontFamily") or "").strip()
+    weight = str(payload.get("fontWeight") or "regular").strip() or "regular"
+    chars = str(payload.get("chars") or "")
+    if not family or not chars:
+        return {"available": False, "glyphs": {}}
+
+    project_id = str(payload.get("projectId") or "").strip()
+    ctx = _ensure_project_ctx(project_id) if project_id else current_project()
+
+    font_path: Path | None = None
+    font_number = -1
+    config = ensure_config(ctx)
+    for item in config.get("fonts", []):
+        if item.get("id") == family:
+            for candidate in paths_for_weight(item, weight):
+                resolved = existing_font_path(candidate)
+                if resolved:
+                    font_path = resolved
+                    break
+            break
+    if font_path is None:
+        face = system_fonts_mod.resolve_face(family, weight)
+        if face:
+            font_path = Path(face[0])
+            font_number = face[1]
+    if font_path is None:
+        return {"available": False, "glyphs": {}}
+    return vertical_glyph_payload(font_path, font_number, chars)
+
+
 # ============================================================================
 # アプリ内アップデータ (git pull ラッパ)
 # ============================================================================
@@ -4535,6 +4645,12 @@ def system_health_endpoint() -> dict[str, Any]:
     環境タブの診断パネルで表示する。
     """
     return runtime_health.diagnose()
+
+
+@app.get("/api/version")
+def version_endpoint() -> dict[str, Any]:
+    """ローカルの現在バージョン情報を返す (R11)。ネットワーク fetch なし。"""
+    return update_mod.get_current_version()
 
 
 @app.get("/api/update/check")

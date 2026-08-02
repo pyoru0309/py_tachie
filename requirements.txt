@@ -24,5 +24,10 @@ numpy
 fonttools
 # JS vendor 取得 (Noto Sans JP / three / mp4box) で使用。
 httpx
+# macOS: CoreText 経由で「登録済みフォントの実ファイルパス」を列挙する
+# (app/system_fonts.py)。Adobe Fonts 等の仮想インストールフォントを標準
+# ディレクトリ走査に頼らず正攻法で検出できる。未導入でも CoreSync
+# ディレクトリの直接走査でフォールバックするため必須ではない。
+pyobjc-framework-CoreText ; sys_platform == "darwin"
 # 配布用 import_manifest.yml の読み書きに使用 (Phase 5 で独自パーサから移行)。
 PyYAML>=6.0

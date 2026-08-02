@@ -96,6 +96,32 @@ export function videoLayerDurationFrame(vl, videoDurationSec) {
   return Math.max(0, Math.round(videoLayerDurationSec(vl, videoDurationSec) * PROJECT_FPS));
 }
 
+// R2: アイテム (telop/se/vl) のレーン番号 (0 起点)。
+export function itemLane(item) {
+  return Math.max(0, Math.round(Number(item?.lane) || 0));
+}
+
+// R2: 種別 ("telop" | "soundEffect" | "videoLayer") のレーン数 (最低 1)。
+export function sceneLaneCount(scene, kind) {
+  const lc = scene && typeof scene === "object" ? scene.laneCounts : null;
+  const n = lc && typeof lc === "object" ? Number(lc[kind]) : 1;
+  return Math.max(1, Math.round(Number.isFinite(n) ? n : 1));
+}
+
+// R10: カット入りトランジション設定の取得 (既定 none)。
+export function cutTransition(cut) {
+  const t = cut && typeof cut === "object" ? cut.transition : null;
+  if (!t || typeof t !== "object") return { type: "none", durationFrame: 0 };
+  const type = String(t.type || "none");
+  const durationFrame = Math.max(0, Math.round(Number(t.durationFrame) || 0));
+  const out = { type, durationFrame };
+  if (type === "wipe") {
+    const d = String(t.wipeDirection || "right").toLowerCase();
+    out.wipeDirection = ["right", "left", "up", "down"].includes(d) ? d : "right";
+  }
+  return out;
+}
+
 export function attachScenarioCutsAlias(scenario) {
   // v4 シナリオは scenes[0].cuts が正、state.scenario.cuts はその同一参照として扱う。
   // 旧フォーマット（cuts 直下）を受け取った場合も scenes に巻き直す。
@@ -121,6 +147,11 @@ export function attachScenarioCutsAlias(scenario) {
   if (!Array.isArray(scene.cuts)) scene.cuts = [];
   if (!Array.isArray(scene.soundEffects)) scene.soundEffects = [];
   if (!Array.isArray(scene.videoLayers)) scene.videoLayers = [];
+  if (!Array.isArray(scene.telops)) scene.telops = [];
+  // R2: 種別ごとのレーン数。サーバ正規化で必ず入るが、クライアント生成/旧データ向けに既定。
+  if (!scene.laneCounts || typeof scene.laneCounts !== "object") {
+    scene.laneCounts = { telop: 1, soundEffect: 1, videoLayer: 1 };
+  }
   scenario.cuts = scene.cuts;
   if (!scenario.version) scenario.version = 4;
   return scenario;

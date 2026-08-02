@@ -114,6 +114,37 @@ export async function exportText() {
   );
 }
 
+// テロップ / セリフを SRT + VTT で outputs/ に同時書き出しする。
+// kind: "telop" | "serif"。話者名 (セリフのみ) は cut 内の登場キャラから解決される。
+export async function exportSubtitles(kind) {
+  const label = kind === "serif" ? "セリフデータ" : "テロップデータ";
+  // 現在編集中の状態をシナリオへ反映してから送る (自動保存待ちを回避)
+  try { updateSelectedCutFromCurrent(); } catch (_e) {}
+  try {
+    const response = await fetch("/api/export/subtitles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scenario: state.scenario || {}, kind }),
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || `HTTP ${response.status}`);
+    }
+    const result = await response.json();
+    if (!result.count) {
+      showToast(`${label}: 書き出せる字幕がありませんでした`, "warning");
+      return;
+    }
+    showToast(
+      `${label}を書き出しました: ${result.count} 件 → ${result.srtName} / ${result.vttName}`,
+      "success",
+    );
+  } catch (error) {
+    console.error(error);
+    showToast(`${label}の書き出しに失敗しました: ${error.message || error}`, "error");
+  }
+}
+
 // ---- 書き出しダイアログのライフサイクル -----------------------------------
 //
 // 1 つの session 状態を closure に閉じ込める (multiple click / 競合防止)。
@@ -620,6 +651,14 @@ export function bindExport() {
   // 役割が変わったので click 紐付けは backup.js 側に移動。`exportText`
   // 関数と `/api/export/text` エンドポイントは残してあるので、必要なら
   // window 経由で叩ける。
+
+  // 「エクスポート ▼」ドロップダウン内の字幕 (SRT/VTT) 書き出し。
+  elements.exportTelopSubtitlesButton?.addEventListener("click", () => {
+    exportSubtitles("telop");
+  });
+  elements.exportSerifSubtitlesButton?.addEventListener("click", () => {
+    exportSubtitles("serif");
+  });
 
   // ダイアログ内のフォーム連動
   elements.exportOptionsPresetSelect?.addEventListener("change", () => {
