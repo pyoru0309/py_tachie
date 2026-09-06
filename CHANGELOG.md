@@ -5,7 +5,14 @@
 
 ## [Unreleased]
 
-（dev チャネルで先行配信中。stable への取り込みは検証後になります。）
+## [0.4.0] - 2026-09-07
+
+演出まわりの追加が中心のアップデートです。カット全体をゆっくり動かす
+「ケンバーンズ」、前景・背景の拡大率と表示位置、キャラの立ち位置を覚えておける
+「配置プリセット」を追加しました。
+
+（本リリースは py_tachie/dev チャネルで先行配信していた変更を、検証を経て
+stable に取り込んだものです。）
 
 ### Added
 - **ケンバーンズ（シーン全体のズーム・パン）**。演出タブに追加されました。カットの
@@ -317,7 +324,8 @@ WebGL → WebSocket → ffmpeg のまま、**ブラウザ内 WebCodecs で H.264
   - キャラクター素材: `maki_py`, `moca_py` (作者: pyoru0309 / 改変自由)
   - 背景・前景・装飾画像・音声: `assets/audio`, `backgrounds`, `foregrounds`, `overlays` (作者: pyoru0309 / 改変自由)
 
-[Unreleased]: https://github.com/pyoru0309/py_tachie/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/pyoru0309/py_tachie/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.4.0
 [0.3.0]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.3.0
 [0.2.2]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.2.2
 [0.2.1]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.2.1
