@@ -459,6 +459,112 @@ def _merge_asset_and_project_presets(
     return merged
 
 
+# ---------------------------------------------------------------------------
+# 配置プリセット (placement presets)
+#
+# 表情プリセットとは独立した「キャラ 1 体の立ち位置」プリセット。
+# 名前付きで X / Y / 拡大率 を保存し、任意のカットの同じキャラへ適用する。
+# 保存先は projects/<id>/placement_presets.json (プロジェクト単位) のみ。
+# アセット側 (assets/characters/<id>/) には持たせない ── 座標はプロジェクトの
+# 構図設計に強く依存するため、共通アセットへ持ち回る意味が薄い。
+# ---------------------------------------------------------------------------
+
+def _normalize_placement_preset(item: Any, index: int, fallback_character_id: str) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        return None
+    name = str(item.get("name") or f"配置{index}").strip() or f"配置{index}"
+    raw_id = str(item.get("id") or name or f"placement_{index}").strip()
+    preset_id = re.sub(r"\s+", "_", raw_id) or f"placement_{index}"
+    character_id = str(item.get("characterId") or fallback_character_id or "")
+
+    def _num(key: str, default: float) -> float:
+        try:
+            return round(float(item.get(key, default)), 2)
+        except (TypeError, ValueError):
+            return default
+
+    scale = _num("scale", 1.0)
+    if not (scale > 0):
+        scale = 1.0
+    return {
+        "id": preset_id,
+        "name": name,
+        "characterId": character_id,
+        "x": _num("x", 0.0),
+        "y": _num("y", 0.0),
+        "scale": round(min(4.0, max(0.05, scale)), 4),
+    }
+
+
+def ensure_placement_presets(
+    manifest: dict[str, Any], ctx: ProjectContext | None = None
+) -> list[dict[str, Any]]:
+    """projects/<id>/placement_presets.json を読み込んで正規化した配列を返す。
+
+    ファイルが無い場合は空配列 (作成はしない ── 保存時に初めて書き出す)。
+    """
+    ctx = ctx or current_project()
+    path = ctx.placement_presets_path
+    if not path.exists():
+        return []
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except (json.JSONDecodeError, OSError):
+        return []
+    if not isinstance(raw, list):
+        return []
+    fallback = first_character_id(manifest)
+    out: list[dict[str, Any]] = []
+    used_keys: set[tuple[str, str]] = set()
+    for index, item in enumerate(raw, start=1):
+        record = _normalize_placement_preset(item, index, fallback)
+        if record is None:
+            continue
+        key = (record["characterId"], record["id"])
+        if key in used_keys:
+            continue
+        used_keys.add(key)
+        out.append(record)
+    return out
+
+
+def save_placement_presets(
+    payload: dict[str, Any],
+    manifest: dict[str, Any],
+    ctx: ProjectContext | None = None,
+) -> list[dict[str, Any]]:
+    """projects/<id>/placement_presets.json を丸ごと置き換える。
+
+    表情プリセットと違いアセット側の正本が無いので、受け取った配列をそのまま
+    正規化して保存し、保存後の配列を返す。
+    """
+    ctx = ctx or current_project()
+    presets_payload = payload.get("presets")
+    if not isinstance(presets_payload, list):
+        raise ValueError("presets must be a list")
+    fallback = first_character_id(manifest)
+    out: list[dict[str, Any]] = []
+    used_keys: set[tuple[str, str]] = set()
+    for index, item in enumerate(presets_payload, start=1):
+        record = _normalize_placement_preset(item, index, fallback)
+        if record is None:
+            continue
+        key = (record["characterId"], record["id"])
+        suffix = 2
+        while key in used_keys:
+            record["id"] = f"{record['id']}_{suffix}"
+            key = (record["characterId"], record["id"])
+            suffix += 1
+        used_keys.add(key)
+        out.append(record)
+    ctx.placement_presets_path.parent.mkdir(parents=True, exist_ok=True)
+    with ctx.placement_presets_path.open("w", encoding="utf-8") as handle:
+        json.dump(out, handle, ensure_ascii=False, indent=2)
+    write_project_file(ctx)
+    return out
+
+
 def ensure_expression_presets(manifest: dict[str, Any], ctx: ProjectContext | None = None) -> list[dict[str, Any]]:
     """project + asset の表情プリセットをマージして返す。
 
@@ -1068,6 +1174,24 @@ def normalize_cut_state(state: dict[str, Any], manifest: dict[str, Any]) -> dict
     foreground_x = _coord_or_none(state.get("foregroundX"))
     foreground_y = _coord_or_none(state.get("foregroundY"))
 
+    # 前景 / 背景の拡大率と背景の表示位置。
+    #   - *Scale: 1.0 = 従来通り (前景 = contain フィット、背景 = cover フィット)。
+    #   - backgroundX / Y: 背景 plane 左上の絶対座標。None = 中央 (= 従来挙動)。
+    # ケンバーンズでズームアウトする際に「あらかじめ少し大きめに敷いておく」用途。
+    def _scale_or_default(value: Any, default: float = 1.0) -> float:
+        try:
+            f = float(value)
+        except (TypeError, ValueError):
+            return default
+        if not (f > 0):
+            return default
+        return round(min(SCALE_MAX, max(SCALE_MIN, f)), 4)
+
+    foreground_scale = _scale_or_default(state.get("foregroundScale"))
+    background_scale = _scale_or_default(state.get("backgroundScale"))
+    background_x = _coord_or_none(state.get("backgroundX"))
+    background_y = _coord_or_none(state.get("backgroundY"))
+
     # textStyle は基本的に pass-through だが、個別文字間カーニング (R8) だけは
     # スキーマ (gap index -> 1/1000em 整数, 0 は省く) を強制する。空なら出力しない。
     text_style = state.get("textStyle", defaults.get("textStyle", {}))
@@ -1110,6 +1234,20 @@ def normalize_cut_state(state: dict[str, Any], manifest: dict[str, Any]) -> dict
     # 編集中キャラ id (per-cut で永続化)。クライアントが loadCut 時に最優先で復元
     # する。記録された id がカット内に居なくても保持する (= キャラ削除→復活時に再利用)
     # が、空文字はそもそも書き出さない。
+    # 前景 / 背景の拡大率・背景座標・ケンバーンズは「既定のときはキーを出さない」。
+    # 既存シナリオの normalized payload が 1 bit も変わらず、scene-bundle の
+    # token (= キャッシュキー) と自己修復書き戻しを無駄に無効化しないため。
+    if foreground_scale != 1.0:
+        normalized["foregroundScale"] = foreground_scale
+    if background_scale != 1.0:
+        normalized["backgroundScale"] = background_scale
+    if background_x is not None:
+        normalized["backgroundX"] = background_x
+    if background_y is not None:
+        normalized["backgroundY"] = background_y
+    ken_burns = _normalize_ken_burns(state.get("kenBurns"))
+    if ken_burns is not None:
+        normalized["kenBurns"] = ken_burns
     raw_editing_id = state.get("editingCharacterId")
     if isinstance(raw_editing_id, str) and raw_editing_id:
         normalized["editingCharacterId"] = raw_editing_id
@@ -1319,6 +1457,68 @@ VALID_LAYOUT_PATTERNS = frozenset({
     "t_top", "t_bottom", "l_left", "l_right",
     "vertical_4", "horizontal_4", "grid_2x2",
 })
+
+
+# 前景 / 背景 / ケンバーンズで共有する拡大率のレンジ。
+SCALE_MIN = 0.05
+SCALE_MAX = 4.0
+
+# ケンバーンズの補間カーブ。UI のセレクトと 1:1 対応。
+KEN_BURNS_EASINGS = ("linear", "ease_in", "ease_out", "ease_in_out")
+
+
+def _normalize_ken_burns(raw: Any) -> dict[str, Any] | None:
+    """カット単位のケンバーンズ (ゆっくりズーム / パン) 設定を正規化する。
+
+    背景・前景・キャラ・動画レイヤー・ビジュアライザーを 1 つの「絵」とみなし、
+    カット尺いっぱいを使って start → end へ拡大率と平行移動を線形補間する
+    (セリフ枠・テロップは対象外。renderer 側で world group から除外している)。
+
+    - scale: 画面中心 (960, 540) を原点とした倍率。
+    - x / y: 平行移動 (px)。正の x で絵が右へ動く。
+    - 無効 (enabled=False) かつ start/end が既定値のままなら None を返して
+      cut.state に書き込まない (= 既存シナリオの payload token を変えない)。
+    """
+    if not isinstance(raw, dict):
+        return None
+
+    def _num(key: str, default: float) -> float:
+        try:
+            return round(float(raw.get(key, default)), 3)
+        except (TypeError, ValueError):
+            return default
+
+    def _scale(key: str) -> float:
+        value = _num(key, 1.0)
+        if not (value > 0):
+            return 1.0
+        return round(min(SCALE_MAX, max(SCALE_MIN, value)), 4)
+
+    easing = str(raw.get("easing") or "ease_in_out")
+    if easing not in KEN_BURNS_EASINGS:
+        easing = "ease_in_out"
+    normalized = {
+        "enabled": bool(raw.get("enabled") or False),
+        "startScale": _scale("startScale"),
+        "endScale": _scale("endScale"),
+        "startX": _num("startX", 0.0),
+        "startY": _num("startY", 0.0),
+        "endX": _num("endX", 0.0),
+        "endY": _num("endY", 0.0),
+        "easing": easing,
+    }
+    if not normalized["enabled"] and normalized == {
+        "enabled": False,
+        "startScale": 1.0,
+        "endScale": 1.0,
+        "startX": 0.0,
+        "startY": 0.0,
+        "endX": 0.0,
+        "endY": 0.0,
+        "easing": "ease_in_out",
+    }:
+        return None
+    return normalized
 
 
 def _normalize_character_layout(raw: Any) -> dict[str, Any] | None:

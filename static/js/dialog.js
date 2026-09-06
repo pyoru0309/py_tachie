@@ -880,6 +880,49 @@ export async function applyDialogTextStyleToAllCuts(textStyleScope = "all") {
 }
 
 // ===== 演出「背景・場面を一括適用」 =====
+// 一括適用ダイアログ用の拡大率フォールバック (空欄 / 不正値は 1.0)。
+function _scaleOrOneForBulk(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || !(n > 0)) return 1;
+  return Math.min(4, Math.max(0.05, n));
+}
+
+// ケンバーンズ設定を他カットへ一括反映する。
+export async function applyKenBurnsToAllCuts() {
+  const cuts = state.scenario?.cuts || [];
+  if (cuts.length <= 1) {
+    showToast("他のカットがありません", "error");
+    return;
+  }
+  const { scope, ids } = await resolveCutApplyScope();
+  if (scope === null) return;
+  const currentCut = cuts.find((c) => c.id === state.selectedCutId);
+  const raw = currentCut?.state?.kenBurns;
+  const source = (raw && typeof raw === "object") ? { ...raw } : null;
+  const otherCount = cuts.filter((c) => _isCutInApplyScope(c.id, scope, ids)).length;
+  const valueText = source && source.enabled
+    ? `拡大率 ${source.startScale ?? 1} → ${source.endScale ?? 1} / X ${source.startX ?? 0} → ${source.endX ?? 0} / Y ${source.startY ?? 0} → ${source.endY ?? 0}`
+    : "無効";
+  const result = await promptBulkApply({
+    title: "ケンバーンズを一括適用",
+    description: `現在のカットのケンバーンズ設定を、他の ${otherCount} カットに反映します。`,
+    items: [{ key: "kenBurns", label: "ケンバーンズ", valueText }],
+  });
+  if (!result.confirmed || result.selectedKeys.size === 0) return;
+  let count = 0;
+  for (const cut of cuts) {
+    if (!_isCutInApplyScope(cut.id, scope, ids)) continue;
+    cut.state = cut.state || {};
+    if (source) cut.state.kenBurns = { ...source };
+    else delete cut.state.kenBurns;
+    count += 1;
+  }
+  deps.scheduleScenarioSave();
+  recordHistory();
+  await renderPreview();
+  showToast(`${count} カットに反映しました`);
+}
+
 export async function applyEffectSceneToAllCuts() {
   deps.updateSelectedCutFromCurrent();
   const cuts = state.scenario?.cuts || [];
@@ -900,6 +943,11 @@ export async function applyEffectSceneToAllCuts() {
     // 前景の表示位置 (null = 中央)。前景アセットと一緒に反映する。
     foregroundX: Number.isFinite(Number(cs.foregroundX)) && cs.foregroundX != null ? Number(cs.foregroundX) : null,
     foregroundY: Number.isFinite(Number(cs.foregroundY)) && cs.foregroundY != null ? Number(cs.foregroundY) : null,
+    foregroundScale: _scaleOrOneForBulk(cs.foregroundScale),
+    // 背景の表示位置 / 拡大率。背景アセットと一緒に反映する。
+    backgroundX: Number.isFinite(Number(cs.backgroundX)) && cs.backgroundX != null ? Number(cs.backgroundX) : null,
+    backgroundY: Number.isFinite(Number(cs.backgroundY)) && cs.backgroundY != null ? Number(cs.backgroundY) : null,
+    backgroundScale: _scaleOrOneForBulk(cs.backgroundScale),
   };
   // M-1 で motion は per-character へ移行したため、この「背景・場面の一括適用」
   // からは motion を扱わない (= 各キャラのモーションは「同一キャラに一括適用」
@@ -914,16 +962,19 @@ export async function applyEffectSceneToAllCuts() {
   // 前景は反映時にアセットと表示位置 (X/Y) をセットで適用する (dialog 下部参照)。
   // 値テキストにも X/Y を出して「位置も一緒に反映される」ことが分かるようにする。
   // null = 中央寄せ (= 座標未指定)。
-  const fgPosText = (source.foregroundX == null && source.foregroundY == null)
+  const _posText = (x, y) => ((x == null && y == null)
     ? "中央"
-    : `X ${source.foregroundX == null ? "中央" : Math.round(source.foregroundX)} / Y ${source.foregroundY == null ? "中央" : Math.round(source.foregroundY)}`;
+    : `X ${x == null ? "中央" : Math.round(x)} / Y ${y == null ? "中央" : Math.round(y)}`);
+  const fgPosText = `${_posText(source.foregroundX, source.foregroundY)} / ×${source.foregroundScale}`;
+  const bgPosText = `${_posText(source.backgroundX, source.backgroundY)} / ×${source.backgroundScale}`;
   const items = [
     { key: "background", label: "背景", valueText: source.background ? (bgItem?.name || source.background) : "なし（透過）" },
+    { key: "backgroundGeometry", label: "背景の表示位置 / 拡大率", valueText: bgPosText },
     { key: "backgroundBlurPx", label: "背景ぼかし", valueText: `${source.backgroundBlurPx}px` },
     { key: "backgroundColorPair", label: "背景色 / 不透明度", valueText: bgColorText },
     {
       key: "foreground",
-      label: "前景 / 表示位置",
+      label: "前景 / 表示位置 / 拡大率",
       valueText: source.foreground
         ? `${fgItem?.name || source.foreground}（位置: ${fgPosText}）`
         : "なし",
@@ -945,10 +996,15 @@ export async function applyEffectSceneToAllCuts() {
         cut.state.backgroundColor = source.backgroundColor;
         cut.state.backgroundColorOpacity = source.backgroundColorOpacity;
       } else if (k === "foreground") {
-        // 前景アセットと表示位置 (X/Y) はセットで反映する。
+        // 前景アセットと表示位置 (X/Y) / 拡大率はセットで反映する。
         cut.state.foreground = source.foreground;
         cut.state.foregroundX = source.foregroundX;
         cut.state.foregroundY = source.foregroundY;
+        cut.state.foregroundScale = source.foregroundScale;
+      } else if (k === "backgroundGeometry") {
+        cut.state.backgroundX = source.backgroundX;
+        cut.state.backgroundY = source.backgroundY;
+        cut.state.backgroundScale = source.backgroundScale;
       } else {
         cut.state[k] = source[k];
       }

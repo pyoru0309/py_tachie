@@ -4,7 +4,7 @@
 // TextClip 用プリセットの「契約」を文書化したファイル。実体は JSDoc 型のみで、
 // 実行時の側は static/js/renderer/text-effects.js の registry が見る。
 //
-// プリセットの slot は § dev_docs/text_system_plan.md §4.1 に従い固定する:
+// プリセットの slot は § dev_docs/archive/text_system_plan.md §4.1 に従い固定する:
 //
 //   slot                          | preset 例
 //   ------------------------------|----------------------------------------

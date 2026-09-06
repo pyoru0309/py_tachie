@@ -1014,7 +1014,35 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#placement-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        配置プリセット (placement preset)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="配置プリセット (placement preset)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        編集画面での操作
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
     <span class="md-ellipsis">
       
         白背景素材を使う場合
@@ -1037,7 +1065,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#_14" class="md-nav__link">
+  <a href="#_15" class="md-nav__link">
     <span class="md-ellipsis">
       
         使い方
@@ -1048,7 +1076,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#_15" class="md-nav__link">
+  <a href="#_16" class="md-nav__link">
     <span class="md-ellipsis">
       
         プリセット
@@ -1481,7 +1509,35 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#placement-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        配置プリセット (placement preset)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="配置プリセット (placement preset)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        編集画面での操作
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
     <span class="md-ellipsis">
       
         白背景素材を使う場合
@@ -1504,7 +1560,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#_14" class="md-nav__link">
+  <a href="#_15" class="md-nav__link">
     <span class="md-ellipsis">
       
         使い方
@@ -1515,7 +1571,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#_15" class="md-nav__link">
+  <a href="#_16" class="md-nav__link">
     <span class="md-ellipsis">
       
         プリセット
@@ -1900,7 +1956,58 @@
 <li><strong>プロジェクト側プリセット</strong>: 編集画面の「表情プリセット」セレクタ横の <code>保存</code> ボタンで現在のキャラ表情をプロジェクトに保存できます。アセット由来プリセットを選択した状態で組合せを変更し保存すると、<strong>同 ID で project override が作成され</strong>、そのプロジェクトでだけアセット定義より優先されます。アセット側のファイルは無傷のままです。</li>
 <li>アセット由来のプリセットは編集画面の <code>削除</code> ボタンが無効化されます。プロジェクト固有 override の削除は可能で、削除後はアセット側の定義に戻ります。</li>
 </ul>
-<h2 id="_13">白背景素材を使う場合<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
+<h2 id="placement-presets">配置プリセット (placement preset)<a class="headerlink" href="#placement-presets" title="Permanent link">&para;</a></h2>
+<p>キャラ <strong>1 体の立ち位置</strong> (X / Y / 拡大率) を名前付きで保存する仕組みです。表情プリセットとは <strong>完全に独立した系統</strong> で、適用しても表情・髪型・前面オブジェクトは変わりません。逆に表情プリセットを切り替えても立ち位置は変わりません。</p>
+<p>正本は <strong>プロジェクト側の 1 ファイルだけ</strong> です (<code>projects/&lt;project_id&gt;/placement_presets.json</code>)。座標や拡大率はそのプロジェクトの構図設計に強く依存するため、表情プリセットのようなアセット側定義 (<code>assets/characters/&lt;id&gt;/</code>) は持ちません。</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">[</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="p">{</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;placement_1788656839373&quot;</span><span class="p">,</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;左寄り&quot;</span><span class="p">,</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">&quot;characterId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;default&quot;</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">&quot;x&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="nt">&quot;y&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="nt">&quot;scale&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.9</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="p">]</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>プリセット ID。編集画面から新規保存すると <code>placement_&lt;timestamp&gt;</code> が振られる</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>表示名</td>
+</tr>
+<tr>
+<td><code>characterId</code></td>
+<td>キャラクター<strong>定義</strong> ID。カット内インスタンス ID (<code>character_XXXX_n</code>) ではない</td>
+</tr>
+<tr>
+<td><code>x</code> / <code>y</code></td>
+<td>配置座標 (px, 0,0 = 画面左上)</td>
+</tr>
+<tr>
+<td><code>scale</code></td>
+<td>拡大率 (0.05〜4.0)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_13">編集画面での操作<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h3>
+<ul>
+<li>セレクタには <strong>編集中キャラの <code>characterId</code> に紐づくプリセットだけ</strong> が並びます (<code>名前（X 100 / Y 12 / ×0.9）</code> の形式)。</li>
+<li>選ぶとその場で X / Y / 拡大率 が入力欄とカットへ反映されます。</li>
+<li><code>配置プリセット保存</code> は、セレクタで既存プリセットを選んでいれば <strong>上書き</strong>、<code>なし</code> を選んでいれば <strong>新規作成</strong> です。</li>
+<li>カットを移動したとき、現在の X / Y / 拡大率 と一致するプリセットがあれば自動で選択状態になります (どの立ち位置が当たっているか一目で分かります)。</li>
+</ul>
+<h2 id="_14">白背景素材を使う場合<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
 <p>透過 PNG が理想ですが、白背景付き素材も利用できます。
 キャラクター設定 (またはカット内設定) で <code>白背景を透過扱いにする</code> を有効にすると、<code>#FFFFFF</code> 完全一致のピクセルだけを透明化します。
 白い服や白い小物、ハイライトが消える可能性があるため、可能であれば事前に透過 PNG として書き出しておくのを推奨します。</p>
@@ -1920,10 +2027,10 @@
 <li><strong>シルエットの黒線</strong> (線 ↔ 透明) は線芯はシャープなまま、外側に半透明黒のフリンジが出る。どの背景の上に重ねても halo が出ない</li>
 <li>黒線以外 (肌の陰影や髪の色違い) は <strong>一切変化しない</strong></li>
 </ul>
-<h3 id="_14">使い方<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h3>
+<h3 id="_15">使い方<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h3>
 <p>PSD インポータダイアログ下部の <strong>黒線アンチエイリアス</strong> チェックボックスを ON にして取り込みます。
 <strong>白背景を透過</strong> と組み合わせる場合は順序が重要で、必ず <code>白透過 → 黒線 AA</code> の順で適用されます (アンチエイリアスをかけると境界で純白が失われるため)。</p>
-<h3 id="_15">プリセット<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h3>
+<h3 id="_16">プリセット<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h3>
 <p>チェックボックスを ON にすると AA プリセットセレクタが有効になり、以下から選べます。</p>
 <table>
 <thead>

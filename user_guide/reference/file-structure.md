@@ -19,7 +19,7 @@
 | `tools/` | PSD 取り込みなど CLI |
 | `docs/` | zensical ビルド済みヘルプ (UI から `/help/` で配信) |
 | `user_guide/` | このガイドの Markdown ソース |
-| `dev_docs/` / `_dev_docs/` | 開発検討メモ・スクリーンショット |
+| `dev_docs/` | 開発ドキュメント（構造マップ・ロードマップ・過去計画のアーカイブ） |
 | `requirements.txt` | Python 依存 |
 | `README.md` | プロジェクト概要 (PSD レイヤー命名規則とシナリオデータ仕様は `user_guide/technical/` 配下に集約) |
 | `zensical.toml` | ヘルプドキュメントのビルド設定 |
@@ -31,6 +31,7 @@ projects/<project_id>/
   project.json
   config.json
   expression_presets.json
+  placement_presets.json
   scenarios/
     main.json
   assets/
@@ -75,6 +76,12 @@ projects/<project_id>/
 プロジェクト固有の表情プリセットを保存します。各エントリは `{id, name, characterId, cheekId, eyeId, mouthId, isDefault}` で、頬・目・口の組合せです。
 
 アセット側 (`assets/characters/<id>/expression_presets.json`) と二段マージされ、同 (characterId, presetId) はプロジェクト側が優先 (override) です。詳細は [キャラクターモデル](../technical/character-model.md#expression-presets) を参照してください。
+
+## `placement_presets.json`
+
+プロジェクト固有の **配置プリセット** (キャラ 1 体の立ち位置) を保存します。各エントリは `{id, name, characterId, x, y, scale}` です。
+
+表情プリセットと違いアセット側 (`assets/characters/<id>/`) には正本を持たず、**このファイルだけが正本**です。詳細は [キャラクターモデル](../technical/character-model.md#placement-presets) を参照してください。
 
 ## `scenarios/main.json`
 
@@ -132,6 +139,7 @@ three.js / mp4box.js のローカル取得状況を記録します。サーバ�
     ├── project.json
     ├── config.json
     ├── expression_presets.json
+    ├── placement_presets.json
     ├── scenarios/main.json
     └── assets/
 ```

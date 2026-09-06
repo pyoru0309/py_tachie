@@ -36,6 +36,7 @@ let deps = {
   scheduleScenarioSave: () => {},
   renderPreview: async () => {},
   fillExpressionPresets: () => {},
+  getActiveWorldTransform: () => ({ scale: 1, x: 0, y: 0 }),
 };
 
 let wired = false;
@@ -56,7 +57,13 @@ export function bindPreviewInteractions(injectedDeps = {}) {
     if (rect.width <= 0 || rect.height <= 0) return { x: 0, y: 0 };
     const x = (event.clientX - rect.left) * 1920 / rect.width;
     const y = (event.clientY - rect.top) * 1080 / rect.height;
-    return { x, y };
+    // ケンバーンズが効いているカットでは、絵は world group ごと拡大・平行移動
+    // されている。キャラの basePos は変換前のシーン座標なので、画面座標を
+    // 逆変換してから当てないと掴む位置がズレる。変換なしなら恒等。
+    const t = deps.getActiveWorldTransform();
+    const scale = Number(t?.scale) > 0 ? Number(t.scale) : 1;
+    if (scale === 1 && !t?.x && !t?.y) return { x, y };
+    return { x: (x - (Number(t.x) || 0)) / scale, y: (y - (Number(t.y) || 0)) / scale };
   }
 
   // 「キャラ配置」タブが表示されていないと操作を許可しない (UX 配慮)。

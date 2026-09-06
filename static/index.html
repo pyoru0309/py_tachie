@@ -363,6 +363,27 @@
             </div>
             <div class="inline-fields">
               <label>
+                配置プリセット
+                <select id="placementPresetSelect"></select>
+              </label>
+              <label>
+                プリセット名
+                <input id="placementPresetNameInput" type="text" placeholder="立ち位置1" />
+              </label>
+            </div>
+            <div class="button-row">
+              <button id="savePlacementPresetButton" type="button" title="編集中のキャラの X / Y / 拡大率 を名前付きで保存します">
+                <span class="msym button-icon" aria-hidden="true">bookmark_add</span>
+                <span>配置プリセット保存</span>
+              </button>
+              <button id="deletePlacementPresetButton" type="button">
+                <span class="msym button-icon" aria-hidden="true">delete</span>
+                <span>削除</span>
+              </button>
+            </div>
+            <p class="asset-hint">配置プリセットは編集中のキャラの X / Y / 拡大率 だけを覚えます。表情プリセットとは独立しているので、適用しても表情・髪型・前面オブジェクトは変わりません。</p>
+            <div class="inline-fields">
+              <label>
                 ベース
                 <select id="baseSelect"></select>
               </label>
@@ -873,6 +894,20 @@
                 Y
                 <input id="foregroundYInput" type="number" step="10" placeholder="中央" />
               </label>
+              <label>
+                拡大率
+                <input id="foregroundScaleInput" type="number" min="0.05" max="4" step="0.01" placeholder="1" />
+              </label>
+            </div>
+            <div class="button-row">
+              <button id="centerForegroundXButton" type="button" title="前景の X を「中央」(空欄) に戻します">
+                <span class="msym button-icon" aria-hidden="true">align_horizontal_center</span>
+                <span>前景を左右中央</span>
+              </button>
+              <button id="centerForegroundYButton" type="button" title="前景の Y を「中央」(空欄) に戻します">
+                <span class="msym button-icon" aria-hidden="true">align_vertical_center</span>
+                <span>前景を上下中央</span>
+              </button>
             </div>
             <div class="inline-fields">
               <label>
@@ -884,7 +919,31 @@
                 <input id="backgroundBlurPxInput" type="number" min="0" max="200" step="1" />
               </label>
             </div>
-            <p class="asset-hint">前景の X / Y は前景画像の左上の表示位置です（0,0 = 画面左上、キャラの座標と同じルール）。空欄のときは中央に配置します。</p>
+            <div class="inline-fields">
+              <label>
+                背景 X
+                <input id="backgroundXInput" type="number" step="10" placeholder="中央" />
+              </label>
+              <label>
+                背景 Y
+                <input id="backgroundYInput" type="number" step="10" placeholder="中央" />
+              </label>
+              <label>
+                背景 拡大率
+                <input id="backgroundScaleInput" type="number" min="0.05" max="4" step="0.01" placeholder="1" />
+              </label>
+            </div>
+            <div class="button-row">
+              <button id="centerBackgroundXButton" type="button" title="背景の X を「中央」(空欄) に戻します">
+                <span class="msym button-icon" aria-hidden="true">align_horizontal_center</span>
+                <span>背景を左右中央</span>
+              </button>
+              <button id="centerBackgroundYButton" type="button" title="背景の Y を「中央」(空欄) に戻します">
+                <span class="msym button-icon" aria-hidden="true">align_vertical_center</span>
+                <span>背景を上下中央</span>
+              </button>
+            </div>
+            <p class="asset-hint">前景 / 背景の X / Y は画像の左上の表示位置です（0,0 = 画面左上、キャラの座標と同じルール）。空欄のときは中央に配置します。拡大率は前景が「画面に収まるサイズ」、背景が「画面いっぱい（1920×1080）」を 1.0 とした倍率です。ケンバーンズでズームアウトさせるときは、あらかじめ 1.1〜1.3 程度に上げて余白を作っておくと画面端が透けません。</p>
             <div class="inline-fields">
               <label>
                 背景色
@@ -906,6 +965,69 @@
               </button>
             </div>
           </div>
+
+          <div class="panel-section">
+            <h2>ケンバーンズ（シーン全体のズーム・パン）</h2>
+            <label class="checkbox-row">
+              <input id="kenBurnsEnabledInput" type="checkbox" />
+              ケンバーンズを有効にする
+            </label>
+            <div class="inline-fields">
+              <label>
+                開始 拡大率
+                <input id="kenBurnsStartScaleInput" type="number" min="0.05" max="4" step="0.01" />
+              </label>
+              <label>
+                開始 X
+                <input id="kenBurnsStartXInput" type="number" step="10" />
+              </label>
+              <label>
+                開始 Y
+                <input id="kenBurnsStartYInput" type="number" step="10" />
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                終了 拡大率
+                <input id="kenBurnsEndScaleInput" type="number" min="0.05" max="4" step="0.01" />
+              </label>
+              <label>
+                終了 X
+                <input id="kenBurnsEndXInput" type="number" step="10" />
+              </label>
+              <label>
+                終了 Y
+                <input id="kenBurnsEndYInput" type="number" step="10" />
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                変化のしかた
+                <select id="kenBurnsEasingSelect">
+                  <option value="ease_in_out">ゆっくり始まりゆっくり止まる</option>
+                  <option value="linear">一定速度</option>
+                  <option value="ease_in">ゆっくり始まる</option>
+                  <option value="ease_out">ゆっくり止まる</option>
+                </select>
+              </label>
+            </div>
+            <div class="button-row button-row-three">
+              <button id="kenBurnsSwapButton" type="button" title="開始と終了の値を入れ替えます（ズームイン ⇔ ズームアウト）">
+                <span class="msym button-icon" aria-hidden="true">swap_horiz</span>
+                <span>開始と終了を入替</span>
+              </button>
+              <button id="kenBurnsResetButton" type="button" title="拡大率 1.0 / X・Y 0 に戻します">
+                <span class="msym button-icon" aria-hidden="true">restart_alt</span>
+                <span>リセット</span>
+              </button>
+              <button id="applyKenBurnsToAllCutsButton" type="button" title="ケンバーンズ設定を他カットへ一括反映します">
+                <span class="msym button-icon" aria-hidden="true">done_all</span>
+                <span>他カットへ一括適用</span>
+              </button>
+            </div>
+            <p class="asset-hint">カットの先頭から末尾までをかけて、シーン全体（背景・前景・キャラ・動画レイヤー・ビジュアライザー）をゆっくり拡大・移動させます。セリフ枠とテロップは対象外で、画面に固定されたままです。<br>拡大率は画面中央を基準にした倍率（1.0 = 等倍）、X / Y は平行移動量（px。X を正にすると絵が右へ動きます）です。ズームアウト（例: 1.2 → 1.0）では画面端に余白が出るため、上の「前景 / 背景 拡大率」であらかじめ大きめに敷いてください。</p>
+          </div>
+
           <div class="panel-section">
             <h2>トランジション（カット入り）</h2>
             <div class="inline-fields">

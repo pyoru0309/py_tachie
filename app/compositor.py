@@ -132,6 +132,14 @@ class RenderRequest:
     # 前景の表示位置 (plane 左上の絶対座標, 0,0 = 画面左上)。None = 中央配置。
     foreground_x: float | None = None
     foreground_y: float | None = None
+    # 前景 / 背景の拡大率 (1.0 = 従来通り: 前景 contain / 背景 cover フィット)。
+    foreground_scale: float = 1.0
+    background_scale: float = 1.0
+    # 背景の表示位置 (plane 左上の絶対座標)。None = 中央配置。
+    background_x: float | None = None
+    background_y: float | None = None
+    # ケンバーンズ (カット尺いっぱいの緩やかなズーム / パン)。None = 無効。
+    ken_burns: dict[str, Any] | None = None
 
 
 def remove_exact_white(rgba: Image.Image) -> Image.Image:
@@ -1040,13 +1048,23 @@ def request_from_payload(
         return _project_default_int(key, 0, min_value=0, max_value=500)
 
     def _coord_or_none(value: Any) -> float | None:
-        # 前景 X / Y: 空欄 / 非数値は None = 中央配置。
+        # 前景 / 背景 X / Y: 空欄 / 非数値は None = 中央配置。
         if value is None or value == "":
             return None
         try:
             return float(value)
         except (TypeError, ValueError):
             return None
+
+    def _scale_or_one(value: Any) -> float:
+        # 前景 / 背景の拡大率。空欄 / 非数値 / 0 以下は 1.0 (= 従来のフィット)。
+        try:
+            scale = float(value)
+        except (TypeError, ValueError):
+            return 1.0
+        if not (scale > 0):
+            return 1.0
+        return min(4.0, max(0.05, scale))
     character_payloads = payload.get("characters")
     if isinstance(character_payloads, list):
         characters = [
@@ -1172,6 +1190,15 @@ def request_from_payload(
         ),
         foreground_x=_coord_or_none(payload.get("foregroundX")),
         foreground_y=_coord_or_none(payload.get("foregroundY")),
+        foreground_scale=_scale_or_one(payload.get("foregroundScale")),
+        background_scale=_scale_or_one(payload.get("backgroundScale")),
+        background_x=_coord_or_none(payload.get("backgroundX")),
+        background_y=_coord_or_none(payload.get("backgroundY")),
+        ken_burns=(
+            dict(payload.get("kenBurns"))
+            if isinstance(payload.get("kenBurns"), dict)
+            else None
+        ),
     )
 
 

@@ -106,7 +106,7 @@ PSD_IMPORTER_MANIFEST_KEY_FOR_CATEGORY: dict[str, str] = {
     "front": "fronts",
 }
 
-# 推奨カテゴリ (user_guide/technical/psd-layer-rules.md / dev_docs/v4_extension_plan.md)。
+# 推奨カテゴリ (user_guide/technical/psd-layer-rules.md / dev_docs/archive/v4_extension_plan.md)。
 # 互換のため YAML の map: ブロックを読み続けるが、現行ではフラグ宣言として
 # 解釈する (id / ファイル名の rename は行わない)。
 #   map: mouth_closed: "口/閉" → 口/閉 のレイヤーに flags.lipClosed=true を立てる

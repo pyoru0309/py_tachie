@@ -219,12 +219,14 @@ from .scenario import (
     default_character_state,
     default_scenario,
     ensure_expression_presets,
+    ensure_placement_presets,
     ensure_scenario,
     first_character_id,
     normalize_character_state,
     normalize_cut_state,
     normalize_scenario,
     save_expression_presets,
+    save_placement_presets,
     scenario_cuts,
 )
 
@@ -775,7 +777,7 @@ def duplicate_project(project_id: str, payload: dict[str, Any]) -> dict[str, Any
     new_path_prefix = f"projects/{new_ctx.id}/"
     if old_path_prefix != new_path_prefix:
         rewrite_targets = list(dst_root.glob("scenarios/*.json"))
-        for name in ("project.json", "config.json", "expression_presets.json"):
+        for name in ("project.json", "config.json", "expression_presets.json", "placement_presets.json"):
             candidate = dst_root / name
             if candidate.exists():
                 rewrite_targets.append(candidate)
@@ -913,6 +915,7 @@ def restore_project_backup(project_id: str, backup_id: str) -> dict[str, Any]:
     manifest = apply_config_defaults(manifest, config)
     manifest["config"] = config
     manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
+    manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
     manifest["project"] = read_project_file(ctx)
     manifest["projectId"] = ctx.id
     return {**result, "manifest": manifest, "scenario": scenario}
@@ -992,6 +995,7 @@ def rescan_project_assets() -> dict[str, Any]:
     manifest = apply_config_defaults(manifest, config)
     manifest["config"] = config
     manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
+    manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
     return manifest
 
 
@@ -1008,6 +1012,7 @@ def _manifest_for_ctx(ctx) -> dict[str, Any]:
     _append_system_fonts(config_out)
     manifest["config"] = config_out
     manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
+    manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
     manifest["project"] = read_project_file(ctx)
     manifest["projectId"] = ctx.id
     return manifest
@@ -1105,6 +1110,22 @@ def update_expression_presets(payload: dict[str, Any]) -> dict[str, Any]:
         ctx = current_project()
         manifest = ensure_manifest(ctx)
         presets = save_expression_presets(payload, manifest, ctx)
+        return {"presets": presets}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/placement-presets")
+def update_placement_presets(payload: dict[str, Any]) -> dict[str, Any]:
+    """配置プリセット (キャラ 1 体の X / Y / 拡大率) をまとめて保存する。
+
+    表情プリセットとは独立した系統で、projects/<id>/placement_presets.json が正本。
+    アセット側 (assets/characters/<id>/) には持たせない。
+    """
+    try:
+        ctx = current_project()
+        manifest = ensure_manifest(ctx)
+        presets = save_placement_presets(payload, manifest, ctx)
         return {"presets": presets}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -1224,6 +1245,7 @@ def post_asset_hairstyle_presets(payload: dict[str, Any]) -> dict[str, Any]:
     if ctx is not None:
         manifest = ensure_manifest(ctx)
         manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
+        manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
     return {"presets": saved, "manifest": manifest}
 
 
@@ -1278,6 +1300,7 @@ def post_asset_expression_presets(payload: dict[str, Any]) -> dict[str, Any]:
     if ctx is not None:
         manifest = ensure_manifest(ctx)
         manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
+        manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
     return {"presets": saved, "manifest": manifest}
 
 
@@ -1292,6 +1315,7 @@ def update_character(payload: dict[str, Any]) -> dict[str, Any]:
             manifest = apply_config_defaults(ensure_manifest(ctx), config)
             manifest["config"] = config
             manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
+            manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
         else:
             manifest = common_character_manifest()
         return {"character": character_manifest, "manifest": manifest}
@@ -1317,6 +1341,7 @@ def delete_character(payload: dict[str, Any]) -> dict[str, Any]:
         manifest = apply_config_defaults(ensure_manifest(ctx), config)
         manifest["config"] = config
         manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
+        manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
         manifest["project"] = read_project_file(ctx)
         manifest["projectId"] = ctx.id
         return {"deleted": character_id, "manifest": manifest, "scenario": ensure_scenario(manifest, ctx)}
@@ -1358,6 +1383,7 @@ async def import_character(
         manifest = apply_config_defaults(manifest, config)
         manifest["config"] = config
         manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
+        manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
         manifest["project"] = read_project_file(ctx)
         manifest["projectId"] = ctx.id
         return {"character": character_manifest, "manifest": manifest}
@@ -2859,6 +2885,15 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
     }
     if bg_asset_url:
         background_payload["assetUrl"] = bg_asset_url
+    # 背景の拡大率 / 表示位置 (plane 左上の絶対座標)。scale=1.0 かつ x/y=None が従来挙動
+    # (cover フィットで全面)。ケンバーンズのズームアウト用に「少し大きめに敷く」ときに使う。
+    background_payload["scale"] = float(getattr(request, "background_scale", 1.0) or 1.0)
+    bg_x = getattr(request, "background_x", None)
+    bg_y = getattr(request, "background_y", None)
+    if bg_x is not None:
+        background_payload["x"] = float(bg_x)
+    if bg_y is not None:
+        background_payload["y"] = float(bg_y)
 
     foreground_payload: dict[str, Any] | None = None
     if fg_asset_url:
@@ -2870,6 +2905,7 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
             foreground_payload["x"] = float(fg_x)
         if fg_y is not None:
             foreground_payload["y"] = float(fg_y)
+        foreground_payload["scale"] = float(getattr(request, "foreground_scale", 1.0) or 1.0)
 
     dialogue_payload: dict[str, Any] | None = (
         {"raw": dialogue_layout} if dialogue_layout is not None else None
@@ -2949,6 +2985,9 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
         "audioUrl": asset_url(cut_audio) if cut_audio else None,
         "background": background_payload,
         "foreground": foreground_payload,
+        # ケンバーンズ (カット尺いっぱいのズーム / パン)。renderer が world group
+        # (背景・前景・キャラ・動画レイヤー・ビジュアライザー) にだけ適用する。
+        "kenBurns": getattr(request, "ken_burns", None),
         "dialogue": dialogue_payload,
         "characters": characters_payload,
         "speakerId": speaker_id,
@@ -4189,6 +4228,7 @@ def synthesize_tts(payload: dict[str, Any]) -> dict[str, Any]:
         manifest = apply_config_defaults(manifest, config)
         manifest["config"] = config
         manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
+        manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
         response["manifest"] = manifest
     return response
 

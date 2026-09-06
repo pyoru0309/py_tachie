@@ -33,11 +33,19 @@ import {
 } from "./voice-dialogue.js";
 import { openCharacterLayerEditor, bindCharacterLayerEditor } from "./character-layer-editor.js";
 import { bindCharacterLayoutDialog } from "./character-layout-dialog.js";
+import {
+  fillPlacementPresets,
+  applySelectedPlacementPreset,
+  saveCurrentPlacementPreset,
+  deleteCurrentPlacementPreset,
+  bindPlacementPresets,
+} from "./character-placement-presets.js";
 import { bindMotionPivotPicker, exitMotionPivotPicking } from "./motion-pivot-picker.js";
 import { bindPreviewInteractions } from "./preview-interactions.js";
 import {
   getActiveScene as _v2GetActiveScene,
   redrawActiveScene as _v2RedrawActiveScene,
+  getActiveWorldTransform as _v2GetActiveWorldTransform,
 } from "./renderer/index.js";
 import {
   openAssetExpressionPresets,
@@ -135,6 +143,7 @@ import {
   applyDialogTextStyleToAllCuts,
   applyDialogBoxStyleToAllCuts,
   applyEffectSceneToAllCuts,
+  applyKenBurnsToAllCuts,
   applyEffectCharacterToAllCuts,
   applyTelopDefaultsToAllTelops,
   promptBulkApply,
@@ -175,6 +184,7 @@ import {
   syncMotionParamsVisibility,
   collectCutMotionSettings,
   applyCutMotionSettingsToControls,
+  applyKenBurnsToControls,
 } from "./scenario-actions.js";
 // 「移動」モーションのピボット指定モードはカット切替で持ち越したくない。
 // loadCut の中で exit を呼ぶようにすることもできるが、シンプルに app.js から
@@ -972,6 +982,7 @@ function bindControls() {
     ensureSelectValue,
     syncPresetName,
     fillExpressionPresets,
+    fillPlacementPresets,
     updateSelectedCutFromCurrent,
     scheduleScenarioSave,
     renderPreview,
@@ -1015,6 +1026,7 @@ function bindControls() {
     syncDialogueVoiceFromSpeaker,
   });
   bindDialogueVoice();
+  bindPlacementPresets({ handleEditorChanged });
   bindCharacterManager({
     fillAssetControls,
     fillConfigForm,
@@ -1027,6 +1039,7 @@ function bindControls() {
   bindPreviewInteractions({
     getActiveScene: _v2GetActiveScene,
     redrawActiveScene: _v2RedrawActiveScene,
+    getActiveWorldTransform: _v2GetActiveWorldTransform,
     updateSelectedCutFromCurrent,
     scheduleScenarioSave,
     renderPreview,
@@ -1057,6 +1070,18 @@ function bindControls() {
     elements.foreground,
     elements.foregroundX,
     elements.foregroundY,
+    elements.foregroundScale,
+    elements.backgroundX,
+    elements.backgroundY,
+    elements.backgroundScale,
+    elements.kenBurnsEnabled,
+    elements.kenBurnsStartScale,
+    elements.kenBurnsStartX,
+    elements.kenBurnsStartY,
+    elements.kenBurnsEndScale,
+    elements.kenBurnsEndX,
+    elements.kenBurnsEndY,
+    elements.kenBurnsEasing,
     elements.base,
     elements.expressionPreset,
     elements.cheek,
@@ -1482,6 +1507,51 @@ function bindControls() {
   elements.renderButton.addEventListener("click", () => renderPreview({ saveOutput: true }));
   elements.centerCharacterButton.addEventListener("click", centerCharacter);
   elements.resetCharacterButton.addEventListener("click", resetCharacter);
+  // 前景 / 背景の「左右中央」「上下中央」。座標を空欄に戻すと scene-builder が
+  // 拡大率適用後のサイズで中央寄せするので、拡大率を後から変えても中央のままになる。
+  const _centerAxis = (input) => {
+    if (!input) return;
+    input.value = "";
+    handleEditorChanged();
+  };
+  elements.centerForegroundXButton?.addEventListener("click", () => _centerAxis(elements.foregroundX));
+  elements.centerForegroundYButton?.addEventListener("click", () => _centerAxis(elements.foregroundY));
+  elements.centerBackgroundXButton?.addEventListener("click", () => _centerAxis(elements.backgroundX));
+  elements.centerBackgroundYButton?.addEventListener("click", () => _centerAxis(elements.backgroundY));
+  // ケンバーンズ: 開始/終了の入替・リセット。
+  elements.kenBurnsSwapButton?.addEventListener("click", () => {
+    const swap = (a, b) => {
+      if (!a || !b) return;
+      const tmp = a.value;
+      a.value = b.value;
+      b.value = tmp;
+    };
+    swap(elements.kenBurnsStartScale, elements.kenBurnsEndScale);
+    swap(elements.kenBurnsStartX, elements.kenBurnsEndX);
+    swap(elements.kenBurnsStartY, elements.kenBurnsEndY);
+    handleEditorChanged();
+  });
+  elements.kenBurnsResetButton?.addEventListener("click", () => {
+    applyKenBurnsToControls(null);
+    handleEditorChanged();
+  });
+  elements.applyKenBurnsToAllCutsButton?.addEventListener("click", () => {
+    applyKenBurnsToAllCuts().catch((error) => showToast(error.message, "error"));
+  });
+  // 配置プリセット (キャラ 1 体の X / Y / 拡大率)。表情プリセットとは独立系統。
+  elements.placementPreset?.addEventListener("change", () => {
+    applySelectedPlacementPreset();
+  });
+  elements.savePlacementPresetButton?.addEventListener("click", () => {
+    withBusy(elements.savePlacementPresetButton, "保存中", saveCurrentPlacementPreset).catch((error) => {
+      showToast(error.message, "error");
+    });
+  });
+  elements.deletePlacementPresetButton?.addEventListener("click", () => {
+    withBusy(elements.deletePlacementPresetButton, "削除中", deleteCurrentPlacementPreset).catch((error) => {
+      showToast(error.message, "error");
+    });
+  });
   bindCharacterLayoutDialog();
   // ピボット指定モード: preview canvas のクリック/ドラッグで pivot X/Y を更新。
   // 値変更時に handleEditorChanged を発火 (= scenario save + 再描画)。

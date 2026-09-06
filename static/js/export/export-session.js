@@ -9,7 +9,7 @@
 //   - 時間は frameIdx / fps だけで進める。performance.now() / AudioContext
 //     currentTime / HTMLVideoElement currentTime はこの経路に絶対入れない
 //   - PBO ring は session 全体で **連続運用**。cut/scene/gap 境界で
-//     flushRemaining を呼ばない (二重回収バグ。dev_docs/v2_export_multi_cut.md §3.4)
+//     flushRemaining を呼ばない (二重回収バグ。dev_docs/archive/v2_export_multi_cut.md §3.4)
 //   - cut ごとに scene rebuild を前提 (token 再利用は現行 payload-hash では
 //     基本効かない)。fetch/build オーバーヘッドは PBO では吸収されないので
 //     落ち幅は実測する

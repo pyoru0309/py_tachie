@@ -304,6 +304,87 @@ function _numOrNull(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+// 拡大率入力の値を 0.05〜4 の数値へ丸める。空欄 / 非数値 / 0 以下は 1.0 (= 既定)。
+function _scaleOrOne(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return 1;
+  const n = Number(value);
+  if (!Number.isFinite(n) || !(n > 0)) return 1;
+  return Math.min(4, Math.max(0.05, n));
+}
+
+// ケンバーンズ (シーン全体のズーム・パン) の既定値。
+const KEN_BURNS_DEFAULTS = {
+  enabled: false,
+  startScale: 1,
+  endScale: 1,
+  startX: 0,
+  startY: 0,
+  endX: 0,
+  endY: 0,
+  easing: "ease_in_out",
+};
+
+const KEN_BURNS_EASINGS = ["linear", "ease_in", "ease_out", "ease_in_out"];
+
+// cut.state.kenBurns を正規化する (サーバ側 _normalize_ken_burns と同じ規則)。
+export function normalizeKenBurns(raw) {
+  const src = (raw && typeof raw === "object") ? raw : {};
+  const num = (key) => {
+    const n = Number(src[key]);
+    return Number.isFinite(n) ? n : KEN_BURNS_DEFAULTS[key];
+  };
+  const scale = (key) => {
+    const n = Number(src[key]);
+    if (!Number.isFinite(n) || !(n > 0)) return 1;
+    return Math.min(4, Math.max(0.05, n));
+  };
+  const easing = String(src.easing || KEN_BURNS_DEFAULTS.easing);
+  return {
+    enabled: Boolean(src.enabled),
+    startScale: scale("startScale"),
+    endScale: scale("endScale"),
+    startX: num("startX"),
+    startY: num("startY"),
+    endX: num("endX"),
+    endY: num("endY"),
+    easing: KEN_BURNS_EASINGS.includes(easing) ? easing : KEN_BURNS_DEFAULTS.easing,
+  };
+}
+
+// 既定のまま (= 無効かつ start/end とも等倍・移動なし) なら null。
+// null を payload に載せると normalize 側でキーごと落ちるので、既存カットの
+// scene-bundle token が変わらない。
+export function collectKenBurnsFromControls() {
+  const cfg = normalizeKenBurns({
+    enabled: Boolean(elements.kenBurnsEnabled?.checked),
+    startScale: elements.kenBurnsStartScale?.value,
+    endScale: elements.kenBurnsEndScale?.value,
+    startX: elements.kenBurnsStartX?.value,
+    startY: elements.kenBurnsStartY?.value,
+    endX: elements.kenBurnsEndX?.value,
+    endY: elements.kenBurnsEndY?.value,
+    easing: elements.kenBurnsEasing?.value,
+  });
+  const isDefault = !cfg.enabled
+    && cfg.startScale === 1 && cfg.endScale === 1
+    && cfg.startX === 0 && cfg.startY === 0
+    && cfg.endX === 0 && cfg.endY === 0
+    && cfg.easing === KEN_BURNS_DEFAULTS.easing;
+  return isDefault ? null : cfg;
+}
+
+export function applyKenBurnsToControls(raw) {
+  const cfg = normalizeKenBurns(raw);
+  if (elements.kenBurnsEnabled) elements.kenBurnsEnabled.checked = cfg.enabled;
+  if (elements.kenBurnsStartScale) elements.kenBurnsStartScale.value = String(cfg.startScale);
+  if (elements.kenBurnsEndScale) elements.kenBurnsEndScale.value = String(cfg.endScale);
+  if (elements.kenBurnsStartX) elements.kenBurnsStartX.value = String(cfg.startX);
+  if (elements.kenBurnsStartY) elements.kenBurnsStartY.value = String(cfg.startY);
+  if (elements.kenBurnsEndX) elements.kenBurnsEndX.value = String(cfg.endX);
+  if (elements.kenBurnsEndY) elements.kenBurnsEndY.value = String(cfg.endY);
+  if (elements.kenBurnsEasing) elements.kenBurnsEasing.value = cfg.easing;
+}
+
 // HEX 表示要素は app.js init で <span> から編集可能な <input> へ格上げされる。
 // span のときは textContent、input のときは value に書き込む (両対応)。
 function setSwatchDisplay(swatch, color) {
@@ -415,6 +496,13 @@ export function payload() {
     // 中央配置 (scene-builder 側でデフォルト中央)。キャラ x/y と同じルール。
     foregroundX: _numOrNull(elements.foregroundX?.value),
     foregroundY: _numOrNull(elements.foregroundY?.value),
+    // 前景 / 背景の拡大率と背景の表示位置。空欄 = 既定 (1.0 / 中央)。
+    foregroundScale: _scaleOrOne(elements.foregroundScale?.value),
+    backgroundX: _numOrNull(elements.backgroundX?.value),
+    backgroundY: _numOrNull(elements.backgroundY?.value),
+    backgroundScale: _scaleOrOne(elements.backgroundScale?.value),
+    // ケンバーンズ (シーン全体のズーム・パン)。
+    kenBurns: collectKenBurnsFromControls(),
     // M-1: cut.state.motionType / motionSettings は撤去。各キャラの character.motion
     // (= updateSelectedCharacterFromControls 経由で書き込まれる) を直接使う。
     characterEffects: collectCharacterEffectsFromControls(),
@@ -1034,6 +1122,22 @@ export async function loadCut(cut, options = {}) {
   if (elements.foregroundY) {
     elements.foregroundY.value = _numOrNull(data.foregroundY) == null ? "" : String(_numOrNull(data.foregroundY));
   }
+  // 前景 / 背景 拡大率、背景 X / Y。1.0 / null は空欄表示 (placeholder が既定値を示す)。
+  if (elements.foregroundScale) {
+    const fs = _scaleOrOne(data.foregroundScale);
+    elements.foregroundScale.value = fs === 1 ? "" : String(fs);
+  }
+  if (elements.backgroundScale) {
+    const bs = _scaleOrOne(data.backgroundScale);
+    elements.backgroundScale.value = bs === 1 ? "" : String(bs);
+  }
+  if (elements.backgroundX) {
+    elements.backgroundX.value = _numOrNull(data.backgroundX) == null ? "" : String(_numOrNull(data.backgroundX));
+  }
+  if (elements.backgroundY) {
+    elements.backgroundY.value = _numOrNull(data.backgroundY) == null ? "" : String(_numOrNull(data.backgroundY));
+  }
+  applyKenBurnsToControls(data.kenBurns);
   // M-1: motionType / motionSettings は character.motion へ統合。
   // loadCut の段階では仮 reset しておき、loadCharacterIntoControls (= 選択中キャラ
   // が決まった後) で各キャラの motion を input に流し込む。

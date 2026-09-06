@@ -21,7 +21,7 @@
 //                              frameIdx -> mediaTimestamp 一致の VideoFrame を
 //                              テクスチャに upload。export 用 deterministic。
 //
-// なぜこの分離か (dev_docs/v2_export_multi_cut.md と同じ思想):
+// なぜこの分離か (dev_docs/archive/v2_export_multi_cut.md と同じ思想):
 //   `HTMLVideoElement.currentTime = X` を毎フレーム設定する経路は frame-accurate
 //   seek が保証されず、keyframe seek コストで 90fps の export pipeline を一気に
 //   遅くする。WebCodecs の sequential decode は decode 順 = 表示順なので、

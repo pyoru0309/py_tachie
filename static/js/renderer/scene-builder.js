@@ -292,16 +292,42 @@ function _applyCropToCharacterMeshes(meshes, crop) {
   }
 }
 
-async function buildBackground(scene, layerData, urls, renderer, videoProvider) {
+// 背景 plane の矩形 (拡大率 + 表示位置) を求める。
+//   scale = 1.0 / x,y 未指定 → 従来通り 1920x1080 全面 (cover フィット)。
+//   scale > 1 で「あらかじめ大きめに敷く」= ケンバーンズのズームアウト用の余白。
+//   x / y は plane 左上の絶対座標 (0,0 = 画面左上)。未指定なら拡大後サイズで中央寄せ。
+function _backgroundPlaneRect(background) {
+  const rawScale = Number(background?.scale);
+  const scale = (Number.isFinite(rawScale) && rawScale > 0) ? Math.min(4, Math.max(0.05, rawScale)) : 1;
+  const width = Math.max(1, Math.round(CANVAS_WIDTH * scale));
+  const height = Math.max(1, Math.round(CANVAS_HEIGHT * scale));
+  const rawX = Number(background?.x);
+  const rawY = Number(background?.y);
+  return {
+    scale,
+    width,
+    height,
+    x: Number.isFinite(rawX) ? Math.round(rawX) : Math.round((CANVAS_WIDTH - width) / 2),
+    y: Number.isFinite(rawY) ? Math.round(rawY) : Math.round((CANVAS_HEIGHT - height) / 2),
+  };
+}
+
+async function buildBackground(scene, world, layerData, urls, renderer, videoProvider) {
   // 背景は最下層に「単色塗りつぶし」(ORDER_BG_COLOR=-10) を常に敷き、
   // その上に「画像 / videoTrack」(ORDER_BG_IMAGE=0) を必要に応じて重ねる。
   // 透過 PNG 等の背景画像でも下の色が透ける + ビジュアライザー (below_bg) を
   // 両者の間に挟める。
   //
+  // scene / world の使い分け:
+  //   - colorMesh は **scene 直下** (= ケンバーンズの対象外)。画面全面の下地なので、
+  //     ズームアウトしたときに端から透明が覗かないよう常に 1920x1080 で固定する。
+  //   - 画像 / video plane は world (= ケンバーンズ対象) に入れる。
+  //
   // 戻り値: { colorMesh?, mesh?, bgBlur?, bgCover?, videoProvider? }
   //   - colorMesh: 色 plane (opacity>0 のときのみ)
   //   - mesh:      画像 / video plane (画像 or videoTrack があるときのみ)
   const result = { mesh: null, colorMesh: null, bgBlur: null, bgCover: null };
+  const rect = _backgroundPlaneRect(layerData.background);
 
   // 1) 単色塗りつぶし (常に最下層、画像と共存)
   const colorOpacity = Math.max(0, Math.min(1, Number(layerData.background?.colorOpacity) || 0));
@@ -322,8 +348,8 @@ async function buildBackground(scene, layerData, urls, renderer, videoProvider) 
   //   関与せず Texture を貼るだけ。dispose 時の texture 解放は provider 側。
   if (videoProvider && layerData?.hasVideoTrack) {
     const videoTex = videoProvider.getTexture();
-    const mesh = makePlane(CANVAS_WIDTH, CANVAS_HEIGHT, videoTex, ORDER_BG_IMAGE, 0, 0);
-    scene.add(mesh);
+    const mesh = makePlane(rect.width, rect.height, videoTex, ORDER_BG_IMAGE, rect.x, rect.y);
+    world.add(mesh);
     result.mesh = mesh;
     result.videoProvider = videoProvider;
     return result;
@@ -357,39 +383,58 @@ async function buildBackground(scene, layerData, urls, renderer, videoProvider) 
   const srcW = (img && (img.naturalWidth || img.videoWidth || img.width)) || 0;
   const srcH = (img && (img.naturalHeight || img.videoHeight || img.height)) || 0;
   if (renderer && srcW > 0 && srcH > 0) {
-    result.bgCover = createCoverPass(CANVAS_WIDTH, CANVAS_HEIGHT);
+    // 拡大率 > 1 のときは cover RT も同じ比率で解像度を上げる (等倍 RT を後から
+    // 引き伸ばすとボケるため)。上限は 2 倍 (3840x2160) — それ以上は VRAM に見合わない。
+    const coverW = Math.max(1, Math.min(CANVAS_WIDTH * 2, rect.width));
+    const coverH = Math.max(1, Math.round(coverW * (CANVAS_HEIGHT / CANVAS_WIDTH)));
+    result.bgCover = createCoverPass(coverW, coverH);
     const coveredTex = result.bgCover.apply(renderer, texture, srcW, srcH);
     if (blurPx > 0) {
-      result.bgBlur = createBlurPass(CANVAS_WIDTH, CANVAS_HEIGHT);
-      displayTexture = result.bgBlur.pass.apply(renderer, coveredTex, bgBlurArg);
+      // blur 量は「1920 幅の画面で何 px」の意味なので、RT 解像度に合わせて換算する。
+      result.bgBlur = createBlurPass(coverW, coverH);
+      displayTexture = result.bgBlur.pass.apply(
+        renderer, coveredTex, bgBlurArg * (coverW / CANVAS_WIDTH),
+      );
     } else {
       displayTexture = coveredTex;
     }
   }
-  const mesh = makePlane(CANVAS_WIDTH, CANVAS_HEIGHT, displayTexture, ORDER_BG_IMAGE, 0, 0);
-  scene.add(mesh);
+  const mesh = makePlane(rect.width, rect.height, displayTexture, ORDER_BG_IMAGE, rect.x, rect.y);
+  world.add(mesh);
   result.mesh = mesh;
   return result;
 }
 
 async function buildForeground(scene, layerData, urls) {
   // assetUrl で元素材を直接 texture 化し、contain (min-scale, no crop) で
-  // 中央配置する。
+  // 中央配置する。foreground.scale があれば contain フィット後にさらに掛ける
+  // (1.0 = 従来通り)。
   const url = layerData.foreground?.assetUrl || null;
   if (!url) return null;
   urls.push(url);
   const texture = await loadTexture(url);
   if (!texture) return null;
+  const rawUserScale = Number(layerData.foreground?.scale);
+  const userScale = (Number.isFinite(rawUserScale) && rawUserScale > 0)
+    ? Math.min(4, Math.max(0.05, rawUserScale)) : 1;
   const img = texture.image;
   const srcW = (img && (img.naturalWidth || img.videoWidth || img.width)) || 0;
   const srcH = (img && (img.naturalHeight || img.videoHeight || img.height)) || 0;
   if (srcW <= 0 || srcH <= 0) {
     // 画像 size 不明: 全画面に貼り付けて素通し (defensive)。
-    const mesh = makePlane(CANVAS_WIDTH, CANVAS_HEIGHT, texture, ORDER_FG, 0, 0);
+    const fallbackW = Math.max(1, Math.round(CANVAS_WIDTH * userScale));
+    const fallbackH = Math.max(1, Math.round(CANVAS_HEIGHT * userScale));
+    const rawFbX = Number(layerData.foreground?.x);
+    const rawFbY = Number(layerData.foreground?.y);
+    const mesh = makePlane(
+      fallbackW, fallbackH, texture, ORDER_FG,
+      Number.isFinite(rawFbX) ? Math.round(rawFbX) : Math.round((CANVAS_WIDTH - fallbackW) / 2),
+      Number.isFinite(rawFbY) ? Math.round(rawFbY) : Math.round((CANVAS_HEIGHT - fallbackH) / 2),
+    );
     scene.add(mesh);
     return mesh;
   }
-  const scale = Math.min(CANVAS_WIDTH / srcW, CANVAS_HEIGHT / srcH);
+  const scale = Math.min(CANVAS_WIDTH / srcW, CANVAS_HEIGHT / srcH) * userScale;
   const planeW = Math.max(1, Math.round(srcW * scale));
   const planeH = Math.max(1, Math.round(srcH * scale));
   // 表示位置 (plane 左上)。foreground.x / y が数値なら絶対座標 (0,0 = 画面左上、
@@ -1189,6 +1234,55 @@ function _normalizeBob(raw) {
   return { bpm, amplitudePx };
 }
 
+// =============================================================================
+// ケンバーンズ (カット尺いっぱいの緩やかなズーム / パン)
+//
+// 対象は world group = 背景画像 / 動画トラック / 前景 / キャラ / 動画レイヤー /
+// ビジュアライザー / レイアウト境界線。セリフ枠・テロップ・背景色 plane・
+// トランジション overlay は scene 直下なので影響を受けない (= 文字は動かない)。
+//
+// 変換は「画面中心 (960, 540) を原点にした拡大 + 平行移動」:
+//   world.scale    = s
+//   world.position = (CX - CX*s + panX, CY - CY*s + panY)
+// これで s=1 / pan=0 のとき恒等変換になり、既存カットの見た目は 1px も変わらない。
+// =============================================================================
+function _normalizeKenBurns(raw) {
+  if (!raw || typeof raw !== "object" || !raw.enabled) return null;
+  const num = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
+  const scale = (value) => {
+    const v = num(value, 1);
+    return v > 0 ? Math.min(4, Math.max(0.05, v)) : 1;
+  };
+  const cfg = {
+    startScale: scale(raw.startScale),
+    endScale: scale(raw.endScale),
+    startX: num(raw.startX, 0),
+    startY: num(raw.startY, 0),
+    endX: num(raw.endX, 0),
+    endY: num(raw.endY, 0),
+    easing: String(raw.easing || "ease_in_out"),
+  };
+  // start と end が完全一致 = 動きなし。恒等変換に倒して余計な行列更新を避ける。
+  if (
+    cfg.startScale === cfg.endScale
+    && cfg.startX === cfg.endX
+    && cfg.startY === cfg.endY
+    && cfg.startScale === 1
+    && cfg.startX === 0
+    && cfg.startY === 0
+  ) return null;
+  return cfg;
+}
+
+function _kenBurnsEase(name, t) {
+  switch (name) {
+    case "linear": return t;
+    case "ease_in": return t * t;
+    case "ease_out": return 1 - (1 - t) * (1 - t);
+    default: return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2; // ease_in_out
+  }
+}
+
 export async function buildScene(
   layerData,
   renderer = null,
@@ -1197,11 +1291,24 @@ export async function buildScene(
   videoLayerDurations = null,
 ) {
   const scene = new THREE.Scene();
+  // ケンバーンズ (シーン全体のゆっくりズーム / パン) の対象になる「絵」のグループ。
+  // 背景画像 / 動画トラック / 前景 / キャラ / 動画レイヤー / ビジュアライザー /
+  // レイアウト境界線をここへ入れ、セリフ枠・テロップ・トランジション overlay と
+  // 背景色 plane は scene 直下に残す (= 画面に固定される)。
+  //
+  // ★ world.renderOrder は 0 のまま絶対に触らないこと。three.js の projectObject が
+  //   `if (object.isGroup) groupOrder = object.renderOrder` で子孫へ伝播させ、
+  //   groupOrder は renderOrder より優先されるため、0 以外にすると scene 直下の
+  //   mesh (セリフ / テロップ) との重ね順が壊れる。
+  const world = new THREE.Group();
+  scene.add(world);
   const urls = [];
-  const meshes = { bg: null, fg: null, dialogue: null, telops: null, characters: [], videoLayers: null };
+  const meshes = { bg: null, fg: null, dialogue: null, telops: null, characters: [], videoLayers: null, world };
   const characterEffects = layerData.characterEffects || {};
   const cutStartSec = Number(layerData.cutStartSec) || 0;
   const projectFps = Number(layerData?.fps) > 0 ? Number(layerData.fps) : 24;
+  const cutDurationSec = Number(layerData?.duration) > 0 ? Number(layerData.duration) : 0;
+  const kenBurns = _normalizeKenBurns(layerData?.kenBurns);
 
   // 並列で 1 カット分の素材をロード。Promise.all で揃ったら一括で Scene 構築。
   // visualizer だけ「背景の見た目 (luminance / averageColor / ...)」を ctx.background
@@ -1215,7 +1322,7 @@ export async function buildScene(
   // プロジェクト切替時の新シーン構築が遅延し、前プロジェクトの最後のフレームが
   // canvas に残った状態 (preserveDrawingBuffer=true) で見えてしまう。
   const characterCount = (layerData.characters || []).length;
-  const bgPromise = buildBackground(scene, layerData, urls, renderer, videoProvider);
+  const bgPromise = buildBackground(scene, world, layerData, urls, renderer, videoProvider);
   // 背景情報 (luminance / averageColor 等) は visualizer と telop (neon_glow.autoAttenuateBright 等)
   // で共用する。telop プリセットの中に「underlayInfo を使うものがあれば」計算するのが理想だが、
   // 判定コストが微妙にかさむため、テロップが 1 件でもあれば常に計算してしまう。
@@ -1227,7 +1334,7 @@ export async function buildScene(
     : Promise.resolve(null);
   const visualizerPromise = layerData?.visualizer
     ? backgroundInfoPromise.then((backgroundInfo) =>
-        buildVisualizer(scene, layerData, urls, renderer, backgroundInfo))
+        buildVisualizer(world, layerData, urls, renderer, backgroundInfo))
     : Promise.resolve(null);
   // dialogue のセリフ枠 blend は「実際に背景 plane が作られたか」を必要とする。
   // assetUrl があっても loadTexture が失敗 (404 等) して plane が作られないケースは
@@ -1242,14 +1349,14 @@ export async function buildScene(
   });
   const all = await Promise.all([
     bgPromise,
-    buildForeground(scene, layerData, urls),
+    buildForeground(world, layerData, urls),
     dialoguePromise,
     visualizerPromise,
     buildTelops(scene, layerData),
-    buildVideoLayers(scene, layerData, urls, videoLayerProvidersById, videoLayerDurations),
+    buildVideoLayers(world, layerData, urls, videoLayerProvidersById, videoLayerDurations),
     backgroundInfoPromise,
     ...((layerData.characters || []).map(
-      (char, i, arr) => buildCharacter(scene, char, i, urls, characterEffects, arr.length),
+      (char, i, arr) => buildCharacter(world, char, i, urls, characterEffects, arr.length),
     )),
   ]);
   meshes.bg = all[0];
@@ -1262,7 +1369,7 @@ export async function buildScene(
   meshes.characters = all.slice(7, 7 + characterCount).filter(Boolean);
   // B-2: マルチキャラレイアウトの border (分割線 + 任意で外周線)。キャラ build 後に
   // 1 度だけ作って scene に追加する (cut.state.characterLayout に依存)。
-  meshes.layoutBorder = buildCharacterLayoutBorder(scene, layerData);
+  meshes.layoutBorder = buildCharacterLayoutBorder(world, layerData);
   // テロップの neon_glow.autoAttenuateBright 等が参照する。
   // 動画背景の場合は frame ごとに変わるが、scene 開始時のサンプルで代用。
   // ★ Phase 3 で renderLayer 単位に plane を分割したため、各 layer の state に個別に underlayInfo を入れる。
@@ -1616,8 +1723,52 @@ export async function buildScene(
     // 内部で setRenderTarget(prev) で復帰しており、効かないカット (キャラ無し)
     // でこの行が不要、効くカットでも内部復帰で十分。
 
+    // ケンバーンズ (world group のズーム / パン)。トランジションと同じく
+    // 量子化していない rawElapsedSec を優先する (elapsedSec は characterAnimationFps
+    // で 8/12fps に丸められており、そのまま使うとカクつく)。
+    _applyKenBurns(rawElapsedSec != null ? Number(rawElapsedSec) : Number(elapsedSec) || 0);
+
     // R10: カット入りトランジションを最前面 overlay で適用する。
     _applyTransition(rawElapsedSec != null ? Number(rawElapsedSec) : Number(elapsedSec) || 0);
+  }
+
+  // 現在の world 変換 (ケンバーンズ適用後)。プレビューのキャラドラッグが
+  // 「画面座標 → シーン座標」の逆変換に使う。
+  let worldTransform = { scale: 1, x: 0, y: 0 };
+
+  function _applyKenBurns(localSec) {
+    if (!kenBurns) return;
+    const CX = CANVAS_WIDTH / 2;
+    const CY = CANVAS_HEIGHT / 2;
+    const t = cutDurationSec > 0
+      ? Math.max(0, Math.min(1, (Number(localSec) || 0) / cutDurationSec))
+      : 0;
+    const e = _kenBurnsEase(kenBurns.easing, t);
+    const s = kenBurns.startScale + (kenBurns.endScale - kenBurns.startScale) * e;
+    const panX = kenBurns.startX + (kenBurns.endX - kenBurns.startX) * e;
+    const panY = kenBurns.startY + (kenBurns.endY - kenBurns.startY) * e;
+    const posX = CX - CX * s + panX;
+    const posY = CY - CY * s + panY;
+    world.scale.set(s, s, 1);
+    world.position.set(posX, posY, 0);
+    worldTransform = { scale: s, x: posX, y: posY };
+
+    // B-2 の crop (uClipRect) は world 座標で評価されるため、world を動かすと
+    // 「クリップ窓だけ画面に固定されたまま、キャラが窓の下を滑る」ことになる。
+    // 構図ごと動かしたいので、クリップ矩形にも同じ変換を掛け直す。
+    for (const charInstance of meshes.characters) {
+      const crop = charInstance?.crop;
+      if (!crop) continue;
+      const cx = Number(crop.x); const cy = Number(crop.y);
+      const cw = Number(crop.width); const ch = Number(crop.height);
+      if (!Number.isFinite(cx) || !Number.isFinite(cy) || !(cw > 0) || !(ch > 0)) continue;
+      const rx = CX + (cx - CX) * s + panX;
+      const ry = CY + (cy - CY) * s + panY;
+      charInstance.group.traverse((obj) => {
+        const uniform = obj?.material?.uniforms?.uClipRect;
+        if (uniform?.value?.set) uniform.value.set(rx, ry, cw * s, ch * s);
+      });
+    }
   }
 
   // mode 番号: 0 crossfade / 1 wipe / 2 crosszoom / 3 whiteout / 4 blackout。
@@ -1749,7 +1900,17 @@ export async function buildScene(
 
   // meshes は本番フローでは外から触らないが、PoC ベンチが visualizer 内部状態へ
   // 介入できるようにここで露出する (v2-export-bench: preloadVisualizerImages)。
-  return { scene, update, dispose, setTransition, token, meshes };
+  return {
+    scene,
+    update,
+    dispose,
+    setTransition,
+    token,
+    meshes,
+    // ケンバーンズ適用後の world 変換 (画面座標 = scale * シーン座標 + offset)。
+    // preview のキャラ pick / ドラッグが逆変換に使う。
+    getWorldTransform: () => worldTransform,
+  };
 }
 
 // =============================================================================

@@ -12,6 +12,8 @@ let deps = {
   ensureSelectValue: () => {},
   syncPresetName: () => {},
   fillExpressionPresets: () => {},
+  // 配置プリセット (X / Y / 拡大率)。表情プリセットとは独立系統。
+  fillPlacementPresets: () => {},
   updateSelectedCutFromCurrent: () => {},
   scheduleScenarioSave: () => {},
   renderPreview: async () => {},
@@ -533,6 +535,7 @@ export function loadCharacterIntoControls(character) {
     if (elements.characterBobAmplitude) elements.characterBobAmplitude.value = "0";
     fillCharacterDefinitionAddSelect();
     deps.fillExpressionPresets("");
+    deps.fillPlacementPresets("");
     return;
   }
   fillCharacterAssetControls(character);
@@ -591,6 +594,9 @@ export function loadCharacterIntoControls(character) {
   );
   deps.fillExpressionPresets(matchingPreset?.id || "");
   deps.syncPresetName();
+  // 配置プリセットは「現在の X/Y/拡大率 に一致するものがあれば自動選択」なので
+  // 引数なしで呼ぶ (fillPlacementPresets 内で照合する)。
+  deps.fillPlacementPresets();
   fillCharacterDefinitionAddSelect();
 }
 

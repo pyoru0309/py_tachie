@@ -185,6 +185,10 @@
 | `backgroundBlurPx` | 背景画像への Gaussian blur (0 で無効) |
 | `foreground` | カット最前面のオーバーレイ画像 (任意) |
 | `foregroundX` / `foregroundY` | 前景画像の左上の表示位置 (px, 0,0 = 画面左上、2026-06 追加)。`null` (未指定) なら中央配置。キャラの `character.x/y` と同じ座標ルール |
+| `foregroundScale` | 前景の拡大率 (2026-09 追加)。`1.0` = 画面に収まるサイズ (contain フィット)。範囲 0.05〜4.0。**既定値 1.0 のときはキー自体が出力されない** |
+| `backgroundX` / `backgroundY` | 背景画像の左上の表示位置 (px, 2026-09 追加)。`null` (未指定) なら中央配置。**既定 (null) のときはキー自体が出力されない** |
+| `backgroundScale` | 背景の拡大率 (2026-09 追加)。`1.0` = 画面いっぱい (1920×1080 の cover フィット)。範囲 0.05〜4.0。**既定値 1.0 のときはキー自体が出力されない** |
+| `kenBurns` | ケンバーンズ (カット尺いっぱいのズーム / パン、2026-09 追加)。下記参照。**無効かつ既定値のときはキー自体が出力されない** |
 | `showSpeechBox` | セリフ枠を表示するかどうか |
 | `text` | セリフ本文 |
 | `characters` | カット内に登場するキャラクター配列 |
@@ -194,6 +198,31 @@
 | `characterLayout` | マルチキャラレイアウト設定 (2026-05 追加)。 `{ "pattern": "vertical_2"\|..., "border": { "width", "color", "includeOuter" } }`。`null` で「分割なし」 |
 | `editingCharacterId` | 編集中キャラの `id` を per-cut で永続化 (2026-05 追加)。再生→停止→同じカットへ戻った際にセレクタが復元される。記録された `id` がカット内にいなければ index=0 (= 最前面) へフォールバック |
 | `motionType` / `motionSettings` | **廃止** (2026-05): scene global motion は撤廃。読込時に話者キャラの `character.motion` へ自動 migration され、normalize 後の JSON にはこれらのキーは出力されない |
+
+### ケンバーンズ (`kenBurns`)
+
+```json
+{
+  "enabled": true,
+  "startScale": 1.2,
+  "endScale": 1.0,
+  "startX": 0,
+  "startY": 0,
+  "endX": -80,
+  "endY": 0,
+  "easing": "ease_in_out"
+}
+```
+
+| 項目 | 範囲 | 説明 |
+| --- | --- | --- |
+| `enabled` | bool | `false` なら効果なし |
+| `startScale` / `endScale` | 0.05〜4.0 | **画面中央 (960, 540) を基準にした倍率**。`1.0` で等倍 |
+| `startX` / `endX` | 任意 (px) | 平行移動量。正で絵が右へ動く |
+| `startY` / `endY` | 任意 (px) | 平行移動量。正で絵が下へ動く |
+| `easing` | `linear` / `ease_in` / `ease_out` / `ease_in_out` | 補間曲線。既定は `ease_in_out` |
+
+補間はカット先頭 (`t = 0`) からカット末尾 (`t = 1`) まで。適用対象は **背景画像・背景動画・前景・キャラクター・動画レイヤー・ビジュアライザー** で、セリフ枠・テロップ・背景色の塗りつぶしは対象外 (画面に固定されます)。
 
 ## キャラクター状態
 

@@ -256,6 +256,14 @@ function _renderSceneWithTransitionZoom(inst) {
   }
 }
 
+// ケンバーンズ適用後の world 変換を返す。プレビュー上のキャラ pick / ドラッグが
+// 「canvas 座標 → シーン座標」の逆変換に使う (変換が無いカットでは恒等)。
+export function getActiveWorldTransform() {
+  const t = activeSceneInstance?.getWorldTransform?.();
+  if (!t || !(Number(t.scale) > 0)) return { scale: 1, x: 0, y: 0 };
+  return { scale: Number(t.scale), x: Number(t.x) || 0, y: Number(t.y) || 0 };
+}
+
 export function renderActiveScene(state = {}) {
   if (!activeSceneInstance) return;
   activeSceneInstance.update(state);
