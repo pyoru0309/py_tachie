@@ -61,7 +61,7 @@ from .timecode import PROJECT_FPS
 from .utils import current_project
 
 _log = app_logger("v2_export")
-from .scenario import ensure_scenario
+from .scenario import ensure_scenario, resolve_effective_scene
 from .manifest import ensure_manifest
 
 router = APIRouter()
@@ -766,6 +766,8 @@ def get_export_plan() -> dict:
     for sidx, scene in enumerate(scenario.get("scenes") or []):
         if not isinstance(scene, dict):
             continue
+        # bedScope に従いプロジェクト通し設定を反映した「解決済みシーン」で読む。
+        scene = resolve_effective_scene(scenario, scene)
 
         # v1 と同じロジックで scene 末尾を求める。fps == PROJECT_FPS なので
         # ceil(duration_sec * fps) は frame と一致する。
@@ -886,7 +888,10 @@ def _build_project_mux_command(
     filter_segments: list[str] = []
     scene_audio_labels: list[tuple[str, float]] = []  # (label, scene_duration)
 
-    scenes = [s for s in (scenario.get("scenes") or []) if isinstance(s, dict)]
+    scenes = [
+        resolve_effective_scene(scenario, s)
+        for s in (scenario.get("scenes") or []) if isinstance(s, dict)
+    ]
     for scene_index, scene in enumerate(scenes):
         scene_duration = _scene_total_duration(scene)
 
@@ -1231,7 +1236,10 @@ def post_export_mux(req: ExportMuxRequest) -> dict:
                 break
         if target_cut is None:
             return {"type": "error", "code": ERR_INVALID_CONFIG, "detail": f"cutId={req.cutId} not found"}
-        synthetic_scene = _make_single_cut_scene(target_scene, target_cut)
+        # 単一カット書き出しもベッド設定を解決してから 1 シーンに畳む。
+        synthetic_scene = _make_single_cut_scene(
+            resolve_effective_scene(scenario, target_scene), target_cut,
+        )
         scenario_for_mux = {"scenes": [synthetic_scene]}
     else:
         scenario_for_mux = scenario

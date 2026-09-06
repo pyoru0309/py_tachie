@@ -122,6 +122,114 @@ export function cutTransition(cut) {
   return out;
 }
 
+// ===========================================================================
+// ベッド設定 (SceneBed) の二層化 — プロジェクト通し / シーンごと
+//
+// background / videoTrack / bgmTracks / visualizer / breath+bpmBob / bpm を、
+// scenario.projectSettings (プロジェクト通し) と scene (シーンごと) の
+// どちらから取るかを scenario.bedScope が決める。既定は全部 "scene" なので、
+// 既存プロジェクトの挙動は変わらない。
+//
+// 詳細は dev_docs/plans/multi-scene.md §1-2。サーバ側の同名ロジックは
+// app/scenario.py: resolve_effective_scene / _normalize_bed_scope と対。
+// ===========================================================================
+
+// bedScope のキー → それが支配する SceneBed のフィールド。
+export const BED_SCOPE_FIELDS = {
+  bgm: ["bgmTracks"],
+  videoTrack: ["videoTrack"],
+  visualizer: ["visualizer"],
+  bodySway: ["breath", "bpmBob"],
+};
+export const BED_SCOPE_KEYS = Object.keys(BED_SCOPE_FIELDS);
+
+// 排他スコープを持たない「上書き型」フィールド。単一スカラーで二重適用が
+// 起きないので、scene 側に値があればそれ、無ければ projectSettings を使う。
+export const BED_OVERRIDE_FIELDS = ["bpm", "background"];
+
+// 各スコープ項目の日本語ラベル (ダイアログの切替 UI で使う)。
+export const BED_SCOPE_LABELS = {
+  bgm: "BGM",
+  videoTrack: "背景動画",
+  visualizer: "ビジュアライザ",
+  bodySway: "体の揺れ",
+};
+
+export function emptySceneBed() {
+  return {
+    background: "",
+    videoTrack: null,
+    bgmTracks: [],
+    visualizer: { enabled: false, pluginKey: "", audioTrackId: "", layer: "above_bg", params: {} },
+    breath: { amplitudePx: 0, periodSec: 4 },
+    bpmBob: { amplitudePx: 0 },
+    bpm: null,
+  };
+}
+
+export function defaultBedScope() {
+  const out = {};
+  for (const key of BED_SCOPE_KEYS) out[key] = "scene";
+  return out;
+}
+
+// scenario.bedScope を読む (欠損キーは "scene")。
+// 制約: ビジュアライザは audioTrackId で BGM を指すので、viz がプロジェクト通しの
+// ときは BGM もプロジェクト通しに倒す (サーバ側 _normalize_bed_scope と同じ規則)。
+export function bedScope(scenario = state.scenario) {
+  const raw = (scenario && typeof scenario.bedScope === "object") ? scenario.bedScope : {};
+  const out = {};
+  for (const key of BED_SCOPE_KEYS) {
+    out[key] = raw[key] === "project" ? "project" : "scene";
+  }
+  if (out.visualizer === "project") out.bgm = "project";
+  return out;
+}
+
+// 指定項目が「プロジェクト通し」かどうか。
+export function isProjectScoped(key, scenario = state.scenario) {
+  return bedScope(scenario)[key] === "project";
+}
+
+export function projectSettings(scenario = state.scenario) {
+  if (!scenario) return emptySceneBed();
+  if (!scenario.projectSettings || typeof scenario.projectSettings !== "object") {
+    scenario.projectSettings = emptySceneBed();
+  }
+  const ps = scenario.projectSettings;
+  // 欠損フィールドの遅延補完 (旧データ / 部分保存対策)。
+  const base = emptySceneBed();
+  for (const [key, value] of Object.entries(base)) {
+    if (ps[key] === undefined) ps[key] = value;
+  }
+  if (!Array.isArray(ps.bgmTracks)) ps.bgmTracks = [];
+  return ps;
+}
+
+// bedScope に従い、scene のベッド設定を projectSettings で差し替えた**新しい**
+// オブジェクトを返す。元 scene は変更しない (= 編集対象と再生対象を分離する)。
+export function resolveSceneBed(scene, scenario = state.scenario) {
+  if (!scene) return scene;
+  const scope = bedScope(scenario);
+  const ps = projectSettings(scenario);
+  const out = { ...scene };
+  for (const key of BED_SCOPE_KEYS) {
+    if (scope[key] !== "project") continue;
+    for (const field of BED_SCOPE_FIELDS[key]) out[field] = ps[field];
+  }
+  // 上書き型: scene 側が未指定のときだけプロジェクト側を使う。
+  for (const field of BED_OVERRIDE_FIELDS) {
+    if (!out[field] && ps[field]) out[field] = ps[field];
+  }
+  return out;
+}
+
+// 再生・描画が見るべき「解決済みシーン」。編集 UI は生の scene を触ること。
+export function activeSceneResolved(scenario = state.scenario) {
+  const scene = scenario?.scenes?.[0];
+  return scene ? resolveSceneBed(scene, scenario) : null;
+}
+
 export function attachScenarioCutsAlias(scenario) {
   // v4 シナリオは scenes[0].cuts が正、state.scenario.cuts はその同一参照として扱う。
   // 旧フォーマット（cuts 直下）を受け取った場合も scenes に巻き直す。
@@ -153,6 +261,16 @@ export function attachScenarioCutsAlias(scenario) {
     scene.laneCounts = { telop: 1, soundEffect: 1, videoLayer: 1 };
   }
   scenario.cuts = scene.cuts;
+  // ベッド設定の二層化 (dev_docs/plans/multi-scene.md)。サーバは既定値のとき
+  // キーを出さないので、クライアント側で器を用意しておく。
+  if (!scenario.projectSettings || typeof scenario.projectSettings !== "object") {
+    scenario.projectSettings = emptySceneBed();
+  }
+  if (!scenario.bedScope || typeof scenario.bedScope !== "object") {
+    scenario.bedScope = defaultBedScope();
+  } else {
+    scenario.bedScope = bedScope(scenario);
+  }
   if (!scenario.version) scenario.version = 4;
   return scenario;
 }

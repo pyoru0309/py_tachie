@@ -1186,7 +1186,11 @@
             </button>
             <span id="timelinePlayheadInfo" class="timeline-playhead-info" aria-live="polite" tabindex="0" role="button" title="ダブルクリックで再生ヘッドを移動 (MM:SS.FF)">00:00.00 / 0f</span>
           </div>
-          <button id="openSceneDialogButton" type="button" class="ghost-button" style="margin-left:auto">
+          <button id="openProjectSettingsDialogButton" type="button" class="ghost-button" style="margin-left:auto" title="BGM・背景動画・ビジュアライザ・体の揺れを、プロジェクト全体に通して設定します">
+            <span class="msym button-icon" aria-hidden="true">inventory</span>
+            <span>プロジェクト設定</span>
+          </button>
+          <button id="openSceneDialogButton" type="button" class="ghost-button">
             <span class="msym button-icon" aria-hidden="true">movie</span>
             <span>シーン設定</span>
           </button>
@@ -1218,7 +1222,7 @@
                 <span class="msym button-icon" aria-hidden="true">delete</span>
                 <span>削除</span>
               </button>
-              <button id="actionSplitButton" type="button" role="menuitem" class="dropdown-menu-item" title="再生位置で分割（カット/効果音/動画）">
+              <button id="actionSplitButton" type="button" role="menuitem" class="dropdown-menu-item" title="再生位置で分割（カット/テロップ/効果音/動画）">
                 <span class="msym button-icon" aria-hidden="true">content_cut</span>
                 <span>分割（再生位置）</span>
               </button>
@@ -1323,8 +1327,8 @@
       <form method="dialog" class="settings-panel" id="sceneForm">
         <div class="dialog-header">
           <div>
-            <h2>シーン設定</h2>
-            <p>背景動画・BGM・テンポ等のシーン全体に対する設定</p>
+            <h2 id="sceneDialogTitle">シーン設定</h2>
+            <p id="sceneDialogDescription">背景動画・BGM・テンポ等のシーン全体に対する設定</p>
           </div>
         </div>
         <div class="dialog-body">
@@ -1352,7 +1356,7 @@
           </div>
 
           <section class="form-tab-panel" data-scene-tab-panel="basic">
-            <label>
+            <label id="sceneTitleField">
               タイトル
               <input id="sceneTitleInput" type="text" />
             </label>
@@ -1360,9 +1364,22 @@
               テンポ (BPM)
               <input id="sceneBpmInput" type="number" min="0" step="1" placeholder="未指定" />
             </label>
+            <p class="asset-hint" id="sceneBpmHint">テンポは体の揺れ (BPM ボブ) とビジュアライザの拍同期が参照します。シーン側を空欄にすると、プロジェクト設定の値が使われます。</p>
           </section>
 
           <section class="form-tab-panel hidden" data-scene-tab-panel="motion">
+            <div class="bed-scope-row" data-bed-scope="bodySway">
+              <span class="bed-scope-label">体の揺れの適用範囲</span>
+              <label class="bed-scope-option">
+                <input type="radio" name="bedScope_bodySway" value="scene" />
+                シーンごと
+              </label>
+              <label class="bed-scope-option">
+                <input type="radio" name="bedScope_bodySway" value="project" />
+                プロジェクト通し
+              </label>
+              <p class="asset-hint bed-scope-hint" data-bed-scope-hint="bodySway"></p>
+            </div>
             <p class="asset-hint">全キャラのベース＋前髪を含めた立ち絵全体を Y 軸に揺らします。0 で無効。</p>
             <div class="inline-fields">
               <label>
@@ -1381,6 +1398,18 @@
           </section>
 
           <section class="form-tab-panel hidden" data-scene-tab-panel="video">
+            <div class="bed-scope-row" data-bed-scope="videoTrack">
+              <span class="bed-scope-label">背景動画の適用範囲</span>
+              <label class="bed-scope-option">
+                <input type="radio" name="bedScope_videoTrack" value="scene" />
+                シーンごと
+              </label>
+              <label class="bed-scope-option">
+                <input type="radio" name="bedScope_videoTrack" value="project" />
+                プロジェクト通し
+              </label>
+              <p class="asset-hint bed-scope-hint" data-bed-scope-hint="videoTrack"></p>
+            </div>
             <label class="checkbox-row">
               <input id="sceneVideoEnabledInput" type="checkbox" />
               背景動画を使用する
@@ -1431,6 +1460,18 @@
           </section>
 
           <section class="form-tab-panel hidden" data-scene-tab-panel="bgm">
+            <div class="bed-scope-row" data-bed-scope="bgm">
+              <span class="bed-scope-label">BGMの適用範囲</span>
+              <label class="bed-scope-option">
+                <input type="radio" name="bedScope_bgm" value="scene" />
+                シーンごと
+              </label>
+              <label class="bed-scope-option">
+                <input type="radio" name="bedScope_bgm" value="project" />
+                プロジェクト通し
+              </label>
+              <p class="asset-hint bed-scope-hint" data-bed-scope-hint="bgm"></p>
+            </div>
             <div id="sceneBgmList" class="scene-bgm-list" aria-live="polite"></div>
             <div class="dialog-actions">
               <button type="button" id="addSceneBgmButton">
@@ -1441,6 +1482,18 @@
           </section>
 
           <section class="form-tab-panel hidden" data-scene-tab-panel="visualizer">
+            <div class="bed-scope-row" data-bed-scope="visualizer">
+              <span class="bed-scope-label">ビジュアライザの適用範囲</span>
+              <label class="bed-scope-option">
+                <input type="radio" name="bedScope_visualizer" value="scene" />
+                シーンごと
+              </label>
+              <label class="bed-scope-option">
+                <input type="radio" name="bedScope_visualizer" value="project" />
+                プロジェクト通し
+              </label>
+              <p class="asset-hint bed-scope-hint" data-bed-scope-hint="visualizer"></p>
+            </div>
             <p class="asset-hint">音声と連動した装飾をシーンに重ねます。プラグインは plugins/visualizers/*.py に追加できます。動画レイヤーは常にビジュアライザーより上 (= 背景の一種として) 重なります</p>
             <label class="checkbox-row">
               <input id="sceneVisualizerEnabledInput" type="checkbox" />

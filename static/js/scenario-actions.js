@@ -1833,6 +1833,10 @@ export async function saveScenario(options = {}) {
     version: state.scenario?.version || 4,
     title: state.scenario?.title || "scenario",
     scenes: Array.isArray(state.scenario?.scenes) ? state.scenario.scenes : [],
+    // ベッド設定の二層化 (dev_docs/plans/multi-scene.md)。サーバ側は既定値のとき
+    // キーごと落とすので、常に送って構わない。
+    projectSettings: state.scenario?.projectSettings || null,
+    bedScope: state.scenario?.bedScope || null,
     projectId: loadedProjectId || targetProjectId || null,
   };
   // ★ options.projectId が指定されたら project-scoped エンドポイントへ。

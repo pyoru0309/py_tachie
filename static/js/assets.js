@@ -70,7 +70,8 @@ export const ASSET_CATEGORY_ACCEPT = {
 // state.scenario を走査して、現在プロジェクトで参照されている音声 rootPath の Set を返す。
 // 参照ソース:
 //   - cut.audio (話者音声)
-//   - scene.bgmTracks[].src (BGM)
+//   - scene.bgmTracks[].src (シーンごとの BGM)
+//   - scenario.projectSettings.bgmTracks[].src (プロジェクト通しの BGM)
 // scene.soundEffects は別カテゴリ (sound_effects) なので除外。
 function collectReferencedAudioPaths() {
   const used = new Set();
@@ -88,6 +89,11 @@ function collectReferencedAudioPaths() {
     for (const bgm of scene?.bgmTracks || []) {
       add(bgm?.src);
     }
+  }
+  // プロジェクト通しのベッド設定 (scenario.projectSettings) に載っている BGM も
+  // 「使用中」に数える。数えないと、プロジェクト BGM が未使用扱いで削除候補に出る。
+  for (const bgm of scenario.projectSettings?.bgmTracks || []) {
+    add(bgm?.src);
   }
   // v3 以前互換: scenario.cuts (scenes に入っていないルートレベル) も走査。
   for (const cut of scenario.cuts || []) {

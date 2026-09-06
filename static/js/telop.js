@@ -1258,6 +1258,54 @@ export function insertPosterTemplateClips({ patches, templateId, params, sourceT
 // ショートカット用: 選択中のテロップを複製する。
 // 単一選択時は同じシーン内の「次のテロップとの隙間」 or 末尾までに収まるよう配置。
 // 後続のテロップ位置は変更しない（重なりは許容）。
+// 再生位置で選択中のテロップを 2 つに分割する。
+//
+// テキスト・スタイル・モーションはそのまま複製し、時間だけを切る (= 同じ文字が
+// 前半 / 後半に分かれて出る)。効果音・動画レイヤーの分割と同じく、
+// **継ぎ目に登場 / 退場アニメを残さない**: 前半の「退場」と後半の「登場」を
+// none に倒す。これをやらないと、切った瞬間に文字が消えて再度出てくる。
+//
+// 複数選択時は先頭 (state.selectedTelopId) の 1 件だけを対象にする
+// (カット / 効果音 / 動画の分割と同じ挙動)。
+export function splitSelectedTelop() {
+  const scene = deps.activeScene();
+  const telops = Array.isArray(scene?.telops) ? scene.telops : [];
+  const id = state.selectedTelopId;
+  const telop = id ? telops.find((t) => t && t.id === id) : null;
+  if (!telop) {
+    showToast("分割するテロップが選択されていません");
+    return;
+  }
+  const playheadFrame = secToFrames(Math.max(0, Number(state.timeline?.currentSec) || 0));
+  const startFrame = telopStartFrame(telop);
+  const endFrame = startFrame + telopDurationFrame(telop);
+  if (playheadFrame <= startFrame || playheadFrame >= endFrame) {
+    showToast("再生位置がテロップの範囲外です");
+    return;
+  }
+  const clone = JSON.parse(JSON.stringify(telop));
+  clone.id = generateTelopId();
+  clone.startFrame = playheadFrame;
+  clone.durationFrame = endFrame - playheadFrame;
+  // 継ぎ目のアニメを落とす (前半の out / 後半の in)。animation は
+  // {in|out|body: {preset, params}} 形式で、preset=null が「なし」。
+  if (clone.animation && typeof clone.animation === "object") {
+    clone.animation.in = { preset: null, params: {} };
+  }
+  if (telop.animation && typeof telop.animation === "object") {
+    telop.animation.out = { preset: null, params: {} };
+  }
+  telop.durationFrame = playheadFrame - startFrame;
+  scene.telops.push(clone);
+  scene.telops.sort((a, b) => telopStartFrame(a) - telopStartFrame(b));
+  deps.scheduleScenarioSave();
+  recordHistory();
+  renderTelopTrack();
+  selectTelop(clone.id);
+  deps.renderPreview();
+  showToast(`テロップを ${formatTimecode(playheadFrame - startFrame)} で分割しました`);
+}
+
 export function duplicateSelectedTelop() {
   const scene = deps.activeScene();
   const telops = Array.isArray(scene?.telops) ? scene.telops : [];

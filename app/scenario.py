@@ -2205,22 +2205,8 @@ def _normalize_scene(
             if isinstance(cut, dict):
                 cuts.append(_normalize_cut(cut, cut_index, manifest))
     _fill_cut_start_frame(cuts)
-    bgm_tracks_raw = scene.get("bgmTracks")
-    bgm_tracks: list[dict[str, Any]] = []
-    if isinstance(bgm_tracks_raw, list):
-        for track in bgm_tracks_raw:
-            if isinstance(track, dict):
-                normalized = _normalize_bgm_track(track)
-                if normalized:
-                    bgm_tracks.append(normalized)
-    # useForLipSync は同シーン内で1トラックのみ。先頭で見つけた true 以外を false に倒す。
-    seen_lip_sync = False
-    for track in bgm_tracks:
-        if track.get("useForLipSync"):
-            if seen_lip_sync:
-                track["useForLipSync"] = False
-            else:
-                seen_lip_sync = True
+    # useForLipSync は同シーン内で 1 トラックのみ (_normalize_bgm_tracks が担保)。
+    bgm_tracks = _normalize_bgm_tracks(scene.get("bgmTracks"))
     telops_raw = scene.get("telops")
     telops: list[dict[str, Any]] = []
     if isinstance(telops_raw, list):
@@ -2319,7 +2305,7 @@ def _normalize_scene(
         "videoLayer": _lane_count("videoLayer", video_layers),
     }
 
-    return {
+    out_scene = {
         "id": str(scene.get("id") or f"scene_{scene_index:03d}"),
         "title": str(scene.get("title") or f"シーン{scene_index}"),
         "background": str(scene.get("background") or ""),
@@ -2335,6 +2321,12 @@ def _normalize_scene(
         "telops": telops,
         "visualizer": _normalize_scene_visualizer(scene.get("visualizer")),
     }
+    # シーン間トランジション (Phase 3)。cut.transition と同一スキーマ。
+    # "none" のときはキーごと出さない (既存シナリオの正規化結果を変えないため)。
+    scene_transition = _normalize_transition(scene.get("transition"))
+    if scene_transition.get("type") != "none":
+        out_scene["transition"] = scene_transition
+    return out_scene
 
 
 def _normalize_breath(value: Any) -> dict[str, float]:
@@ -2363,6 +2355,133 @@ def _normalize_bpm_bob(value: Any) -> dict[str, float]:
     return {"amplitudePx": amp}
 
 
+# =============================================================================
+# ベッド設定 (SceneBed) の二層化 — プロジェクト通し / シーンごと
+#
+# 「その区間の下地として敷かれ続けるもの」= background / videoTrack / bgmTracks /
+# visualizer / breath / bpmBob / bpm を、プロジェクト単位でも持てるようにする。
+# どちらを使うかは `scenario.bedScope` が唯一の真実で、切替時に無効側のデータは
+# **消さない** (再生 / 書き出しに使われなくなるだけ)。
+#
+# 詳細は dev_docs/plans/multi-scene.md §1-2。
+# =============================================================================
+
+# bedScope のキーと、それが支配する SceneBed のフィールド。
+BED_SCOPE_FIELDS: dict[str, tuple[str, ...]] = {
+    "bgm": ("bgmTracks",),
+    "videoTrack": ("videoTrack",),
+    "visualizer": ("visualizer",),
+    "bodySway": ("breath", "bpmBob"),
+}
+BED_SCOPE_KEYS: tuple[str, ...] = tuple(BED_SCOPE_FIELDS.keys())
+
+# 排他スコープを持たない「上書き型」フィールド。単一スカラーで二重適用が
+# 起きないので、`scene 側に値があればそれ、無ければ projectSettings` で解決する。
+# ・bpm: テンポ。bpmBob とビジュアライザのビート同期が参照する。
+# ・background: gap フレーム用の背景。現状シーン設定に編集 UI が無く常に空。
+BED_OVERRIDE_FIELDS: tuple[str, ...] = ("bpm", "background")
+
+
+def _normalize_bgm_tracks(raw: Any) -> list[dict[str, Any]]:
+    """BGM 配列の正規化 + useForLipSync の単一化 (同一レベル内で 1 本まで)。"""
+    tracks: list[dict[str, Any]] = []
+    if isinstance(raw, list):
+        for track in raw:
+            if isinstance(track, dict):
+                normalized = _normalize_bgm_track(track)
+                if normalized:
+                    tracks.append(normalized)
+    seen_lip_sync = False
+    for track in tracks:
+        if track.get("useForLipSync"):
+            if seen_lip_sync:
+                track["useForLipSync"] = False
+            else:
+                seen_lip_sync = True
+    return tracks
+
+
+def _normalize_bed_scope(raw: Any) -> dict[str, str]:
+    """各ベッド項目を project / scene のどちらから取るか。既定は全部 "scene"。
+
+    既定を "scene" にしてあるので、既存プロジェクト (シーン 1 個・データは
+    scenes[0] にしかない) は挙動が 1 mm も変わらない。
+    """
+    raw = raw if isinstance(raw, dict) else {}
+    out: dict[str, str] = {}
+    for key in BED_SCOPE_KEYS:
+        value = str(raw.get(key) or "scene").strip().lower()
+        out[key] = "project" if value == "project" else "scene"
+    # 制約: ビジュアライザは audioTrackId で BGM を指すので、viz がプロジェクト
+    # 通しなら BGM もプロジェクト通しでなければ「1 個の viz が場面ごとに違う曲を
+    # 解析する」破綻が起きる。
+    if out["visualizer"] == "project":
+        out["bgm"] = "project"
+    return out
+
+
+def _normalize_scene_bed(raw: Any) -> dict[str, Any]:
+    """SceneBed (プロジェクト通し設定 / シーン設定で共通の形) を正規化する。"""
+    raw = raw if isinstance(raw, dict) else {}
+    bpm_value = raw.get("bpm")
+    try:
+        bpm = int(bpm_value) if bpm_value not in (None, "") else None
+    except (TypeError, ValueError):
+        bpm = None
+    if bpm is not None and bpm <= 0:
+        bpm = None
+    return {
+        "background": _nfc(str(raw.get("background") or "")),
+        "videoTrack": _normalize_video_track(raw.get("videoTrack")),
+        "bgmTracks": _normalize_bgm_tracks(raw.get("bgmTracks")),
+        "visualizer": _normalize_scene_visualizer(raw.get("visualizer")),
+        "breath": _normalize_breath(raw.get("breath")),
+        "bpmBob": _normalize_bpm_bob(raw.get("bpmBob")),
+        "bpm": bpm,
+    }
+
+
+def _scene_bed_is_default(bed: dict[str, Any]) -> bool:
+    """何も設定されていない SceneBed か。既定なら永続化から省く判定に使う。"""
+    return (
+        not bed.get("background")
+        and bed.get("videoTrack") is None
+        and not bed.get("bgmTracks")
+        and not (bed.get("visualizer") or {}).get("enabled")
+        and not (bed.get("breath") or {}).get("amplitudePx")
+        and not (bed.get("bpmBob") or {}).get("amplitudePx")
+        and bed.get("bpm") is None
+    )
+
+
+def resolve_effective_scene(
+    scenario: dict[str, Any], scene: dict[str, Any]
+) -> dict[str, Any]:
+    """bedScope に従い、scene のベッド設定を projectSettings で差し替えた dict を返す。
+
+    元の scene は変更しない (shallow copy)。呼び出し側はこの戻り値をそのまま
+    「シーン」として扱えるので、既存の読み出しコードに手を入れずに済む。
+    """
+    if not isinstance(scene, dict):
+        return scene
+    scope = _normalize_bed_scope(scenario.get("bedScope") if isinstance(scenario, dict) else None)
+    raw_project = scenario.get("projectSettings") if isinstance(scenario, dict) else None
+    if all(v == "scene" for v in scope.values()) and not isinstance(raw_project, dict):
+        return scene
+    project_bed = _normalize_scene_bed(raw_project)
+    out = dict(scene)
+    for key, fields in BED_SCOPE_FIELDS.items():
+        if scope.get(key) != "project":
+            continue
+        for field in fields:
+            out[field] = project_bed.get(field)
+    # 上書き型: scene 側が未指定のときだけ projectSettings を使う。
+    for field in BED_OVERRIDE_FIELDS:
+        if not out.get(field) and project_bed.get(field):
+            out[field] = project_bed.get(field)
+    return out
+
+
 def normalize_scenario(scenario: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
     raw_scenes = scenario.get("scenes")
     scenes_input: list[dict[str, Any]]
@@ -2384,11 +2503,20 @@ def normalize_scenario(scenario: dict[str, Any], manifest: dict[str, Any]) -> di
     ]
     if not scenes:
         scenes = [_normalize_scene({"id": "scene_001", "title": "シーン1", "cuts": []}, 1, manifest)]
-    return {
+    out: dict[str, Any] = {
         "version": 4,
         "title": str(scenario.get("title", "scenario")),
         "scenes": scenes,
     }
+    # プロジェクト通しのベッド設定 + どちらを使うかのスコープ。
+    # どちらも「既定なら書き出さない」= 既存シナリオの正規化結果を 1 bit も変えない。
+    project_bed = _normalize_scene_bed(scenario.get("projectSettings"))
+    if not _scene_bed_is_default(project_bed):
+        out["projectSettings"] = project_bed
+    bed_scope = _normalize_bed_scope(scenario.get("bedScope"))
+    if any(value != "scene" for value in bed_scope.values()):
+        out["bedScope"] = bed_scope
+    return out
 
 
 def scenario_cuts(scenario: dict[str, Any]) -> list[dict[str, Any]]:

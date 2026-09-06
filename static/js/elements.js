@@ -459,6 +459,12 @@ export const elements = {
   cutMotionMovePivotY: document.querySelector("#cutMotionMovePivotYInput"),
   cutMotionMovePivotPickButton: document.querySelector("#cutMotionMovePivotPickButton"),
   motionPivotIndicator: document.querySelector("#motionPivotIndicator"),
+  // ベッド設定ダイアログ (シーン設定 / プロジェクト設定 の 2 モード共用)
+  sceneDialogTitle: document.querySelector("#sceneDialogTitle"),
+  sceneDialogDescription: document.querySelector("#sceneDialogDescription"),
+  sceneTitleField: document.querySelector("#sceneTitleField"),
+  sceneBpmHint: document.querySelector("#sceneBpmHint"),
+  openProjectSettingsDialogButton: document.querySelector("#openProjectSettingsDialogButton"),
   presetName: document.querySelector("#presetNameInput"),
   savePresetButton: document.querySelector("#savePresetButton"),
   deletePresetButton: document.querySelector("#deletePresetButton"),

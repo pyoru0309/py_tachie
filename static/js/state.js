@@ -97,6 +97,10 @@ export const state = {
   // 起動時に /api/tts/state を fetch して入れ、以降は全体設定 / キャラ紐付け /
   // セリフパネルから参照する。
   tts: null,
+  // ベッド設定ダイアログ (シーン設定 / プロジェクト設定) の編集対象。
+  // "scene" = scenario.scenes[0] / "project" = scenario.projectSettings。
+  // 詳細は dev_docs/plans/multi-scene.md §2。
+  bedEditTarget: "scene",
 };
 
 // デバッグ用: dev tools の console から `__spliteState` で state を参照できる。

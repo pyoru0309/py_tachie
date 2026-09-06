@@ -144,6 +144,7 @@ import {
   applyDialogBoxStyleToAllCuts,
   applyEffectSceneToAllCuts,
   applyKenBurnsToAllCuts,
+  openProjectSettingsDialog,
   applyEffectCharacterToAllCuts,
   applyTelopDefaultsToAllTelops,
   promptBulkApply,
@@ -192,7 +193,7 @@ import {
 function _exitPivotPickingOnMotionChange() {
   if (elements.motionType?.value !== "move") exitMotionPivotPicking();
 }
-import { duplicateSelectedTelop, deleteSelectedTelops, selectAdjacentTelop } from "./telop.js";
+import { duplicateSelectedTelop, deleteSelectedTelops, selectAdjacentTelop, splitSelectedTelop } from "./telop.js";
 import { openPosterTypographyDialog } from "./poster-typography-dialog.js";
 import {
   bindSoundEffect,
@@ -584,7 +585,7 @@ function _dispatchSplit() {
   try {
     if (state.editorTarget === "soundEffect") splitSelectedSoundEffect();
     else if (state.editorTarget === "videoLayer") splitSelectedVideoLayer();
-    else if (state.editorTarget === "telop") showToast("テロップは分割できません");
+    else if (state.editorTarget === "telop") splitSelectedTelop();
     else splitCutAtPlayhead();
   } catch (error) {
     console.error(error);
@@ -613,8 +614,8 @@ function _bindActionDropdown() {
     show(elements.actionCopyButton, true);
     // 貼り付けはクリップボードに項目があるときのみ。
     show(elements.actionPasteButton, !!(state.clipboard && state.clipboard.items?.length));
-    // 分割はカット / 効果音 / 動画のみ (テロップは不可)。
-    show(elements.actionSplitButton, target !== "telop");
+    // 分割はカット / テロップ / 効果音 / 動画のすべてで可能。
+    show(elements.actionSplitButton, true);
     // 一括追加は種別に応じて。カット選択時=カット一括追加、テロップ選択時=テロップ一括追加。
     show(elements.actionAddCutBatchButton, target === "cut");
     show(elements.actionAddTelopBatchButton, target === "telop");
@@ -1297,6 +1298,7 @@ function bindControls() {
   });
   elements.closeTelopEditorButton?.addEventListener("click", () => clearTelopSelection());
   elements.openSceneDialogButton?.addEventListener("click", openSceneDialog);
+  elements.openProjectSettingsDialogButton?.addEventListener("click", openProjectSettingsDialog);
   elements.linkToggleButton?.addEventListener("click", () => toggleLinkForSelection());
   elements.duplicateSelectedCutsButton?.addEventListener("click", () => {
     if (state.editorTarget === "telop") {
@@ -1347,23 +1349,10 @@ function bindControls() {
     }
     runPrerenderAll({ onProgress: _setPrerenderButtonUi });
   });
-  elements.splitCutAtPlayheadButton?.addEventListener("click", () => {
-    // editorTarget に応じて分割対象を切替: 効果音 / 動画レイヤー / (それ以外) カット
-    // 効果音 / 動画は新ファイルを生成せず、durationFrame・audioOffsetSec / trimStartSec・
-    // trimEndSec の調整で疑似分割する (= 編集中の素材は触らない)。
-    try {
-      if (state.editorTarget === "soundEffect") {
-        splitSelectedSoundEffect();
-      } else if (state.editorTarget === "videoLayer") {
-        splitSelectedVideoLayer();
-      } else {
-        splitCutAtPlayhead();
-      }
-    } catch (error) {
-      console.error(error);
-      showToast("分割に失敗しました", "error");
-    }
-  });
+  // editorTarget に応じて分割対象を切替 (操作プルダウンと同じ _dispatchSplit を共有)。
+  // テロップ / 効果音 / 動画は新ファイルを生成せず、durationFrame・audioOffsetSec /
+  // trimStartSec・trimEndSec の調整で疑似分割する (= 編集中の素材は触らない)。
+  elements.splitCutAtPlayheadButton?.addEventListener("click", _dispatchSplit);
   // ★ シーン設定ダイアログはモーダルでプレビューが遮られている (リアルタイム
   // プレビュー不可)。よってダイアログ内の input イベントは
   // applySceneFieldsFromDialog (= ローカル state 更新だけ、軽量) に留め、

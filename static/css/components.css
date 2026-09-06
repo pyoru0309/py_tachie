@@ -3763,3 +3763,54 @@ dialog::backdrop {
 #prerenderButton.is-running .button-icon {
   color: #ef4444;
 }
+
+/* ベッド設定 (BGM / 背景動画 / ビジュアライザ / 体の揺れ) のスコープ切替。
+   シーン設定ダイアログとプロジェクト設定ダイアログの両方に出る共有スイッチ。
+   base.css の `label { display: grid }` と `input { width: 100% }` を打ち消す
+   必要があるので、ラジオ側を明示的に上書きする。 */
+.bed-scope-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.06));
+}
+
+.bed-scope-label {
+  font-weight: 600;
+  font-size: 13px;
+  flex: 0 0 auto;
+}
+
+.bed-scope-row label.bed-scope-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.bed-scope-row input[type="radio"] {
+  width: auto;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.bed-scope-hint {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+/* 無効側 (このダイアログでは編集しても使われない) を淡くする */
+.bed-scope-inactive {
+  opacity: 0.5;
+}

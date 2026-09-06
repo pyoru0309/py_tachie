@@ -13,6 +13,13 @@ import { fontDisplayName, globalWeightLabel, weightItemsForFamily } from "./font
 import { TEXT_DEFAULT_LABELS, TELOP_DEFAULT_LABELS, TELOP_TOP_LEVEL_KEYS } from "./bulk-apply.js";
 import { renderPreview } from "./playback.js";
 import { renderTelopTrack, drawTimeline } from "./timeline.js";
+import {
+  BED_SCOPE_KEYS,
+  BED_SCOPE_FIELDS,
+  BED_SCOPE_LABELS,
+  bedScope,
+  projectSettings,
+} from "./scenario.js";
 import { renderTelopEditor } from "./telop.js";
 import {
   selectedCharacter,
@@ -70,9 +77,158 @@ function loadVisualizerPlugins() {
   return visualizerPluginsPromise;
 }
 
+// =============================================================================
+// ベッド設定ダイアログ (シーン設定 / プロジェクト設定 の 2 モード)
+//
+// 同じ <dialog id="sceneDialog"> を 2 つの入口から開く。編集対象は
+// state.bedEditTarget が決める:
+//   "scene"   → state.scenario.scenes[0]        (シーンごとの設定)
+//   "project" → state.scenario.projectSettings  (プロジェクト通しの設定)
+// どちらも同じ SceneBed の形なので、フォームの読み書きコードを共有できる。
+//
+// どちらが実際に再生・書き出しに使われるかは scenario.bedScope が決める
+// (項目ごとに独立)。ダイアログ内のスコープ切替はその bedScope を書き換える。
+// 詳細は dev_docs/plans/multi-scene.md §2。
+// =============================================================================
+
+function isProjectMode() {
+  return state.bedEditTarget === "project";
+}
+
+// 現在編集中のベッド設定オブジェクト。
+function bedTarget() {
+  if (isProjectMode()) return projectSettings();
+  return deps.activeScene();
+}
+
+// スコープ切替 UI (各タブの先頭) を現在値で塗り直す。
+// 「今開いているダイアログの側が実際に使われるか」を hint に出す。
+function syncBedScopeControls() {
+  const scope = bedScope();
+  const projectMode = isProjectMode();
+  for (const key of BED_SCOPE_KEYS) {
+    const row = document.querySelector(`.bed-scope-row[data-bed-scope="${key}"]`);
+    if (!row) continue;
+    for (const radio of row.querySelectorAll('input[type="radio"]')) {
+      radio.checked = radio.value === scope[key];
+    }
+    const active = projectMode ? scope[key] === "project" : scope[key] === "scene";
+    const panel = row.closest(".form-tab-panel");
+    if (panel) panel.classList.toggle("bed-scope-inactive", !active);
+    const hint = row.querySelector(`[data-bed-scope-hint="${key}"]`);
+    if (hint) {
+      const label = BED_SCOPE_LABELS[key] || key;
+      if (active) {
+        hint.textContent = projectMode
+          ? `${label}はプロジェクト通しです。ここでの設定が全シーンに適用されます。`
+          : `${label}はシーンごとです。ここでの設定はこのシーンにだけ適用されます。`;
+      } else {
+        hint.textContent = projectMode
+          ? `${label}はシーンごとに設定されています。ここでの設定は使われません（データは残ります）。`
+          : `${label}はプロジェクト通しに設定されています。ここでの設定は使われません（データは残ります）。`;
+      }
+    }
+  }
+}
+
+// 指定項目のスコープを切り替える。無効化される側に実データがあるときだけ確認する。
+async function requestBedScopeChange(key, nextScope) {
+  const scenario = state.scenario;
+  if (!scenario) return;
+  const current = bedScope()[key];
+  if (current === nextScope) return;
+  const label = BED_SCOPE_LABELS[key] || key;
+  // 無効化される側に実データがあるか (= 確認を出すべきか)。
+  const losing = current === "project"
+    ? [{ name: "プロジェクト設定", bed: projectSettings() }]
+    : (scenario.scenes || []).map((sc, i) => ({ name: sc.title || `シーン${i + 1}`, bed: sc }));
+  const withData = losing.filter((entry) => bedFieldsHaveData(key, entry.bed));
+  if (withData.length > 0) {
+    const names = withData.map((e) => e.name).join(" / ");
+    const toLabel = nextScope === "project" ? "プロジェクト通し" : "シーンごと";
+    // 破壊的操作ではない (データは残る) が、「どこの設定が効かなくなるか」を
+    // 明示しないと気づけないので確認を挟む。
+    const ok = window.confirm(
+      `${label}が ${names} に設定されています。\n\n`
+      + `「${toLabel}」に切り替えると、これらは再生・書き出しに使われなくなります。\n`
+      + `設定自体は残るので、いつでも戻せます。`,
+    );
+    if (!ok) {
+      syncBedScopeControls();
+      return;
+    }
+  }
+  scenario.bedScope = { ...bedScope(), [key]: nextScope };
+  // 制約: viz をプロジェクト通しにするなら BGM も (audioTrackId が BGM を指すため)。
+  if (key === "visualizer" && nextScope === "project" && scenario.bedScope.bgm !== "project") {
+    scenario.bedScope.bgm = "project";
+    showToast("ビジュアライザに合わせて BGM もプロジェクト通しにしました");
+  }
+  syncBedScopeControls();
+  deps.scheduleScenarioSave();
+  recordHistory();
+  renderPreview();
+  drawTimeline();
+}
+
+// 指定スコープ項目に「実データ」が入っているか。確認ダイアログの要否判定に使う。
+function bedFieldsHaveData(key, bed) {
+  if (!bed) return false;
+  for (const field of BED_SCOPE_FIELDS[key] || []) {
+    const value = bed[field];
+    if (field === "bgmTracks") {
+      if (Array.isArray(value) && value.some((t) => t && t.src)) return true;
+    } else if (field === "videoTrack") {
+      if (value && value.src) return true;
+    } else if (field === "visualizer") {
+      if (value && value.enabled) return true;
+    } else if (field === "breath" || field === "bpmBob") {
+      if (Number(value?.amplitudePx) > 0) return true;
+    } else if (value) {
+      return true;
+    }
+  }
+  return false;
+}
+
+let bedScopeControlsBound = false;
+function ensureBedScopeControlsBound() {
+  if (bedScopeControlsBound) return;
+  bedScopeControlsBound = true;
+  for (const key of BED_SCOPE_KEYS) {
+    const row = document.querySelector(`.bed-scope-row[data-bed-scope="${key}"]`);
+    if (!row) continue;
+    for (const radio of row.querySelectorAll('input[type="radio"]')) {
+      radio.addEventListener("change", () => {
+        if (!radio.checked) return;
+        requestBedScopeChange(key, radio.value).catch((err) => {
+          console.error(err);
+          showToast("適用範囲の切り替えに失敗しました", "error");
+        });
+      });
+    }
+  }
+}
+
 export function fillSceneDialog() {
-  const scene = deps.activeScene();
-  if (elements.sceneTitle) elements.sceneTitle.value = scene.title || "";
+  const scene = bedTarget();
+  const projectMode = isProjectMode();
+  if (elements.sceneTitleField) elements.sceneTitleField.hidden = projectMode;
+  if (elements.sceneTitle) elements.sceneTitle.value = projectMode ? "" : (scene.title || "");
+  if (elements.sceneDialogTitle) {
+    elements.sceneDialogTitle.textContent = projectMode ? "プロジェクト設定" : "シーン設定";
+  }
+  if (elements.sceneDialogDescription) {
+    elements.sceneDialogDescription.textContent = projectMode
+      ? "BGM・背景動画・ビジュアライザ・体の揺れを、プロジェクト全体に通して設定します"
+      : "背景動画・BGM・テンポ等のシーン全体に対する設定";
+  }
+  if (elements.sceneBpmHint) {
+    // テンポは排他スコープを持たない「上書き型」。シーン側が空欄ならプロジェクト値。
+    elements.sceneBpmHint.textContent = projectMode
+      ? "テンポは体の揺れ (BPM ボブ) とビジュアライザの拍同期が参照します。シーン側が空欄のシーンで、ここの値が使われます。"
+      : "テンポは体の揺れ (BPM ボブ) とビジュアライザの拍同期が参照します。空欄にすると、プロジェクト設定の値が使われます。";
+  }
   if (elements.sceneBpm) elements.sceneBpm.value = scene.bpm == null ? "" : Number(scene.bpm);
   const breath = scene.breath || {};
   if (elements.sceneBreathAmplitude)
@@ -102,7 +258,7 @@ export function fillSceneDialog() {
 // =============================================================================
 
 async function fillSceneVisualizerSection() {
-  const scene = deps.activeScene();
+  const scene = bedTarget();
   if (!scene.visualizer || typeof scene.visualizer !== "object") {
     scene.visualizer = { enabled: false, pluginKey: "", audioTrackId: "", layer: "above_bg", params: {} };
   }
@@ -349,9 +505,12 @@ export function readSceneVideoTrack() {
 // 価値がない。重い副作用は ``commitSceneFromDialog()`` (= ダイアログを閉じるとき)
 // にまとめて 1 回だけ実行する設計に変更した。
 export function applySceneFieldsFromDialog() {
-  const scene = deps.activeScene();
+  const scene = bedTarget();
   if (!scene) return;
-  scene.title = String(elements.sceneTitle?.value || "シーン1");
+  // タイトルはシーン固有 (プロジェクト設定には無い)。
+  if (!isProjectMode()) {
+    scene.title = String(elements.sceneTitle?.value || "シーン1");
+  }
   const bpmRaw = elements.sceneBpm?.value;
   scene.bpm = bpmRaw === "" ? null : Math.max(0, Number(bpmRaw) || 0);
   scene.videoTrack = readSceneVideoTrack();
@@ -382,7 +541,7 @@ export function commitSceneFromDialog() {
 
 export function renderSceneBgmList() {
   if (!elements.sceneBgmList) return;
-  const scene = deps.activeScene();
+  const scene = bedTarget();
   if (!Array.isArray(scene.bgmTracks)) scene.bgmTracks = [];
   const tracks = scene.bgmTracks;
   elements.sceneBgmList.innerHTML = "";
@@ -534,7 +693,7 @@ export function renderSceneBgmList() {
 }
 
 export function addSceneBgmTrack() {
-  const scene = deps.activeScene();
+  const scene = bedTarget();
   if (!Array.isArray(scene.bgmTracks)) scene.bgmTracks = [];
   scene.bgmTracks.push({
     src: "",
@@ -573,11 +732,22 @@ function ensureSceneDialogTabsBound() {
   }
 }
 
+export function openProjectSettingsDialog() {
+  openBedDialog("project");
+}
+
 export function openSceneDialog() {
+  openBedDialog("scene");
+}
+
+function openBedDialog(mode) {
   if (!elements.sceneDialog) return;
+  state.bedEditTarget = mode === "project" ? "project" : "scene";
   ensureSceneDialogTabsBound();
+  ensureBedScopeControlsBound();
   setSceneDialogTab("basic");
   fillSceneDialog();
+  syncBedScopeControls();
   if (typeof elements.sceneDialog.showModal === "function") {
     elements.sceneDialog.showModal();
   } else {

@@ -221,6 +221,7 @@ from .scenario import (
     ensure_expression_presets,
     ensure_placement_presets,
     ensure_scenario,
+    resolve_effective_scene,
     first_character_id,
     normalize_character_state,
     normalize_cut_state,
@@ -2164,6 +2165,11 @@ def _save_scenario_to_ctx(ctx, payload: dict[str, Any]) -> dict[str, Any]:
         raw_input["scenes"] = payload["scenes"]
     else:
         raw_input["cuts"] = payload["cuts"]
+    # ベッド設定の二層化 (dev_docs/plans/multi-scene.md)。normalize_scenario が
+    # 既定値のときはキーごと落とすので、そのまま素通しでよい。
+    for key in ("projectSettings", "bedScope"):
+        if key in payload:
+            raw_input[key] = payload[key]
     scenario = normalize_scenario(raw_input, ensure_manifest(ctx))
     ctx.scenario_path.parent.mkdir(parents=True, exist_ok=True)
     with ctx.scenario_path.open("w", encoding="utf-8") as handle:
@@ -2284,7 +2290,9 @@ def _build_preview_visualizer(
         for scene in scenario.get("scenes") or []:
             for cut in scene.get("cuts") or []:
                 if str(cut.get("id") or "") == cut_id:
-                    target_scene = scene
+                    # ベッド設定 (visualizer / bgmTracks) を bedScope に従って解決する。
+                    # override_scene 経路は呼び出し側で解決済みなのでここを通らない。
+                    target_scene = resolve_effective_scene(scenario, scene)
                     target_cut = cut
                     break
             if target_scene is not None:
@@ -2448,10 +2456,17 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
     cut_id_for_lookup = str(payload.get("cutId") or "")
     target_scene_for_lookup: dict[str, Any] | None = None
     target_cut_for_lookup: dict[str, Any] | None = None
+    # ベッド設定 (projectSettings / bedScope) の供給元。ディスクの scenario を
+    # 既定にし、sceneOverride が乗っていればそちらで上書きする。
+    bed_source: dict[str, Any] = {}
     if cut_id_for_lookup:
         try:
             _t_scn0 = _perf()
             scenario_for_lookup = ensure_scenario(manifest, ctx)
+            bed_source = {
+                "projectSettings": scenario_for_lookup.get("projectSettings"),
+                "bedScope": scenario_for_lookup.get("bedScope"),
+            }
             _timing_ms["scenario"] = _timing_ms.get("scenario", 0.0) + (_perf() - _t_scn0) * 1000.0
             for scene_iter in scenario_for_lookup.get("scenes") or []:
                 cuts_iter = scene_iter.get("cuts") or []
@@ -2478,6 +2493,10 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
         for key in ("telops", "videoTrack", "bgmTracks", "soundEffects", "videoLayers", "visualizer", "bpm", "breath", "bpmBob"):
             if key in scene_override:
                 target_scene_for_lookup[key] = scene_override[key]
+        # プロジェクト通しのベッド設定も live state を優先する (シーン設定と同じ理由)。
+        for key in ("projectSettings", "bedScope"):
+            if key in scene_override:
+                bed_source[key] = scene_override[key]
         # cuts も override に乗っていれば差し替える (cut の startFrame / durationFrame
         # 編集が即時反映されるように)。該当 cut も live cut で上書き。
         override_cuts = scene_override.get("cuts")
@@ -2487,6 +2506,11 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
                 if isinstance(cut_iter, dict) and str(cut_iter.get("id") or "") == cut_id_for_lookup:
                     target_cut_for_lookup = cut_iter
                     break
+    # bedScope に従い、シーンのベッド設定をプロジェクト通し設定で差し替える。
+    # 以降の視覚化 / videoTrack / idleMotion / 背景の読み出しはすべてこの
+    # 「解決済みシーン」を見るので、二層化を意識せずに済む。
+    if target_scene_for_lookup is not None:
+        target_scene_for_lookup = resolve_effective_scene(bed_source, target_scene_for_lookup)
     visualizer_spec_for_token: dict[str, Any] | None = (
         (target_scene_for_lookup.get("visualizer") or {})
         if target_scene_for_lookup else None

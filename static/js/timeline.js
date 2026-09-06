@@ -29,6 +29,7 @@ import {
   sceneLaneCount,
   cutTransition,
   recalcCutStartSec,
+  activeSceneResolved,
 } from "./scenario.js";
 import { recordHistory } from "./history.js";
 import { resolveShortcutAction } from "./shortcuts.js";
@@ -208,7 +209,8 @@ state.timelineWaveformLoading = false;
 state.timelineWaveformToken = 0;
 
 export function timelineEffectiveDurationSec() {
-  const scene = state.scenario?.scenes?.[0];
+  // videoTrack はベッド設定 (プロジェクト通し可) なので解決済みシーンで読む。
+  const scene = activeSceneResolved();
   const cuts = state.scenario?.cuts || [];
   const telops = scene?.telops || [];
   let total = 0;
@@ -396,7 +398,8 @@ function drawTimelineRuler(ctx, view) {
     ctx.fillText(formatTimecodeSec(t), x + 3, (layout.prerenderStripHeight || 3) + 1);
   }
   // 拍 (BPM)
-  const bpm = Number(state.scenario?.scenes?.[0]?.bpm) || 0;
+  // BPM グリッドと口パク波形はベッド設定 (プロジェクト通し可) を解決して読む。
+  const bpm = Number(activeSceneResolved()?.bpm) || 0;
   if (bpm > 0) {
     const beatSec = 60 / bpm;
     const beatBegin = Math.floor(tStart / beatSec) * beatSec;
@@ -465,7 +468,7 @@ function drawTimelineWaveform(ctx, view) {
       ctx.fillStyle = palette.fgFaint;
       ctx.font = "10px sans-serif";
       ctx.textBaseline = "middle";
-      const lipBgm = (state.scenario?.scenes?.[0]?.bgmTracks || []).find((b) => b && b.useForLipSync && b.src);
+      const lipBgm = (activeSceneResolved()?.bgmTracks || []).find((b) => b && b.useForLipSync && b.src);
       ctx.fillText(lipBgm ? "（波形を読み込めませんでした）" : "（口パク用 BGM 未指定）", scrollLeft + 8, midY);
     }
     ctx.restore();
@@ -1189,7 +1192,7 @@ export function seekPlayheadToEnd() {
 }
 
 export async function ensureTimelineWaveform() {
-  const scene = state.scenario?.scenes?.[0];
+  const scene = activeSceneResolved();
   const lipBgm = (scene?.bgmTracks || []).find((b) => b && b.useForLipSync && b.src);
   if (!lipBgm) {
     if (state.timelineWaveform) {

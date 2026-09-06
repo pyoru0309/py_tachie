@@ -3,7 +3,10 @@ import { elements } from "./elements.js";
 import { showToast } from "./toast.js";
 import { drawTimeline, autoScrollTimelineToCursor, autoScrollCutListToActive } from "./timeline.js";
 import { PROJECT_FPS, clampCharacterAnimationFps } from "./timecode.js";
-import { cutStartFrame, cutDurationFrame, cutStartSec, cutDurationSec, cutTransition } from "./scenario.js";
+import {
+  cutStartFrame, cutDurationFrame, cutStartSec, cutDurationSec, cutTransition,
+  activeSceneResolved, projectSettings, bedScope,
+} from "./scenario.js";
 import { captureAndUploadThumbnail } from "./thumbnail.js";
 import { createPreviewScheduler, PRIORITY } from "./preview-scheduler.js";
 import { setCutPrerenderStatus } from "./prerender.js";
@@ -1839,7 +1842,9 @@ function resetAudioMeter() {
 }
 
 function sceneIdleMotionConfig() {
-  const scene = state.scenario?.scenes?.[0];
+  // 体の揺れ (breath / bpmBob) と BPM は bedScope でプロジェクト通しにできるので、
+  // 解決済みシーンから読む (dev_docs/plans/multi-scene.md §2)。
+  const scene = activeSceneResolved();
   if (!scene) return null;
   return {
     bpm: scene.bpm == null ? null : Number(scene.bpm) || 0,
@@ -2043,7 +2048,7 @@ async function renderPreviewV2(cut, requestId) {
   const v2 = await loadRendererV2();
   v2.initRenderer(canvas);
 
-  const sceneVideo = state.scenario?.scenes?.[0]?.videoTrack || null;
+  const sceneVideo = activeSceneResolved()?.videoTrack || null;
   const hasVideoTrack = !!(sceneVideo && sceneVideo.src);
   layerData.hasVideoTrack = hasVideoTrack;
   // 動画レイヤー: A1 の時間窓フィルタを停止プレビューにも適用。
@@ -2256,6 +2261,11 @@ async function fetchSceneBundleV2(cut, options = {}) {
     ...(liveScene
       ? {
           sceneOverride: {
+            // ベッド設定の二層化: サーバは bedScope に従ってシーン設定を
+            // projectSettings で差し替える。編集直後の即時反映のため live state
+            // をそのまま送る (dev_docs/plans/multi-scene.md §2)。
+            projectSettings: projectSettings(),
+            bedScope: bedScope(),
             telops: Array.isArray(liveScene.telops) ? liveScene.telops : [],
             videoTrack: liveScene.videoTrack || null,
             bgmTracks: Array.isArray(liveScene.bgmTracks) ? liveScene.bgmTracks : [],
@@ -2888,7 +2898,7 @@ export async function playLiveCutV2(cut, _options = {}) {
   // VideoTexture のソースとして scene-builder へ渡す。video element 自体は
   // DOM に残し続ける (currentTime 操作などの API のため)。canvas の bg plane
   // が opaque になり画面では完全に隠れるので、見た目上の重複は無し。
-  const sceneVideo = state.scenario?.scenes?.[0]?.videoTrack || null;
+  const sceneVideo = activeSceneResolved()?.videoTrack || null;
   const hasVideoTrack = !!(sceneVideo && sceneVideo.src);
   layerData.hasVideoTrack = hasVideoTrack;
   // 動画レイヤー: live state を最新として注入 + A1 の時間窓フィルタ。
@@ -3443,7 +3453,7 @@ export async function playPreviewPlayback() {
     }
 
     state.playbackStartTimelineSec = startTimelineSec;
-    await startLivePreviewBgm(state.scenario?.scenes?.[0], startTimelineSec);
+    await startLivePreviewBgm(activeSceneResolved(), startTimelineSec);
     if (!state.isPlaying) return;
     startLivePreviewSoundEffects(state.scenario?.scenes?.[0], startTimelineSec);
     state.playbackStartWallclockMs = performance.now();
