@@ -3640,19 +3640,15 @@ dialog::backdrop {
 .overflow-menu > .dropdown-button.open > button .dropdown-caret {
   transform: rotate(-90deg); /* overflow 内では回転アニメは抑止 */
 }
+/* サブメニューは右へ fly-out。開いたときの実座標 (画面端での左反転を含む) は
+   popup-menu.js の placeFloatingMenu が position:fixed で上書きする。
+   ここの値は fixed 化される前の一瞬に使われる初期位置。 */
 .overflow-menu > .dropdown-button > .dropdown-menu {
   top: 0;
   left: 100%;
   right: auto;
   margin-top: 0;
   margin-left: 4px;
-}
-/* 画面右端にぶつかる場合は左反転 (JS が flip-left class を付ける)。 */
-.overflow-menu > .dropdown-button.flip-left > .dropdown-menu {
-  left: auto;
-  right: 100%;
-  margin-left: 0;
-  margin-right: 4px;
 }
 
 /* テロップ編集パネル側の「テンプレ生成由来」表示 */
@@ -3810,7 +3806,33 @@ dialog::backdrop {
   margin: 0;
 }
 
-/* 無効側 (このダイアログでは編集しても使われない) を淡くする */
-.bed-scope-inactive {
+/* 無効側 (このダイアログでは編集しても使われない) のフィールドを淡くする。
+   ★ 適用範囲の切替 (.bed-scope-row) 自体は淡くしない。パネル全体に opacity を
+   掛けると切替スイッチまで無効に見えて「ここでは切り替えられない」と誤解される
+   (opacity は stacking context を作るので、子側の opacity:1 では戻せない)。
+   そのため .bed-scope-row を除いた直下の子だけを対象にする。 */
+.bed-scope-inactive > *:not(.bed-scope-row) {
   opacity: 0.5;
+}
+
+/* 無効側では、操作できる唯一の要素である切替スイッチを少し強調する。 */
+.bed-scope-inactive > .bed-scope-row {
+  border-color: var(--accent);
+}
+
+/* シーン設定ダイアログ内の小見出し (シーン入りトランジション等)。 */
+.scene-subheading {
+  margin: 18px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+/* シーン入りトランジションに上書きされているカットへの注記。 */
+.scene-transition-override-note {
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+  margin-bottom: 10px;
 }

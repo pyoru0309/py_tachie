@@ -77,6 +77,7 @@ from .utils import (
     read_project_file,
     relative_to_root,
     set_active_project,
+    fallback_project_id,
     slugify_project_id,
     unique_project_id,
     write_project_file,
@@ -977,11 +978,10 @@ def delete_project(project_id: str, payload: dict[str, Any] | None = None) -> di
         raise HTTPException(status_code=400, detail="Project name confirmation does not match")
     shutil.rmtree(ctx.root)
     if was_active:
-        remaining = sorted(current_projects_dir().glob("*/project.json"))
-        if remaining:
-            set_active_project(remaining[0].parent.name)
-        else:
-            set_active_project("")
+        # 削除したのがアクティブなら「最後に開いたプロジェクト」へ寄せる。
+        # 旧実装はアルファベット順の先頭を選んでいたため、まったく関係の無い
+        # プロジェクトへ黙って飛んでいた。
+        set_active_project(fallback_project_id())
     return {"deleted": ctx.id, "activeProjectId": active_project_id()}
 
 

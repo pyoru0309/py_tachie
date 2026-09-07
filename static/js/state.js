@@ -97,6 +97,12 @@ export const state = {
   // 起動時に /api/tts/state を fetch して入れ、以降は全体設定 / キャラ紐付け /
   // セリフパネルから参照する。
   tts: null,
+  // 再生中に今 BGM を鳴らしているシーン ID。シーン境界で張り替える判定に使う
+  // (シーンごと BGM のときのみ。プロジェクト通しでは null 固定)。
+  playbackBgmSceneId: null,
+  // タイムラインのシーンレーンで選択中のシーン ID (null = 未選択)。
+  // シーン設定ダイアログの編集対象と、レーンのハイライトに使う。
+  selectedSceneId: null,
   // ベッド設定ダイアログ (シーン設定 / プロジェクト設定) の編集対象。
   // "scene" = scenario.scenes[0] / "project" = scenario.projectSettings。
   // 詳細は dev_docs/plans/multi-scene.md §2。

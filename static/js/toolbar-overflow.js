@@ -3,6 +3,12 @@
 // 移動して常に 1 段に収める。余裕が出たら元の位置に自動復帰する。
 
 import { elements } from "./elements.js";
+import {
+  registerPopup,
+  closeOtherPopups,
+  placeFloatingMenu,
+  clearFloatingMenu,
+} from "./popup-menu.js";
 
 /**
  * @param {Object} opts
@@ -56,41 +62,47 @@ export function bindToolbarOverflow({
     return null;
   };
 
+  // メニューを開いている間に振り分けを走らせない (要素を DOM 間で移動するので、
+  // 開いたままだと中身が入れ替わり、fixed 座標も迷子になる)。要求は溜めておいて
+  // 閉じたときに実行する。ウィンドウリサイズでは popup-menu 側が先に閉じるので
+  // 通常の経路は塞がらない。
+  let deferredUpdate = false;
+
   const closeMenu = () => {
     if (overflowMenu.hidden) return;
     overflowMenu.hidden = true;
+    clearFloatingMenu(overflowMenu);
     overflowButton.setAttribute("aria-expanded", "false");
     // 内部の dropdown 子も閉じる
     overflowMenu.querySelectorAll(".dropdown-button.open").forEach((el) => {
       el.classList.remove("open");
       const sub = el.querySelector(".dropdown-menu");
-      if (sub) sub.hidden = true;
+      if (sub) {
+        sub.hidden = true;
+        clearFloatingMenu(sub);
+      }
       const trig = el.querySelector("[aria-expanded]");
       if (trig) trig.setAttribute("aria-expanded", "false");
     });
+    // 開いている間に溜まった振り分け要求を消化する。
+    if (deferredUpdate) {
+      deferredUpdate = false;
+      scheduleUpdate();
+    }
   };
 
   const openMenu = () => {
+    // 他のプルダウンが開いていたら閉じる (trigger が stopPropagation するため、
+    // 外側クリック判定だけでは閉じない)。
+    closeOtherPopups(overflowContainer);
     overflowMenu.hidden = false;
     overflowButton.setAttribute("aria-expanded", "true");
-    // サブメニュー (.dropdown-button) の右出し fly が画面右端にぶつかる場合は
-    // .flip-left クラスで左反転する (CSS が対応)。
-    overflowMenu.querySelectorAll(".dropdown-button").forEach((db) => {
-      const sub = db.querySelector(".dropdown-menu");
-      if (!sub) return;
-      db.classList.remove("flip-left");
-      const wasHidden = sub.hidden;
-      // 測定のため visibility:hidden 相当で一時表示
-      sub.style.visibility = "hidden";
-      sub.hidden = false;
-      const rect = sub.getBoundingClientRect();
-      sub.hidden = wasHidden;
-      sub.style.visibility = "";
-      if (rect.right > window.innerWidth - 8) {
-        db.classList.add("flip-left");
-      }
-    });
+    // overflow:hidden の祖先に切られないよう fixed へ逃がして右端に揃える。
+    // 中のサブメニューの右出し / 左反転は placeFloatingMenu が開くときに決める。
+    placeFloatingMenu(overflowMenu, overflowButton, { align: "end" });
   };
+
+  registerPopup(overflowContainer, closeMenu);
 
   let scheduled = false;
   const scheduleUpdate = () => {
@@ -103,6 +115,10 @@ export function bindToolbarOverflow({
   };
 
   const update = () => {
+    if (!overflowMenu.hidden) {
+      deferredUpdate = true;
+      return;
+    }
     // 一旦すべて戻して、現状の幅で再評価 (= 余裕が出たら自動復帰)。
     restoreAll();
     // ★ 2 段階判定:

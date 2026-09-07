@@ -19,6 +19,7 @@ import {
   BED_SCOPE_LABELS,
   bedScope,
   projectSettings,
+  sceneAtFrame,
 } from "./scenario.js";
 import { renderTelopEditor } from "./telop.js";
 import {
@@ -98,7 +99,18 @@ function isProjectMode() {
 // 現在編集中のベッド設定オブジェクト。
 function bedTarget() {
   if (isProjectMode()) return projectSettings();
-  return deps.activeScene();
+  return selectedScene();
+}
+
+// シーン設定の編集対象。タイムラインのシーンレーンで選択中のシーン、
+// 未選択なら再生ヘッド位置のシーン、それも無ければ先頭。
+function selectedScene() {
+  const scenes = state.scenario?.scenes || [];
+  if (scenes.length === 0) return null;
+  const byId = scenes.find((s) => s.id === state.selectedSceneId);
+  if (byId) return byId;
+  const frame = Math.round((Number(state.timeline?.currentSec) || 0) * 24);
+  return sceneAtFrame(frame) || scenes[0];
 }
 
 // スコープ切替 UI (各タブの先頭) を現在値で塗り直す。
@@ -222,6 +234,43 @@ export function fillSceneDialog() {
     elements.sceneDialogDescription.textContent = projectMode
       ? "BGM・背景動画・ビジュアライザ・体の揺れを、プロジェクト全体に通して設定します"
       : "背景動画・BGM・テンポ等のシーン全体に対する設定";
+  }
+  // シーン入りトランジション (Phase 3)。シーン固有なのでプロジェクト設定では隠す。
+  if (elements.sceneTransitionField) elements.sceneTransitionField.hidden = projectMode;
+  // シーンの結合 (区切りを消す) はシーンモードのときだけ。先頭 / 末尾では
+  // 対応する向きのボタンを無効化する。
+  if (elements.sceneMergeField) elements.sceneMergeField.hidden = projectMode;
+  if (!projectMode) {
+    const list = state.scenario?.scenes || [];
+    const index = list.findIndex((s) => s.id === scene?.id);
+    if (elements.sceneMergePrevButton) {
+      elements.sceneMergePrevButton.disabled = index <= 0;
+      elements.sceneMergePrevButton.title = index > 0
+        ? `「${list[index - 1].title}」と 1 つにまとめます（「${list[index - 1].title}」の設定が残ります）`
+        : "先頭のシーンには前のシーンがありません";
+    }
+    if (elements.sceneMergeNextButton) {
+      const hasNext = index >= 0 && index < list.length - 1;
+      elements.sceneMergeNextButton.disabled = !hasNext;
+      elements.sceneMergeNextButton.title = hasNext
+        ? `「${list[index + 1].title}」と 1 つにまとめます（このシーンの設定が残ります）`
+        : "最後のシーンには次のシーンがありません";
+    }
+
+    const tr = (scene && typeof scene.transition === "object") ? scene.transition : null;
+    const type = tr && tr.type ? String(tr.type) : "none";
+    if (elements.sceneTransitionType) elements.sceneTransitionType.value = type;
+    if (elements.sceneTransitionDuration) {
+      const df = tr ? Math.max(0, Math.round(Number(tr.durationFrame) || 0)) : 0;
+      elements.sceneTransitionDuration.value = String(df > 0 ? df : 12);
+    }
+    if (elements.sceneTransitionWipeDir) {
+      const dir = tr && tr.wipeDirection ? String(tr.wipeDirection) : "right";
+      elements.sceneTransitionWipeDir.value = ["right", "left", "up", "down"].includes(dir) ? dir : "right";
+    }
+    if (elements.sceneTransitionWipeDirLabel) {
+      elements.sceneTransitionWipeDirLabel.hidden = type !== "wipe";
+    }
   }
   if (elements.sceneBpmHint) {
     // テンポは排他スコープを持たない「上書き型」。シーン側が空欄ならプロジェクト値。
@@ -507,9 +556,23 @@ export function readSceneVideoTrack() {
 export function applySceneFieldsFromDialog() {
   const scene = bedTarget();
   if (!scene) return;
-  // タイトルはシーン固有 (プロジェクト設定には無い)。
+  // タイトルとトランジションはシーン固有 (プロジェクト設定には無い)。
   if (!isProjectMode()) {
     scene.title = String(elements.sceneTitle?.value || "シーン1");
+    const type = String(elements.sceneTransitionType?.value || "none");
+    if (type === "none") {
+      delete scene.transition;
+    } else {
+      const df = Math.max(1, Math.round(Number(elements.sceneTransitionDuration?.value) || 12));
+      scene.transition = { type, durationFrame: df };
+      if (type === "wipe") {
+        const dir = String(elements.sceneTransitionWipeDir?.value || "right");
+        scene.transition.wipeDirection = ["right", "left", "up", "down"].includes(dir) ? dir : "right";
+      }
+    }
+    if (elements.sceneTransitionWipeDirLabel) {
+      elements.sceneTransitionWipeDirLabel.hidden = type !== "wipe";
+    }
   }
   const bpmRaw = elements.sceneBpm?.value;
   scene.bpm = bpmRaw === "" ? null : Math.max(0, Number(bpmRaw) || 0);
@@ -743,6 +806,11 @@ export function openSceneDialog() {
 function openBedDialog(mode) {
   if (!elements.sceneDialog) return;
   state.bedEditTarget = mode === "project" ? "project" : "scene";
+  // シーンモードでは編集対象を確定させておく (未選択なら再生ヘッド位置のシーン)。
+  if (state.bedEditTarget === "scene") {
+    const scene = selectedScene();
+    state.selectedSceneId = scene?.id || null;
+  }
   ensureSceneDialogTabsBound();
   ensureBedScopeControlsBound();
   setSceneDialogTab("basic");

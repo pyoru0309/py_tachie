@@ -30,6 +30,10 @@ import {
   cutTransition,
   recalcCutStartSec,
   activeSceneResolved,
+  sceneSpans,
+  syncSelectedSceneToCurrent,
+  TIMELINE_ITEM_KINDS,
+  effectiveCutTransition,
 } from "./scenario.js";
 import { recordHistory } from "./history.js";
 import { resolveShortcutAction } from "./shortcuts.js";
@@ -38,6 +42,12 @@ import { showToast } from "./toast.js";
 
 let deps = {
   selectTelop: () => {},
+  // シーン操作 (scene-ops.js) と シーン設定ダイアログ (dialog.js) への橋渡し。
+  setSceneBoundary: () => false,
+  nearestCutBoundaryIndex: () => 0,
+  clampItemStartToScene: (start) => start,
+  clampItemDurationToScene: (start, dur) => dur,
+  openSceneDialog: () => {},
   clearTelopSelection: () => {},
   setMultiTelopSelection: () => {},
   scheduleScenarioSave: () => {},
@@ -78,7 +88,7 @@ function selectedTelopIdSet() {
 function selectedTelops() {
   const ids = selectedTelopIdSet();
   if (ids.size === 0) return [];
-  const telops = state.scenario?.scenes?.[0]?.telops || [];
+  const telops = state.scenario?.telops || [];
   return telops.filter((t) => t && ids.has(t.id));
 }
 
@@ -92,19 +102,24 @@ const LANE_HEIGHT = 36;            // テロップ / 効果音 / 動画 / カッ
 const RULER_HEIGHT = 22;
 const WAVE_HEIGHT = 46;
 const PRERENDER_STRIP_HEIGHT = 3;
+const SCENE_HEIGHT = 28;           // シーンレーン。カットより低くして「上位の帯」に見せる
 // 上部の固定ヘッダ領域 (ruler + wave + cut レーン) は縦スクロールしない。
 // telop / se / vl レーン群だけが縦スクロールする。
 
-// レーン構成を scene.laneCounts から動的に計算する。
-// 並び順 (上→下): ruler → wave → cut(単一・常設) → telop[n] → se[n] → vl[n]
+// レーン構成を laneCounts から動的に計算する。
+// 並び順 (上→下): ruler → wave → scene → cut(単一・常設) → telop[n] → se[n] → vl[n]
 function computeTimelineLayout() {
-  const scene = state.scenario?.scenes?.[0] || null;
+  const scene = state.scenario || null;
   const telopLanes = sceneLaneCount(scene, "telop");
   const seLanes = sceneLaneCount(scene, "soundEffect");
   const vlLanes = sceneLaneCount(scene, "videoLayer");
   const rulerTop = 0;
   const waveTop = rulerTop + RULER_HEIGHT;
-  const cutTop = waveTop + WAVE_HEIGHT;        // カットレーン (R3: 常設・単一・full height)
+  // シーンレーンはカットレーンの真上。シーンはカットの集まりなので、
+  // 上に置くことで包含関係が見た目に出る (dev_docs/plans/multi-scene.md §3.1)。
+  const sceneTop = waveTop + WAVE_HEIGHT;
+  const sceneHeight = SCENE_HEIGHT;
+  const cutTop = sceneTop + sceneHeight;        // カットレーン (R3: 常設・単一・full height)
   const cutHeight = LANE_HEIGHT;
   const telopTop = cutTop + cutHeight;
   const seTop = telopTop + telopLanes * LANE_HEIGHT;
@@ -113,6 +128,7 @@ function computeTimelineLayout() {
   return {
     rulerTop, rulerHeight: RULER_HEIGHT,
     waveTop, waveHeight: WAVE_HEIGHT,
+    sceneTop, sceneHeight,
     cutTop, cutHeight,
     telopTop, telopHeight: LANE_HEIGHT, telopLanes,
     seTop, seHeight: LANE_HEIGHT, seLanes,
@@ -161,7 +177,7 @@ export function timelineFrameFps() {
 
 // R2: 種別 ("telop" | "soundEffect" | "videoLayer") のレーンを 1 つ追加する。
 export function addTimelineLane(kind) {
-  const scene = state.scenario?.scenes?.[0];
+  const scene = state.scenario;
   if (!scene) return;
   if (!scene.laneCounts || typeof scene.laneCounts !== "object") {
     scene.laneCounts = { telop: 1, soundEffect: 1, videoLayer: 1 };
@@ -176,7 +192,7 @@ export function addTimelineLane(kind) {
 
 // R2: 末尾の空きレーンを 1 つ削除する (アイテムが乗っているレーンは消さない)。
 export function removeEmptyTimelineLane(kind) {
-  const scene = state.scenario?.scenes?.[0];
+  const scene = state.scenario;
   if (!scene) return;
   const key = kind === "soundEffect" ? "soundEffect" : kind === "videoLayer" ? "videoLayer" : "telop";
   const cur = sceneLaneCount(scene, key);
@@ -209,8 +225,10 @@ state.timelineWaveformLoading = false;
 state.timelineWaveformToken = 0;
 
 export function timelineEffectiveDurationSec() {
-  // videoTrack はベッド設定 (プロジェクト通し可) なので解決済みシーンで読む。
-  const scene = activeSceneResolved();
+  // タイムラインアイテムは編集面 (プロジェクト全体のフラット配列) から、
+  // videoTrack はベッド設定 (プロジェクト通し可) なので解決済みシーンから読む。
+  const bed = activeSceneResolved();
+  const scene = state.scenario;
   const cuts = state.scenario?.cuts || [];
   const telops = scene?.telops || [];
   let total = 0;
@@ -222,7 +240,7 @@ export function timelineEffectiveDurationSec() {
     const end = telopStartSec(telop) + telopDurationSec(telop);
     if (end > total) total = end;
   }
-  const videoTrim = scene?.videoTrack;
+  const videoTrim = bed?.videoTrack;
   if (videoTrim && videoTrim.trimEndSec != null) {
     const span = Math.max(0, Number(videoTrim.trimEndSec) - Number(videoTrim.trimStartSec || 0));
     if (span > total) total = span;
@@ -310,6 +328,7 @@ export function drawTimeline() {
   drawTimelineRuler(ctx, view);
   drawTimelinePrerenderStrip(ctx, view);
   drawTimelineWaveform(ctx, view);
+  drawTimelineScenes(ctx, view);
   drawTimelineCuts(ctx, view);
   // レーン群 (縦スクロール対象): telop / se / vl を clip + 縦 translate して描く。
   ctx.save();
@@ -337,7 +356,7 @@ function drawTimelineBackground(ctx, view) {
   // 固定ヘッダの境界線 (ruler/wave/cut)。レーン群の境界は各レーン描画側で引く。
   ctx.strokeStyle = palette.border;
   ctx.lineWidth = 1;
-  for (const y of [layout.waveTop, layout.cutTop, layout.telopTop]) {
+  for (const y of [layout.waveTop, layout.sceneTop, layout.cutTop, layout.telopTop]) {
     ctx.beginPath();
     ctx.moveTo(0, y + 0.5);
     ctx.lineTo(cssW, y + 0.5);
@@ -545,7 +564,7 @@ function drawTimelineTelops(ctx, view) {
   const { cssW, layout, palette } = view;
   ctx.save();
   drawLaneBand(ctx, view, { baseTop: layout.telopTop, laneCount: layout.telopLanes, fill: palette.surface2, label: "T" });
-  const scene = state.scenario?.scenes?.[0];
+  const scene = state.scenario;
   const telops = scene?.telops || [];
   if (telops.length === 0) {
     ctx.fillStyle = palette.fgFaint;
@@ -703,7 +722,7 @@ function drawTimelineSoundEffects(ctx, view) {
   const { cssW, layout, palette } = view;
   ctx.save();
   drawLaneBand(ctx, view, { baseTop: layout.seTop, laneCount: layout.seLanes, fill: palette.surface, label: "S" });
-  const scene = state.scenario?.scenes?.[0];
+  const scene = state.scenario;
   const list = Array.isArray(scene?.soundEffects) ? scene.soundEffects : [];
   if (list.length === 0) {
     ctx.fillStyle = palette.fgFaint;
@@ -817,7 +836,7 @@ function drawTimelineVideoLayers(ctx, view) {
   const { cssW, layout, palette } = view;
   ctx.save();
   drawLaneBand(ctx, view, { baseTop: layout.vlTop, laneCount: layout.vlLanes, fill: palette.surface, label: "V" });
-  const scene = state.scenario?.scenes?.[0];
+  const scene = state.scenario;
   const list = Array.isArray(scene?.videoLayers) ? scene.videoLayers : [];
   if (list.length === 0) {
     ctx.fillStyle = palette.fgFaint;
@@ -950,6 +969,69 @@ function timelineCutRect(cut, view) {
   };
 }
 
+// シーンレーンの矩形 (span = sceneSpans() の 1 要素)。
+function timelineSceneRect(span, view) {
+  const { layout, pxPerSec } = view;
+  const startSec = span.startFrame / PROJECT_FPS;
+  const durSec = Math.max(0, span.endFrame - span.startFrame) / PROJECT_FPS;
+  return {
+    x: startSec * pxPerSec,
+    y: layout.sceneTop + 3,
+    w: Math.max(1, durSec * pxPerSec),
+    h: layout.sceneHeight - 6,
+  };
+}
+
+// シーンレーン。カットレーンの真上に、シーンごとの帯を描く。
+// ★ 色は**カットレーンと同じく「選択中 / 非選択」の 2 値**だけにする (§3.1)。
+//   index の偶奇で色や濃さを変える縞模様は、片方が「無効なシーン」に見えたり
+//   選択状態と紛れたりして読みにくい (2026-09-08 のユーザー報告)。切れ目は
+//   帯の間の隙間と枠線で十分に分かる。
+function drawTimelineScenes(ctx, view) {
+  const { cssW, layout, palette, scrollLeft } = view;
+  ctx.save();
+  ctx.fillStyle = palette.surface;
+  ctx.fillRect(0, layout.sceneTop, cssW, layout.sceneHeight);
+  ctx.fillStyle = palette.fgFaint;
+  ctx.font = "9px sans-serif";
+  ctx.textBaseline = "top";
+  ctx.fillText("シーン", (scrollLeft || 0) + 3, layout.sceneTop + 2);
+
+  const spans = sceneSpans(state.scenario);
+  spans.forEach((span, index) => {
+    const r = timelineSceneRect(span, view);
+    if (r.w <= 0) return;
+    const isActive = span.id === state.selectedSceneId;
+    ctx.fillStyle = palette.accent;
+    ctx.globalAlpha = isActive ? 0.5 : 0.18;
+    roundRect(ctx, r.x, r.y, Math.max(1, r.w - 1), r.h, 4);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = isActive ? palette.accent : palette.border;
+    ctx.lineWidth = isActive ? 2 : 1;
+    roundRect(ctx, r.x + 0.5, r.y + 0.5, Math.max(1, r.w - 1) - 1, r.h - 1, 4);
+    ctx.stroke();
+    if (r.w >= 20) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(r.x + 3, r.y, Math.max(0, r.w - 6), r.h);
+      ctx.clip();
+      ctx.fillStyle = palette.fg;
+      ctx.font = "11px sans-serif";
+      ctx.textBaseline = "middle";
+      const title = String(span.scene?.title || `シーン${index + 1}`);
+      ctx.fillText(`${title}（${span.cutCount}カット）`, r.x + 6, r.y + r.h / 2 + 1);
+      ctx.restore();
+    }
+    // 境界ハンドル (最終シーンの右端は動かせないので描かない)。
+    if (index < spans.length - 1 && r.w >= TIMELINE_HANDLE_PX) {
+      ctx.fillStyle = palette.accent;
+      ctx.fillRect(r.x + r.w - 2, r.y + 3, 2, r.h - 6);
+    }
+  });
+  ctx.restore();
+}
+
 function drawTimelineCuts(ctx, view) {
   const { cssW, layout, pxPerSec, palette, scrollLeft } = view;
   ctx.save();
@@ -998,7 +1080,7 @@ function drawTimelineCuts(ctx, view) {
       ctx.textBaseline = "middle";
       // R3/R10: カット番号 + 本文先頭ラベル (cutList 撤去ぶんのナビ補完)。
       // トランジション設定があるカットは先頭に印を出す。
-      const trans = cutTransition(cut);
+      const trans = effectiveCutTransition(cut);
       const mark = trans.type && trans.type !== "none" ? "⮂ " : "";
       const rawText = String(cut.state?.text || "").replace(/\n/g, " ").trim();
       const label = rawText ? `${index + 1}. ${rawText}` : `${index + 1}`;
@@ -1170,6 +1252,9 @@ export function seekPlayheadToSec(targetSec) {
   const clamped = Math.max(0, Math.min(total, Number(targetSec) || 0));
   const snapped = Math.round(clamped * TIMELINE_FRAME_FPS) / TIMELINE_FRAME_FPS;
   state.timeline.currentSec = snapped;
+  // 再生ヘッドが入ったシーンを選択状態にする (カットが無い位置でも追従させたいので
+  // loadCut より先に呼ぶ)。
+  syncSelectedSceneToCurrent();
   drawTimeline();
   autoScrollTimelineToCursor();
   const targetCut = findCutAtSec(snapped);
@@ -1295,7 +1380,7 @@ function timelineSnapTargets({ excludeIds = null } = {}) {
   const cur = Number(state.timeline?.currentSec || 0);
   if (Number.isFinite(cur) && cur >= 0) targets.push({ sec: cur, priority: 1 });
 
-  const scene = state.scenario?.scenes?.[0];
+  const scene = state.scenario;
 
   // 2. カット境界 (start / end)
   const cuts = state.scenario?.cuts || [];
@@ -1377,6 +1462,29 @@ function snapSec(sec, options = {}) {
   }
   _recordSnapIndicator(null);
   return sec;
+}
+
+// ドラッグ中のアイテムを「シーンをまたがない」ように丸める (§3.5)。
+// 移動は開始位置を最寄りの収まるシーンへ、リサイズは長さをシーン末尾までに詰める。
+// 最後のシーンは後続が無いので自由 (末尾テロップのはみ出しは従来どおり許す)。
+function _fitDraggedItemsToScene(drag) {
+  if (!drag) return;
+  const ids = new Set();
+  if (drag.groupStartMap) for (const id of drag.groupStartMap.keys()) ids.add(id);
+  for (const key of ["telopId", "seId", "vlId"]) if (drag[key]) ids.add(drag[key]);
+  if (ids.size === 0) return;
+  const isResize = String(drag.type || "").startsWith("resize");
+  for (const kind of TIMELINE_ITEM_KINDS) {
+    for (const item of state.scenario?.[kind] || []) {
+      if (!item || !ids.has(item.id)) continue;
+      const dur = Math.max(1, Math.round(Number(item.durationFrame) || 1));
+      if (isResize) {
+        item.durationFrame = deps.clampItemDurationToScene(item.startFrame, dur);
+      } else {
+        item.startFrame = deps.clampItemStartToScene(item.startFrame, dur);
+      }
+    }
+  }
 }
 
 // snap が効いた sec をタイムライン描画から拾えるよう記録 (drawTimeline で縦線描画)。
@@ -1472,7 +1580,21 @@ function timelineLocalCoords(canvas, event) {
 function timelineHitTest(x, y) {
   const layout = computeTimelineLayout();
   if (y < layout.rulerHeight) return { type: "ruler" };
-  if (y < layout.cutTop) return { type: "wave" };
+  if (y < layout.sceneTop) return { type: "wave" };
+  // シーンレーン。右端 6px はシーン境界ハンドル (最終シーンを除く)。
+  if (y < layout.cutTop) {
+    const spans = sceneSpans(state.scenario);
+    for (let i = 0; i < spans.length; i += 1) {
+      const r = timelineSceneRect(spans[i], { layout, pxPerSec: state.timeline.pxPerSec });
+      if (x < r.x || x > r.x + r.w) continue;
+      if (y < r.y || y > r.y + r.h) continue;
+      if (i < spans.length - 1 && r.w >= TIMELINE_HANDLE_PX && x >= r.x + r.w - TIMELINE_HANDLE_PX) {
+        return { type: "sceneEdge", sceneId: spans[i].id, index: i };
+      }
+      return { type: "sceneBar", sceneId: spans[i].id, index: i };
+    }
+    return { type: "sceneBarEmpty" };
+  }
   // R3: カットレーン (full レーン)。右端 6px は尺リサイズハンドル。
   if (y < layout.telopTop) {
     const cuts = state.scenario?.cuts || [];
@@ -1490,7 +1612,7 @@ function timelineHitTest(x, y) {
   }
   if (y < layout.seTop) {
     const telopLane = Math.max(0, Math.min(layout.telopLanes - 1, Math.floor((y - layout.telopTop) / layout.laneHeight)));
-    const telops = state.scenario?.scenes?.[0]?.telops || [];
+    const telops = state.scenario?.telops || [];
     const sorted = telops.slice().sort((a, b) => {
       // プライマリ選択中を最前面に
       if (a.id === state.selectedTelopId) return 1;
@@ -1515,7 +1637,7 @@ function timelineHitTest(x, y) {
   if (y < layout.vlTop) {
     const seLane = Math.max(0, Math.min(layout.seLanes - 1, Math.floor((y - layout.seTop) / layout.laneHeight)));
     // 効果音帯: 選択中を最前面にして hit
-    const list = state.scenario?.scenes?.[0]?.soundEffects || [];
+    const list = state.scenario?.soundEffects || [];
     const sorted = list.slice().sort((a, b) => {
       if (a.id === state.selectedSoundEffectId) return 1;
       if (b.id === state.selectedSoundEffectId) return -1;
@@ -1544,7 +1666,7 @@ function timelineHitTest(x, y) {
   if (y < layout.totalHeight) {
     const vlLane = Math.max(0, Math.min(layout.vlLanes - 1, Math.floor((y - layout.vlTop) / layout.laneHeight)));
     // 動画レイヤー帯: 選択中を最前面にして hit。端 6px は edge (リサイズ)。
-    const list = state.scenario?.scenes?.[0]?.videoLayers || [];
+    const list = state.scenario?.videoLayers || [];
     const sorted = list.slice().sort((a, b) => {
       if (a.id === state.selectedVideoLayerId) return 1;
       if (b.id === state.selectedVideoLayerId) return -1;
@@ -1569,7 +1691,7 @@ function timelineHitTest(x, y) {
 
 export function findTelopById(id) {
   if (!id) return null;
-  const telops = state.scenario?.scenes?.[0]?.telops || [];
+  const telops = state.scenario?.telops || [];
   return telops.find((t) => t && t.id === id) || null;
 }
 
@@ -1588,7 +1710,7 @@ export function findCutAtSec(sec) {
 // onHead にヒットしてしまうケースが発生する。(s/e キーで「前のテロップの開始位置が
 // ヘッドにずれる」症状の原因)
 function findTelopAtOrAfter(frame) {
-  const telops = state.scenario?.scenes?.[0]?.telops || [];
+  const telops = state.scenario?.telops || [];
   const onHead = telops.find((t) => {
     const s = telopStartFrame(t);
     const d = telopDurationFrame(t);
@@ -1602,7 +1724,7 @@ function findTelopAtOrAfter(frame) {
 }
 
 function findTelopAtOrBefore(frame) {
-  const telops = state.scenario?.scenes?.[0]?.telops || [];
+  const telops = state.scenario?.telops || [];
   const onHead = telops.find((t) => {
     const s = telopStartFrame(t);
     const d = telopDurationFrame(t);
@@ -1617,7 +1739,7 @@ function findTelopAtOrBefore(frame) {
 }
 
 function findNextTelop(sec) {
-  const telops = state.scenario?.scenes?.[0]?.telops || [];
+  const telops = state.scenario?.telops || [];
   const after = telops
     .filter((t) => telopStartSec(t) > sec + 1e-6)
     .sort((a, b) => telopStartFrame(a) - telopStartFrame(b));
@@ -1625,7 +1747,7 @@ function findNextTelop(sec) {
 }
 
 function findPrevTelop(sec) {
-  const telops = state.scenario?.scenes?.[0]?.telops || [];
+  const telops = state.scenario?.telops || [];
   const before = telops
     .filter((t) => telopStartSec(t) < sec - 1e-6)
     .sort((a, b) => telopStartFrame(b) - telopStartFrame(a));
@@ -1907,7 +2029,7 @@ function shortcutSnapTelopStartToPlayhead() {
     const dur = telopDurationFrame(target);
     const insideTarget = start <= playheadFrame && playheadFrame < start + dur;
     if (insideTarget && (start + dur) - playheadFrame <= S_SNAP_ALLOWANCE_FRAMES) {
-      const telops = state.scenario?.scenes?.[0]?.telops || [];
+      const telops = state.scenario?.telops || [];
       const after = telops
         .filter((t) => t !== target && telopStartFrame(t) >= (start + dur))
         .sort((a, b) => telopStartFrame(a) - telopStartFrame(b));
@@ -1939,7 +2061,7 @@ function shortcutSnapTelopEndToPlayhead() {
     const dur = telopDurationFrame(target);
     const insideTarget = start <= playheadFrame && playheadFrame < start + dur;
     if (insideTarget && playheadFrame - start <= SNAP_ALLOWANCE_FRAMES) {
-      const telops = state.scenario?.scenes?.[0]?.telops || [];
+      const telops = state.scenario?.telops || [];
       const before = telops
         .filter((t) => t !== target && (telopStartFrame(t) + telopDurationFrame(t)) <= start)
         .sort((a, b) => (telopStartFrame(b) + telopDurationFrame(b))
@@ -2042,6 +2164,8 @@ export function setupTimelineCanvas() {
       else if (hit.type === "vlBody") setTimelineCursor("grab");
       else if (hit.type === "cutEdge") setTimelineCursor("ew-resize");
       else if (hit.type === "cutBar") setTimelineCursor("pointer");
+      else if (hit.type === "sceneEdge") setTimelineCursor("ew-resize");
+      else if (hit.type === "sceneBar") setTimelineCursor("pointer");
       else if (hit.type === "ruler") setTimelineCursor("col-resize");
       else setTimelineCursor("default");
       return;
@@ -2088,6 +2212,7 @@ export function setupTimelineCanvas() {
         const pos = timelineLocalCoords(canvas, event);
         primary.lane = laneFromPointerY(computeTimelineLayout(), "telop", pos.y);
       }
+      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "marquee") {
       drag.curX = timelineLocalCoords(canvas, event).x;
@@ -2105,6 +2230,7 @@ export function setupTimelineCanvas() {
       telop.startFrame = secToFrames(Math.max(0, nextStart));
       telop.durationFrame = Math.max(1, secToFrames(newDuration));
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
+      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "resizeTelopEnd") {
       const telop = findTelopById(drag.telopId);
@@ -2116,6 +2242,7 @@ export function setupTimelineCanvas() {
       if (newDuration < TIMELINE_MIN_TELOP_DURATION) return;
       telop.durationFrame = Math.max(1, secToFrames(newDuration));
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
+      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "moveSoundEffect") {
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
@@ -2144,6 +2271,7 @@ export function setupTimelineCanvas() {
         const pos = timelineLocalCoords(canvas, event);
         primary.lane = laneFromPointerY(computeTimelineLayout(), "soundEffect", pos.y);
       }
+      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "resizeSoundEffectStart") {
       const scene = deps.activeScene();
@@ -2173,6 +2301,7 @@ export function setupTimelineCanvas() {
       se.durationFrame = Math.max(1, secToFrames(newDuration));
       se.audioOffsetSec = Math.max(0, newAudioOffset);
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
+      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "resizeSoundEffectEnd") {
       const scene = deps.activeScene();
@@ -2186,6 +2315,7 @@ export function setupTimelineCanvas() {
       if (newDuration < TIMELINE_MIN_TELOP_DURATION) return;
       se.durationFrame = Math.max(1, secToFrames(newDuration));
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
+      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "moveVideoLayer") {
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
@@ -2223,6 +2353,7 @@ export function setupTimelineCanvas() {
           target.startFrame = secToFrames(ns);
         }
       }
+      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "resizeVideoLayerStart") {
       const scene = deps.activeScene();
@@ -2251,6 +2382,7 @@ export function setupTimelineCanvas() {
       vl.startFrame = Math.max(0, secToFrames(nextStart));
       vl.trimStartSec = Math.max(0, drag.startTrimStartSec + finalDelta);
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
+      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "resizeVideoLayerEnd") {
       const scene = deps.activeScene();
@@ -2274,6 +2406,7 @@ export function setupTimelineCanvas() {
       const newTrimEnd = drag.startTrimStartSec + newDuration;
       vl.trimEndSec = Math.max(drag.startTrimStartSec + 0.05, newTrimEnd);
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
+      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "resizeCutEnd") {
       // R3: カット右端ドラッグで durationFrame を変更。後続カットと linkedItems は
@@ -2291,6 +2424,18 @@ export function setupTimelineCanvas() {
       // ライブで後続カットの startFrame を連番再計算 (視覚追従)。
       recalcCutStartSec();
       drawTimeline();
+    } else if (drag.type === "moveSceneBoundary") {
+      // シーン境界は **カット境界にしかスナップしない**。連続量としては動かない。
+      // ドラッグ中は「どのカット境界に落ちるか」だけを覚え、確定は pointerup。
+      const frame = Math.max(0, Math.round(timelineSecAtClientX(canvas, event.clientX) * PROJECT_FPS));
+      const idx = deps.nearestCutBoundaryIndex(frame);
+      if (idx !== drag.targetCutIndex) {
+        drag.targetCutIndex = idx;
+        const cut = (state.scenario?.cuts || [])[idx];
+        if (cut) _recordSnapIndicator(cutStartSec(cut));
+        drawTimeline();
+      }
+      if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
     } else if (drag.type === "seek") {
       const sec = timelineSecAtClientX(canvas, event.clientX);
       state.timeline.currentSec = Math.max(0, snapSec(sec, { disabled: snapDisabled }));
@@ -2308,6 +2453,13 @@ export function setupTimelineCanvas() {
     window.removeEventListener("pointercancel", onPointerUp);
     // drag 終了で snap インジケータの縦線を消す
     _clearSnapIndicator();
+    if (drag.type === "moveSceneBoundary") {
+      if (drag.dirty && drag.targetCutIndex != null) {
+        deps.setSceneBoundary(drag.boundaryIndex, drag.targetCutIndex);
+      }
+      drawTimeline();
+      return;
+    }
     if (drag.type === "moveTelop" && !drag.dirty) {
       // クリック扱い: 単一選択へリセット (shift クリックは pointerdown で処理済み)
       deps.selectTelop(drag.telopId);
@@ -2326,7 +2478,7 @@ export function setupTimelineCanvas() {
         return;
       }
       // 範囲に重なるテロップを選択
-      const telops = state.scenario?.scenes?.[0]?.telops || [];
+      const telops = state.scenario?.telops || [];
       const pxPerSec = state.timeline.pxPerSec;
       const hits = [];
       for (const t of telops) {
@@ -2483,7 +2635,7 @@ export function setupTimelineCanvas() {
       }
       // Shift クリック: プライマリ〜クリック対象までを範囲選択（連続）
       if (event.shiftKey) {
-        const telops = state.scenario?.scenes?.[0]?.telops || [];
+        const telops = state.scenario?.telops || [];
         const sorted = telops.slice().sort((a, b) => telopStartFrame(a) - telopStartFrame(b));
         const primaryId = state.selectedTelopId;
         const targetIdx = sorted.findIndex((t) => t.id === telop.id);
@@ -2543,7 +2695,7 @@ export function setupTimelineCanvas() {
       return;
     }
     if (hit.type === "seEdge") {
-      const list = state.scenario?.scenes?.[0]?.soundEffects || [];
+      const list = state.scenario?.soundEffects || [];
       const se = list.find((s) => s && s.id === hit.seId);
       if (!se) return;
       const assetDurSec = Number(state.soundEffectDurations?.get(se.src)) || 0;
@@ -2573,7 +2725,7 @@ export function setupTimelineCanvas() {
       return;
     }
     if (hit.type === "seBody") {
-      const list = state.scenario?.scenes?.[0]?.soundEffects || [];
+      const list = state.scenario?.soundEffects || [];
       const se = list.find((s) => s && s.id === hit.seId);
       if (!se) return;
       if (event.metaKey || event.ctrlKey) {
@@ -2647,7 +2799,7 @@ export function setupTimelineCanvas() {
       return;
     }
     if (hit.type === "vlBody" || hit.type === "vlEdge") {
-      const list = state.scenario?.scenes?.[0]?.videoLayers || [];
+      const list = state.scenario?.videoLayers || [];
       const vl = list.find((v) => v && v.id === hit.vlId);
       if (!vl) return;
       if ((event.metaKey || event.ctrlKey) && hit.type === "vlBody") {
@@ -2763,6 +2915,28 @@ export function setupTimelineCanvas() {
       event.preventDefault();
       return;
     }
+    if (hit.type === "sceneEdge") {
+      state.timeline.drag = {
+        type: "moveSceneBoundary",
+        pointerId: event.pointerId,
+        boundaryIndex: hit.index,
+        targetCutIndex: null,
+        startClientX: event.clientX,
+        dirty: false,
+      };
+      canvas.setPointerCapture?.(event.pointerId);
+      canvas.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", onPointerUp);
+      window.addEventListener("pointercancel", onPointerUp);
+      event.preventDefault();
+      return;
+    }
+    if (hit.type === "sceneBar") {
+      state.selectedSceneId = hit.sceneId;
+      drawTimeline();
+      event.preventDefault();
+      return;
+    }
     if (hit.type === "cutBar") {
       const target = (state.scenario?.cuts || []).find((c) => c.id === hit.cutId);
       if (target) {
@@ -2835,6 +3009,10 @@ export function setupTimelineCanvas() {
       event.preventDefault();
     } else if (hit.type === "vlBody" || hit.type === "vlEdge") {
       deps.selectVideoLayer?.(hit.vlId);
+      event.preventDefault();
+    } else if (hit.type === "sceneBar" || hit.type === "sceneEdge") {
+      state.selectedSceneId = hit.sceneId;
+      deps.openSceneDialog?.();
       event.preventDefault();
     }
   });

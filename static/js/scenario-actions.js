@@ -30,6 +30,11 @@ import {
   videoLayerStartFrame,
   videoLayerTrimStartSec,
   videoLayerTrimEndSec,
+  toDiskScenario,
+  restampCutsSceneByPosition,
+  assignSceneMembership,
+  syncSelectedSceneToCurrent,
+  isCutTransitionOverriddenByScene,
 } from "./scenario.js";
 import { renderPreview, invalidateRendererCachesForConfigChange } from "./playback.js";
 import { schedulePlayheadSave } from "./app-state.js";
@@ -134,11 +139,19 @@ export function setAudioPath(value) {
   elements.audioPathDisplay.textContent = path || "音声未選択";
 }
 
+// 編集面 (= プロジェクト全体で 1 本のタイムライン)。
+//
+// Phase 2 以降、cuts / telops / soundEffects / videoLayers / laneCounts は
+// `state.scenario` 直下のフラット配列 (frame はプロジェクト絶対) に集約されている。
+// この関数はその「1 枚のシーンのように振る舞うオブジェクト」を返す。
+// ★ BGM / 背景動画 / ビジュアライザ / 体の揺れ (= ベッド設定) はここには無い。
+//   それらは scenario.scenes[i] か scenario.projectSettings から取ること
+//   (dialog.js: bedTarget / scenario.js: resolveSceneBed)。
 export function activeScene() {
   if (!Array.isArray(state.scenario?.scenes) || state.scenario.scenes.length === 0) {
     attachScenarioCutsAlias(state.scenario);
   }
-  return state.scenario.scenes[0];
+  return state.scenario;
 }
 
 export function missingMaterialMessage() {
@@ -649,6 +662,11 @@ export function cutFromCurrent() {
   }
   return {
     id: state.selectedCutId || `cut_${Date.now()}`,
+    // ★ sceneId はメモリ専用フィールド (所属シーン)。ここで引き継がないと
+    //   updateSelectedCutFromCurrent がカットを作り直すたびに所属が消え、
+    //   そのカットしか持たないシーンが「空」と見なされて削除される。
+    //   (dev_docs/plans/multi-scene.md §3.2 / 二形式データの落とし穴)
+    ...(existing && existing.sceneId ? { sceneId: existing.sceneId } : {}),
     startFrame: existing ? cutStartFrame(existing) : 0,
     durationFrame: Math.max(1, Number(elements.duration?.dataset.frames) || PROJECT_FPS * 3),
     audio: elements.audio.value.trim(),
@@ -834,6 +852,9 @@ function moveCutsTo(sourceIds, targetId, after) {
     if (after) targetIndex += 1;
     cuts.splice(targetIndex, 0, ...movedCuts);
   }
+  // ★ 移動したカットは古い sceneId を持ったまま別の場所に現れる。落とした位置の
+  //   並びから所属を取り直さないと、間のシーンが吸収されて消える。
+  restampCutsSceneByPosition(sourceIds);
   recalcCutStartSec();
   renderCutList();
   scheduleScenarioSave();
@@ -879,7 +900,7 @@ export function duplicateSelectedCuts() {
   // 同種の clone にコピーし、startFrame を「source からの相対オフセット」を保って
   // clone の新 startFrame 基準にシフト、linkedCutId を clone.id に張り替える。
   // 元アイテム自体は触らない (= 元カットに紐付いたまま残る)。
-  const scene = state.scenario?.scenes?.[0];
+  const scene = state.scenario;
   if (scene && sourceToCloneId.size > 0) {
     const cloneShiftBySource = new Map();
     for (const [sourceId, cloneId] of sourceToCloneId) {
@@ -937,7 +958,7 @@ export function deleteSelectedCuts() {
   // 削除対象カットにリンクされたテロップ / 効果音 / 動画レイヤーを集計し、
   // 件数を確認ダイアログで提示してからまとめて削除する。Undo で 1 ステップで戻る。
   const deletedIdSet = new Set(ids);
-  const scene = state.scenario?.scenes?.[0];
+  const scene = state.scenario;
   const linkedTelops = (scene?.telops || []).filter((t) => deletedIdSet.has(t?.linkedCutId));
   const linkedSEs = (scene?.soundEffects || []).filter((s) => deletedIdSet.has(s?.linkedCutId));
   const linkedVLs = (scene?.videoLayers || []).filter((v) => deletedIdSet.has(v?.linkedCutId));
@@ -1015,6 +1036,9 @@ export function moveSelectedCutsBy(direction) {
       cuts.splice(target, 0, moved);
     }
   }
+  // ★ シーン境界をまたいで動かした場合、移動先のシーンに入れ直す (移動元の
+  //   sceneId が残ると、間のシーンが吸収されて消える)。
+  restampCutsSceneByPosition(ids);
   recalcCutStartSec();
   renderCutList();
   scheduleScenarioSave();
@@ -1030,6 +1054,9 @@ export async function loadCut(cut, options = {}) {
   const textStyle = data.textStyle || {};
 
   state.selectedCutId = cut.id;
+  // 選択中シーンをこのカットの所属へ追従させる (シーンレーンのハイライトと
+  // シーン設定ダイアログの編集対象が「今見ているカット」に揃う)。
+  syncSelectedSceneToCurrent();
   // カットを開いたら右パネルはカット編集に戻す。テロップ / 効果音選択は解除。
   // ただし keepTelopSelection / keepSoundEffectSelection / keepVideoLayerSelection
   // で呼ばれた場合は維持する。
@@ -1097,6 +1124,10 @@ export async function loadCut(cut, options = {}) {
     if (elements.cutTransitionWipeDirLabel) {
       elements.cutTransitionWipeDirLabel.hidden = type !== "wipe";
     }
+  }
+  // シーン先頭カットでは scene.transition が優先される。その旨を出す (Phase 3)。
+  if (elements.cutTransitionOverriddenNote) {
+    elements.cutTransitionOverriddenNote.hidden = !isCutTransitionOverriddenByScene(cut);
   }
   // 発話ディレイ (cut 直下フィールド) を演出タブへ反映。
   if (elements.cutAudioDelayInput) {
@@ -1341,6 +1372,11 @@ export function addCutFromCurrent() {
   const cut = cutFromCurrent();
   cut.id = `cut_${Date.now()}`;
   state.selectedCutId = cut.id;
+  // cutFromCurrent は「選択中カットの sceneId」を引き継ぐが、追加先は末尾なので
+  // 末尾カットのシーンに入れる (前方のシーンを宣言したまま末尾に置かない)。
+  const lastCut = state.scenario.cuts[state.scenario.cuts.length - 1];
+  if (lastCut?.sceneId) cut.sceneId = lastCut.sceneId;
+  else delete cut.sceneId;
   state.scenario.cuts.push(cut);
   recalcCutStartSec();
   renderCutList();
@@ -1362,7 +1398,7 @@ export function addCutFromCurrent() {
 // 仕様: 混在 (一部リンク済み + 一部未リンク) のときは "link" を返す。
 // → ユーザは「いったん全部リンク」して、もう一度押せば「全部解除」できる。
 function _computeLinkToggleState() {
-  const scene = state.scenario?.scenes?.[0];
+  const scene = state.scenario;
   if (!scene) return "empty";
   const telopIds = state.selectedTelopIds instanceof Set ? state.selectedTelopIds : new Set();
   const seIds = state.selectedSoundEffectIds instanceof Set ? state.selectedSoundEffectIds : new Set();
@@ -1426,7 +1462,7 @@ export function toggleLinkForSelection() {
 }
 
 export function linkSelectedItemsToCurrentCut() {
-  const scene = state.scenario?.scenes?.[0];
+  const scene = state.scenario;
   if (!scene) return;
   const cuts = state.scenario?.cuts || [];
   // リンク先カットの決定 (優先順):
@@ -1481,7 +1517,7 @@ export function linkSelectedItemsToCurrentCut() {
 }
 
 export function unlinkSelectedItems() {
-  const scene = state.scenario?.scenes?.[0];
+  const scene = state.scenario;
   if (!scene) return;
   const telopIds = state.selectedTelopIds instanceof Set ? state.selectedTelopIds : new Set();
   const seIds = state.selectedSoundEffectIds instanceof Set ? state.selectedSoundEffectIds : new Set();
@@ -1522,7 +1558,7 @@ export function duplicateCutAt(index) {
   // linkedCutId === source.id のアイテムを複製し、clone の新位置にぶら下げる。
   // 注: 既存のリンクアイテム自体は source に紐付いたまま残る (= 元位置のまま)。
   // ここでは「複製先にも同じテロップ・SE・VL 群を持たせる」のが目的。
-  const scene = state.scenario?.scenes?.[0];
+  const scene = state.scenario;
   if (scene) {
     const cloneShift = clone.startFrame - sourceOldStart;
     const _cloneItem = (item, idPrefix) => {
@@ -1648,7 +1684,7 @@ export function splitCutAtPlayhead() {
 // 新しい音声ファイルは作らず、durationFrame / audioOffsetSec を調整して
 // 「元と続き」の 2 つの SE にする。
 export function splitSelectedSoundEffect() {
-  const scene = state.scenario?.scenes?.[0];
+  const scene = state.scenario;
   const list = Array.isArray(scene?.soundEffects) ? scene.soundEffects : [];
   const id = state.selectedSoundEffectId;
   const se = id ? list.find((s) => s && s.id === id) : null;
@@ -1700,7 +1736,7 @@ export function splitSelectedSoundEffect() {
 // 再生位置で選択中の動画レイヤーを 2 つに「擬似分割」する。
 // trimStartSec / trimEndSec を調整して、元と続きの 2 つの動画レイヤーにする。
 export function splitSelectedVideoLayer() {
-  const scene = state.scenario?.scenes?.[0];
+  const scene = state.scenario;
   const list = Array.isArray(scene?.videoLayers) ? scene.videoLayers : [];
   const id = state.selectedVideoLayerId;
   const vl = id ? list.find((v) => v && v.id === id) : null;
@@ -1829,14 +1865,10 @@ export async function saveScenario(options = {}) {
     console.warn(`[scenario] ${message}`);
     throw new Error(message);
   }
+  // メモリはフラット + プロジェクト絶対フレーム。ディスクは per-scene +
+  // シーンローカル。ここが唯一の書き出し側の変換点 (dev_docs/plans/multi-scene.md §3.2)。
   const payload = {
-    version: state.scenario?.version || 4,
-    title: state.scenario?.title || "scenario",
-    scenes: Array.isArray(state.scenario?.scenes) ? state.scenario.scenes : [],
-    // ベッド設定の二層化 (dev_docs/plans/multi-scene.md)。サーバ側は既定値のとき
-    // キーごと落とすので、常に送って構わない。
-    projectSettings: state.scenario?.projectSettings || null,
-    bedScope: state.scenario?.bedScope || null,
+    ...toDiskScenario(state.scenario),
     projectId: loadedProjectId || targetProjectId || null,
   };
   // ★ options.projectId が指定されたら project-scoped エンドポイントへ。

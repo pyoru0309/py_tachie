@@ -5,7 +5,8 @@ import { drawTimeline, autoScrollTimelineToCursor, autoScrollCutListToActive } f
 import { PROJECT_FPS, clampCharacterAnimationFps } from "./timecode.js";
 import {
   cutStartFrame, cutDurationFrame, cutStartSec, cutDurationSec, cutTransition,
-  activeSceneResolved, projectSettings, bedScope,
+  activeSceneResolved, projectSettings, bedScope, sceneToDisk, sceneSpans,
+  syncSelectedSceneToCurrent, resolveSceneBed, effectiveCutTransition,
 } from "./scenario.js";
 import { captureAndUploadThumbnail } from "./thumbnail.js";
 import { createPreviewScheduler, PRIORITY } from "./preview-scheduler.js";
@@ -390,6 +391,21 @@ function audioReadyPromise(audio) {
   });
 }
 
+// 再生中のシーン切替に合わせて BGM を張り替える。
+// `state.playbackBgmSceneId` に「今鳴らしているシーン」を持ち、変化したときだけ
+// stop → start する。プロジェクト通しの BGM では何もしない。
+async function _switchBgmIfSceneChanged(cut) {
+  if (bedScope().bgm === "project") return;
+  const sceneId = cut?.sceneId || null;
+  if (!sceneId || sceneId === state.playbackBgmSceneId) return;
+  state.playbackBgmSceneId = sceneId;
+  const scene = (state.scenario?.scenes || []).find((s) => s.id === sceneId);
+  if (!scene) return;
+  stopLivePreviewBgm();
+  // 新しいシーンの先頭から鳴らす (シーン内経過 = 0)。
+  await startLivePreviewBgm(resolveSceneBed(scene), 0);
+}
+
 async function startLivePreviewBgm(scene, timelineOffsetSec) {
   stopLivePreviewBgm();
   if (!scene || !Array.isArray(scene.bgmTracks)) return;
@@ -569,7 +585,7 @@ function _logVlPerfSample() {
   const elsUniq = new Set(els.values()).size;
   const provsUniq = new Set(provs.values()).size;
   const audsUniq = new Set(auds.values()).size;
-  const sceneVl = state.scenario?.scenes?.[0]?.videoLayers;
+  const sceneVl = state.scenario?.videoLayers;
   const sceneVlLen = Array.isArray(sceneVl) ? sceneVl.length : 0;
   let groupCount = 0;
   try {
@@ -2055,7 +2071,7 @@ async function renderPreviewV2(cut, requestId) {
   // 停止中は lookahead=0 (= 現カット + 1 つ前のみ)。再生再開時に
   // playLiveCutV2 が改めて lookahead 付き window で rebuild するので、
   // 停止中の VL provider は最小限で十分。
-  const liveSceneForLayersStill = state.scenario?.scenes?.[0] || null;
+  const liveSceneForLayersStill = state.scenario || null;
   const { windowedLayers: windowedVideoLayersStill, windowKey: vlWindowKeyStill } =
     _computeVideoLayerWindow(liveSceneForLayersStill, cut, 0);
   layerData.videoLayers = windowedVideoLayersStill;
@@ -2182,7 +2198,7 @@ async function renderPreviewV2(cut, requestId) {
     rawElapsedSec: previewSec,
   };
   // R10: カット入りトランジションを active scene に反映 (毎 render 安価)。
-  v2.setActiveSceneTransition?.(cutTransition(cut));
+  v2.setActiveSceneTransition?.(effectiveCutTransition(cut));
   v2.renderActiveScene(sceneState);
 
   // videoTrack / videoLayer 経路の保険: 初回 render 時点で VideoTexture が前フレームを
@@ -2235,10 +2251,14 @@ async function fetchSceneBundleV2(cut, options = {}) {
   //   くる」体感バグの主因)。
   //   live scene を `sceneOverride` として一緒に送り、サーバ側で disk より優先する
   //   ことで、save 完了を待たずに即時反映できる。
+  // メモリはフラット + プロジェクト絶対フレームなので、カットが属するシーンを
+  // **ディスク形式 (シーンローカル frame)** に組み直してから送る。サーバの
+  // cutStartSec / visualizer の time grid がシーンローカル前提のため
+  // (dev_docs/plans/multi-scene.md §3.2)。
   const liveScene = (() => {
-    const scenes = state.scenario?.scenes;
-    if (!Array.isArray(scenes)) return null;
-    return scenes.find((scene) => (scene?.cuts || []).some((c) => c && c.id === cut.id)) || null;
+    const owner = (state.scenario?.cuts || []).find((c) => c && c.id === cut.id);
+    if (!owner) return null;
+    return sceneToDisk(owner.sceneId);
   })();
   // 音源単位 viz 解析キャッシュの「同期生成」を許すかどうか。先読み (NEXT/LOOKAHEAD)
   // のときだけ true にして裏で音源全長キャッシュを温め、現カット (CURRENT) や対話
@@ -2476,8 +2496,22 @@ function _computeVideoLayerWindow(scene, focusCut, lookaheadCuts = 0) {
   const windowed = layers.filter((layer) =>
     _videoLayerOverlapsCut(layer, windowStartFrame, windowDurationFrame),
   );
-  const windowKey = windowed.map((l) => l?.id).filter(Boolean).sort().join("|");
-  return { windowedLayers: windowed, windowKey };
+  // ★ 座標系の変換。メモリ上の VL は **プロジェクト絶対フレーム** だが、
+  //   renderer は `sceneSec = cutStartSec + elapsed` の **シーンローカル**時間で
+  //   VL の in/out を判定する (cutStartSec は scene-bundle 由来 = シーンローカル)。
+  //   そのままだと 2 つめ以降のシーンで VL の出入りがシーン先頭分ずれる。
+  //   アイテムはシーンをまたげない (§3.5) ので、フォーカス中のカットと同じ
+  //   シーンの VL だけに絞り、そのシーンの開始フレームだけ引いて渡す。
+  const focusSceneId = focusCut.sceneId || null;
+  const spans = sceneSpans(state.scenario);
+  const sceneStartFrame = spans.find((sp) => sp.id === focusSceneId)?.startFrame || 0;
+  const rebased = windowed
+    .filter((layer) => !focusSceneId || !layer?.sceneId || layer.sceneId === focusSceneId)
+    .map((layer) => (sceneStartFrame > 0
+      ? { ...layer, startFrame: Math.max(0, (Number(layer.startFrame) || 0) - sceneStartFrame) }
+      : layer));
+  const windowKey = rebased.map((l) => l?.id).filter(Boolean).sort().join("|");
+  return { windowedLayers: rebased, windowKey };
 }
 
 // 直列化された buildSceneFromLayerData。前の build が終わるまで次は待つ。
@@ -2905,7 +2939,7 @@ export async function playLiveCutV2(cut, _options = {}) {
   // window は「現カット ± lookahead カット」内に時間範囲が重なる VL のみ。
   // これで scene 全 VL に対する `<video preload=auto>` + clean PCM `<audio>` の
   // 常時保持を停止し、ブラウザバッファ消費を有界化する。
-  const liveSceneForLayersTop = state.scenario?.scenes?.[0] || null;
+  const liveSceneForLayersTop = state.scenario || null;
   const { windowedLayers: windowedVideoLayers, windowKey: vlWindowKey } =
     _computeVideoLayerWindow(liveSceneForLayersTop, cut, getPrefetchLookahead());
   // layerData.videoLayers も窓フィルタ後で固定する。これに合わせて
@@ -2971,7 +3005,7 @@ export async function playLiveCutV2(cut, _options = {}) {
   // dispose せず detach して保持する。B の頭 D/2 の間、A を live 延長で描いて合成する。
   const _cutsArrTop = state.scenario?.cuts || [];
   const _bIdxTop = _cutsArrTop.findIndex((c) => c.id === cut.id);
-  const _trBTop = cutTransition(cut);
+  const _trBTop = effectiveCutTransition(cut);
   _disposeStraddleFrom(); // 取りこぼし掃除
   _bSideCutId = null;
   if (_trBTop.type !== "none" && _trBTop.durationFrame > 0
@@ -3129,7 +3163,7 @@ export async function playLiveCutV2(cut, _options = {}) {
   const _cutsArrSelf = state.scenario?.cuts || [];
   const _selfIdx = _cutsArrSelf.findIndex((c) => c.id === cut.id);
   const _nextCutSelf = _selfIdx >= 0 ? _cutsArrSelf[_selfIdx + 1] : null;
-  const _trNextSelf = _nextCutSelf ? cutTransition(_nextCutSelf) : { type: "none", durationFrame: 0 };
+  const _trNextSelf = _nextCutSelf ? effectiveCutTransition(_nextCutSelf) : { type: "none", durationFrame: 0 };
   if (_trNextSelf.type !== "none" && _trNextSelf.durationFrame > 0 && _nextCutSelf) {
     _prepareASideToTex(_nextCutSelf, v2);
   } else {
@@ -3275,6 +3309,8 @@ export async function playLiveCutV2(cut, _options = {}) {
           endCutTransition();
         }
         state.timeline.currentSec = timelineOffsetSec + quantized;
+        // 再生中もシーンレーンのハイライトを追従させる。
+        syncSelectedSceneToCurrent();
         autoScrollTimelineToCursor();
         autoScrollCutListToActive();
         drawTimeline();
@@ -3453,9 +3489,21 @@ export async function playPreviewPlayback() {
     }
 
     state.playbackStartTimelineSec = startTimelineSec;
-    await startLivePreviewBgm(activeSceneResolved(), startTimelineSec);
+    // BGM が「シーンごと」のときは、素材の再生位置はシーン先頭からの経過で決まる。
+    // プロジェクト通しならタイムライン先頭からの経過そのもの。
+    // ★ 現状、再生中にシーンをまたいでも BGM は切り替わらない (再生開始時点の
+    //   シーンのものが鳴り続ける)。dev_docs/plans/multi-scene.md Phase 2e の残作業。
+    const startFrame = Math.round(startTimelineSec * PROJECT_FPS);
+    const bgmScene = activeSceneResolved(state.scenario, startFrame);
+    const bgmOffsetSec = (() => {
+      if (bedScope().bgm === "project") return startTimelineSec;
+      const span = sceneSpans(state.scenario).find((sp) => sp.id === bgmScene?.id);
+      return Math.max(0, startTimelineSec - (span ? span.startFrame / PROJECT_FPS : 0));
+    })();
+    state.playbackBgmSceneId = bgmScene?.id || null;
+    await startLivePreviewBgm(bgmScene, bgmOffsetSec);
     if (!state.isPlaying) return;
-    startLivePreviewSoundEffects(state.scenario?.scenes?.[0], startTimelineSec);
+    startLivePreviewSoundEffects(state.scenario, startTimelineSec);
     state.playbackStartWallclockMs = performance.now();
 
     let interruptedByCutLoop = false;
@@ -3463,6 +3511,10 @@ export async function playPreviewPlayback() {
       if (!state.isPlaying) break outer;
       const cut = cuts[index];
       lastPlayedIndex = index;
+      // シーンごと BGM のときは、シーンが変わった時点で BGM を張り替える。
+      // (プロジェクト通しのときは 1 本を鳴らし続けるので触らない)
+      await _switchBgmIfSceneChanged(cut);
+      if (!state.isPlaying) break outer;
       beginCutTransition(cut, `${index + 1}/${cuts.length}`);
       elements.playbackStatus.textContent = `再生中 ${index + 1} / ${cuts.length}`;
 

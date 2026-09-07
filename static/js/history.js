@@ -5,10 +5,17 @@
 // ===========================================================================
 
 import { state } from "./state.js";
+import { toDiskScenario } from "./scenario.js";
 
+// ★ スナップショットは **ディスク形式** (per-scene / シーンローカル frame) で持つ。
+//   メモリ形式 (フラット / 絶対 frame) のまま保存すると、復元時の
+//   `attachScenarioCutsAlias` が「既にフラットなもの」をもう一度フラット化して
+//   しまい、`scenes[i].cuts` が空なので**全アイテムが消える**。
+//   ディスク形式で持てば、復元は読み込みと同じ経路になり対称になる。
+//   (dev_docs/plans/multi-scene.md §3.2)
 export function takeScenarioSnapshot() {
   return {
-    scenario: JSON.parse(JSON.stringify(state.scenario)),
+    scenario: toDiskScenario(state.scenario),
     selectedCutId: state.selectedCutId,
   };
 }

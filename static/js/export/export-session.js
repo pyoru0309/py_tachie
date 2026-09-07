@@ -1362,6 +1362,8 @@ export async function runProjectExportSession({
   // シナリオ scenes / cuts を plan の順番で参照する。scenario 入力との突合は
   // scenes[].cuts[] の id ベースで取る (フィールド配置が一致する前提)。
   const scenarioScenes = scenario.scenes || [];
+  // シーンまたぎ straddle のために解放を遅らせた VL provider (Phase 3)。
+  const deferredProviderDisposal = [];
 
   outer: for (let sIdx = 0; sIdx < plan.scenes.length; sIdx++) {
     const planScene = plan.scenes[sIdx];
@@ -1507,14 +1509,33 @@ export async function runProjectExportSession({
       };
       // 境界またぎ: 次カットが「隙間なく」続くときだけ next を渡す (gap を挟む
       // ときは隣接でないので straddle しない)。
-      const nextPlanCut = (cIdx + 1 < planScene.cuts.length) ? planScene.cuts[cIdx + 1] : null;
-      const nextContiguous = !!nextPlanCut
-        && Number(nextPlanCut.startFrame) === sceneFrameIdx + planCut.durationFrame;
-      const nextScenarioCut = nextContiguous
-        ? ((scenarioScene.cuts || [])[cIdx + 1]
-           || (scenarioScene.cuts || []).find((c) => c.id === nextPlanCut.id)
-           || null)
-        : null;
+      //
+      // Phase 3: **シーンをまたぐ次カットも対象**にする。シーンは時間軸で連結
+      // されるので、シーン末尾カットの次は次シーンの先頭カット。ただし
+      // post-roll (telop のはみ出し) があるシーンは隣接しないので straddle しない。
+      let nextScenarioCut = null;
+      if (cIdx + 1 < planScene.cuts.length) {
+        const nextPlanCut = planScene.cuts[cIdx + 1];
+        if (Number(nextPlanCut.startFrame) === sceneFrameIdx + planCut.durationFrame) {
+          nextScenarioCut = (scenarioScene.cuts || [])[cIdx + 1]
+            || (scenarioScene.cuts || []).find((c) => c.id === nextPlanCut.id)
+            || null;
+        }
+      } else if (sIdx + 1 < plan.scenes.length) {
+        // シーン末尾カット → 次シーンの先頭カット。
+        // 自シーンに post-roll (= このカット終端 < sceneTotalFrames) があると
+        // 間に gap が入るので隣接ではない。
+        const endsAtSceneEnd =
+          sceneFrameIdx + planCut.durationFrame === planScene.sceneTotalFrames;
+        const nextPlanScene = plan.scenes[sIdx + 1];
+        const nextPlanCut = nextPlanScene?.cuts?.[0];
+        if (endsAtSceneEnd && nextPlanCut && Number(nextPlanCut.startFrame) === 0) {
+          const nextScenarioScene = scenarioScenes[sIdx + 1] || {};
+          nextScenarioCut = (nextScenarioScene.cuts || [])[0]
+            || (nextScenarioScene.cuts || []).find((c) => c.id === nextPlanCut.id)
+            || null;
+        }
+      }
       await renderCutFrames({
         cut: cutForLoop,
         nextCut: nextScenarioCut,
@@ -1526,6 +1547,14 @@ export async function runProjectExportSession({
         projectId,
       });
       sceneFrameIdx += planCut.durationFrame;
+      // 前シーンから持ち越した provider は、シーンまたぎ straddle を消費した
+      // このカットのあとで解放する。
+      if (deferredProviderDisposal.length > 0 && !_exportStraddleFromInst) {
+        for (const pr of deferredProviderDisposal) {
+          try { pr.dispose(); } catch (_) { /* ignore */ }
+        }
+        deferredProviderDisposal.length = 0;
+      }
     }
 
     // 3) post-roll (telop が cuts より後ろまで伸びている場合)
@@ -1552,11 +1581,25 @@ export async function runProjectExportSession({
     }
     // per-scene の videoLayer provider を全解放 (WebCodecs decoder を閉じる)。
     // scene を跨いで素材が共通でも、scene 単位で再 init する MVP 設計。
-    for (const [, p] of videoLayerProvidersById) {
-      try { p.dispose(); } catch (_) { /* ignore */ }
-    }
+    //
+    // ★ Phase 3: シーンをまたぐ straddle が待機中なら解放を **次シーンの先頭カットの
+    //   あと** まで遅らせる。retain した前シーンの SceneInstance が VL provider を
+    //   参照しているので、ここで閉じると B-side 延長描画中に動画レイヤーが落ちる。
+    const providersToDispose = Array.from(videoLayerProvidersById.values());
     videoLayerProvidersById.clear();
+    if (_exportStraddleFromInst) {
+      deferredProviderDisposal.push(...providersToDispose);
+    } else {
+      for (const pr of providersToDispose) {
+        try { pr.dispose(); } catch (_) { /* ignore */ }
+      }
+    }
   }
+  // 取り残した provider を最後に解放。
+  for (const pr of deferredProviderDisposal) {
+    try { pr.dispose(); } catch (_) { /* ignore */ }
+  }
+  deferredProviderDisposal.length = 0;
 
   // 全シーン送信完了。ここから先は ffmpeg のエンコード仕上げ + ファイル close。
   onPhase("finalizing");

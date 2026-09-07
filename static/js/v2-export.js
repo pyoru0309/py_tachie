@@ -100,6 +100,18 @@ async function loadCapabilities() {
 // ----- プロジェクト/カット ---------------------------------------------
 let scenarioCache = null;
 
+// 全シーンのカットを順に並べた配列 (サーバ由来 = ディスク形式)。
+// 複数シーンのプロジェクトでも診断ページのカット一覧が欠けないようにする。
+function _allCuts(scenario) {
+  const scenes = Array.isArray(scenario?.scenes) ? scenario.scenes : [];
+  const out = [];
+  for (const scene of scenes) {
+    for (const cut of scene?.cuts || []) if (cut) out.push(cut);
+  }
+  if (out.length === 0 && Array.isArray(scenario?.cuts)) return scenario.cuts;
+  return out;
+}
+
 async function loadProjects() {
   const res = await fetch("/api/projects");
   const data = await res.json();
@@ -143,7 +155,7 @@ async function onProjectChange() {
     stateMod.state.__exportProjectId = projectId;
   } catch (_) {}
   scenarioCache = await fetchScenario(projectId);
-  const cuts = (scenarioCache?.scenes?.[0]?.cuts) || scenarioCache?.cuts || [];
+  const cuts = _allCuts(scenarioCache);
   ui.cutSelect.innerHTML = "";
   cuts.forEach((cut, i) => {
     const opt = document.createElement("option");
@@ -175,7 +187,7 @@ async function applyTargetMode() {
   } else {
     ui.cutSelect.disabled = false;
     ui.totalFrames.disabled = false;
-    const cuts = (scenarioCache?.scenes?.[0]?.cuts) || [];
+    const cuts = _allCuts(scenarioCache);
     const sel = cuts.find((c) => c.id === ui.cutSelect.value) || cuts[0];
     if (sel?.durationFrame) ui.totalFrames.value = String(sel.durationFrame);
   }
@@ -189,7 +201,7 @@ function currentTarget() {
 ui.projectSelect.addEventListener("change", onProjectChange);
 ui.cutSelect.addEventListener("change", () => {
   if (currentTarget() === "project") return;
-  const cuts = (scenarioCache?.scenes?.[0]?.cuts) || [];
+  const cuts = _allCuts(scenarioCache);
   const sel = cuts.find((c) => c.id === ui.cutSelect.value);
   if (sel?.durationFrame) ui.totalFrames.value = String(sel.durationFrame);
 });
@@ -271,7 +283,7 @@ async function runExport() {
     });
   } else {
     const cutId = ui.cutSelect.value;
-    const cuts = (scenarioCache?.scenes?.[0]?.cuts) || [];
+    const cuts = _allCuts(scenarioCache);
     const cut = cuts.find((c) => c.id === cutId);
     if (!cut) throw new Error("cut not found");
     const totalFrames = Math.max(1, parseInt(ui.totalFrames.value, 10) || cut.durationFrame || 240);

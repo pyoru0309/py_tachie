@@ -21,6 +21,7 @@ import {
 } from "./export-ui.js";
 import { fetchGlobalConfig } from "./global-settings.js";
 import { updateSelectedCutFromCurrent, saveScenario } from "./scenario-actions.js";
+import { toDiskScenario } from "./scenario.js";
 import { isWebcodecsH264Supported, probeH264Accel } from "./export/webcodecs-encoder.js";
 
 // プラットフォーム情報を 1 行に要約する (ログのプラットフォーム行用)。Mac/Win や
@@ -94,8 +95,11 @@ async function ensureGlobalConfigLoaded() {
 export async function exportText() {
   // 現在編集中の状態をシナリオに反映してからサーバへ送る（自動保存待ちを回避）
   try { updateSelectedCutFromCurrent(); } catch (_e) {}
+  // ★ サーバはシナリオを **ディスク形式** (per-scene / シーンローカル frame) で
+  //   解釈する。メモリはフラット + プロジェクト絶対なので必ず変換して送る
+  //   (dev_docs/plans/multi-scene.md §3.2)。
   const payload = {
-    scenario: state.scenario || {},
+    scenario: toDiskScenario(state.scenario),
   };
   const response = await fetch("/api/export/text", {
     method: "POST",
@@ -124,7 +128,7 @@ export async function exportSubtitles(kind) {
     const response = await fetch("/api/export/subtitles", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scenario: state.scenario || {}, kind }),
+      body: JSON.stringify({ scenario: toDiskScenario(state.scenario), kind }),
     });
     if (!response.ok) {
       const errText = await response.text();
@@ -291,11 +295,15 @@ async function runV2Export(formValues) {
     + `alphaPreset=${formValues.transparent} (bg/videoTrack は常に描く)`,
   );
 
+  // 書き出しセッションは scenes[i].cuts / videoLayers をディスク形式で読む。
+  // resolveTransitions: シーン先頭カットの transition を実効値 (シーン側が
+  // 上書きしていればそれ) に差し替える。書き出し経路専用で、保存には影響しない。
+  const diskScenario = toDiskScenario(state.scenario, { resolveTransitions: true });
   let result;
   if (formValues.target === "project") {
     result = await runProjectExportSession({
       canvas,
-      scenario: state.scenario || {},
+      scenario: diskScenario,
       projectId,
       exportConfig: baseExportConfig,
       onLog,
@@ -305,7 +313,7 @@ async function runV2Export(formValues) {
       shouldAbort,
     });
   } else {
-    const cut = selectedCutFromScenario(state.scenario, formValues.selectedCutId);
+    const cut = selectedCutFromScenario(diskScenario, formValues.selectedCutId);
     if (!cut) throw new Error("選択中のカットが見つかりません");
     const totalFrames = Math.max(1, Number(cut.durationFrame) || 0);
     result = await runExportSession({

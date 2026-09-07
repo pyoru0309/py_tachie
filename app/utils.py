@@ -21,7 +21,10 @@ from typing import Any
 from fastapi import HTTPException
 
 from .global_config import current_projects_dir
+from .log_setup import app_logger
 from .paths import ACTIVE_PROJECT_PATH, DEFAULT_PROJECT_ID, PROJECT_ROOT, STATE_DIR
+
+_log = app_logger("project")
 
 
 @dataclass(frozen=True)
@@ -61,6 +64,9 @@ def unique_project_id(raw_id: str) -> str:
 
 def project_context(project_id: str | None = None) -> ProjectContext:
     project_id = slugify_project_id(project_id or active_project_id())
+    # 既存プロジェクトならディスク上の実フォルダ名に寄せる (NFD/NFC のブレ吸収)。
+    # 新規作成時は実在しないので slug のまま使う。
+    project_id = resolve_project_dir_name(project_id) or project_id
     root = current_projects_dir() / project_id
     return ProjectContext(
         id=project_id,
@@ -77,18 +83,86 @@ def project_context(project_id: str | None = None) -> ProjectContext:
     )
 
 
+def resolve_project_dir_name(candidate: str) -> str | None:
+    """`candidate` が指すプロジェクトの **ディスク上の実フォルダ名** を返す。無ければ None。
+
+    macOS (APFS) はフォルダ名を NFD (基底文字 + 結合濁点) で保持することがある一方、
+    `slugify_project_id` は regex を効かせるため NFC へ正規化する。APFS はパス照合が
+    normalization-insensitive なので `exists()` は通るが、**返る文字列がディスク上の
+    名前と一致しない**。この不一致は
+      - `active_project_id() == ctx.id` のような文字列比較
+      - 正規化に無頓着な Windows (NTFS) 上での解決
+    で表面化する。そこで「存在するなら実名を返す」に寄せる。
+    """
+    if not candidate:
+        return None
+    root = current_projects_dir()
+    direct = root / candidate
+    if (direct / "project.json").exists():
+        # 実際に存在するが、NFD/NFC が違うと `direct.name` は candidate のまま。
+        # ディスク側の綴りへ寄せるため下の総当たりも通す。
+        pass
+    target = unicodedata.normalize("NFC", candidate)
+    for project_file in root.glob("*/project.json"):
+        name = project_file.parent.name
+        if name == candidate or unicodedata.normalize("NFC", name) == target:
+            return name
+    return None
+
+
+def fallback_project_id() -> str:
+    """アクティブ指定が失われたときに開くプロジェクト。
+
+    **最後に開いたもの (`project.json.lastOpenedAt` が最新)** を選ぶ。旧実装は
+    `sorted(glob(...))[0]` = アルファベット順の先頭だったため、まったく関係の無い
+    プロジェクトが「アクティブ」として返り、しかも黙って起きるので原因が分からなかった。
+    """
+    best_name = ""
+    best_key = ""
+    for project_file in sorted(current_projects_dir().glob("*/project.json")):
+        name = project_file.parent.name
+        try:
+            with project_file.open("r", encoding="utf-8") as handle:
+                opened = str(json.load(handle).get("lastOpenedAt") or "")
+        except (OSError, ValueError):
+            opened = ""
+        # (lastOpenedAt, name) の辞書順最大。lastOpenedAt は ISO8601 なので文字列比較で足りる。
+        if not best_name or (opened, name) > (best_key, best_name):
+            best_name, best_key = name, opened
+    return best_name
+
+
 def active_project_id() -> str:
     if ACTIVE_PROJECT_PATH.exists():
         text = ACTIVE_PROJECT_PATH.read_text(encoding="utf-8").strip()
-        if text and (current_projects_dir() / slugify_project_id(text) / "project.json").exists():
-            return slugify_project_id(text)
-    project_files = sorted(current_projects_dir().glob("*/project.json"))
-    return project_files[0].parent.name if project_files else ""
+        if text:
+            resolved = resolve_project_dir_name(slugify_project_id(text))
+            if resolved:
+                return resolved
+            _log.warning(
+                "active project %r が見つかりません (%s)。最後に開いたプロジェクトへ切り替えます。"
+                " Finder でフォルダ名を変更・移動していないか確認してください。",
+                text, ACTIVE_PROJECT_PATH,
+            )
+        else:
+            _log.warning(
+                "active project の記録 (%s) が空です。最後に開いたプロジェクトへ切り替えます。",
+                ACTIVE_PROJECT_PATH,
+            )
+    fallback = fallback_project_id()
+    if fallback:
+        _log.warning("active project fallback -> %r", fallback)
+    return fallback
 
 
 def set_active_project(project_id: str) -> None:
     STATE_DIR.mkdir(exist_ok=True)
-    ACTIVE_PROJECT_PATH.write_text(slugify_project_id(project_id) if project_id else "", encoding="utf-8")
+    # ディスク上に実在するならその綴りで保存する (NFD/NFC のブレを持ち込まない)。
+    if project_id:
+        value = resolve_project_dir_name(slugify_project_id(project_id)) or slugify_project_id(project_id)
+    else:
+        value = ""
+    ACTIVE_PROJECT_PATH.write_text(value, encoding="utf-8")
 
 
 def relative_to_root(path: Path) -> str:

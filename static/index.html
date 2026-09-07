@@ -1060,6 +1060,7 @@
                 <input id="cutAudioDelayInput" type="number" min="0" max="10" step="0.1" />
               </label>
             </div>
+            <p class="asset-hint scene-transition-override-note" id="cutTransitionOverriddenNote" hidden>このカットはシーンの先頭です。<strong>シーン設定の「シーン入りトランジション」が優先される</strong>ため、ここの設定は使われません。</p>
             <p class="asset-hint">直前カットの末尾と このカットの先頭で、効果時間を半分ずつシェアしてつなぎます（境界をまたぐので両カットが動いたまま切り替わります）。先頭カットでは「ホワイトアウト＝白から」「ブラックアウト＝黒から」のフェードインになります。<br>発話ディレイは、このカットの話者音声を冒頭から指定秒だけ遅らせます（トランジション中に声が出始める不自然さを避けるのに使います）。</p>
           </div>
 
@@ -1226,6 +1227,14 @@
                 <span class="msym button-icon" aria-hidden="true">content_cut</span>
                 <span>分割（再生位置）</span>
               </button>
+              <button id="actionSceneSplitButton" type="button" role="menuitem" class="dropdown-menu-item" title="選択中のカットを先頭にして、新しいシーンを始めます">
+                <span class="msym button-icon" aria-hidden="true">splitscreen_left</span>
+                <span>ここから新しいシーンを始める</span>
+              </button>
+              <button id="actionSceneMergeButton" type="button" role="menuitem" class="dropdown-menu-item" title="選択中のカットが属するシーンを、前のシーンへ結合します（区切りを消す）">
+                <span class="msym button-icon" aria-hidden="true">merge</span>
+                <span>前のシーンに結合</span>
+              </button>
               <button id="actionAddCutBatchButton" type="button" role="menuitem" class="dropdown-menu-item">
                 <span class="msym button-icon" aria-hidden="true">playlist_add</span>
                 <span>カットを一括追加</span>
@@ -1365,6 +1374,50 @@
               <input id="sceneBpmInput" type="number" min="0" step="1" placeholder="未指定" />
             </label>
             <p class="asset-hint" id="sceneBpmHint">テンポは体の揺れ (BPM ボブ) とビジュアライザの拍同期が参照します。シーン側を空欄にすると、プロジェクト設定の値が使われます。</p>
+            <div id="sceneTransitionField">
+              <h3 class="scene-subheading">シーン入りトランジション</h3>
+              <div class="inline-fields">
+                <label>
+                  種類
+                  <select id="sceneTransitionTypeSelect">
+                    <option value="none">なし</option>
+                    <option value="crossfade">クロスフェード</option>
+                    <option value="wipe">ワイプ</option>
+                    <option value="whiteout">ホワイトアウト／イン</option>
+                    <option value="blackout">ブラックアウト／イン</option>
+                    <option value="crosszoom">クロスズーム</option>
+                  </select>
+                </label>
+                <label>
+                  長さ(フレーム)
+                  <input id="sceneTransitionDurationInput" type="number" min="1" max="120" step="1" />
+                </label>
+                <label id="sceneTransitionWipeDirLabel" hidden>
+                  ワイプ方向
+                  <select id="sceneTransitionWipeDirSelect">
+                    <option value="right">左 → 右</option>
+                    <option value="left">右 → 左</option>
+                    <option value="down">上 → 下</option>
+                    <option value="up">下 → 上</option>
+                  </select>
+                </label>
+              </div>
+              <p class="asset-hint">前のシーンの末尾と このシーンの先頭で、効果時間を半分ずつシェアしてつなぎます（カットのトランジションと同じ挙動です）。先頭シーンでは「白から」「黒から」のフェードインになります。<br><strong>このシーンの先頭カットにカット側のトランジションが設定されていても、こちらが優先されます</strong>（境界に 2 つ掛けると二重になるため）。</p>
+            </div>
+            <div id="sceneMergeField">
+              <h3 class="scene-subheading">シーンの区切り</h3>
+              <div class="dialog-actions">
+                <button type="button" id="sceneMergePrevButton">
+                  <span class="msym button-icon" aria-hidden="true">merge</span>
+                  <span>前のシーンと結合</span>
+                </button>
+                <button type="button" id="sceneMergeNextButton">
+                  <span class="msym button-icon" aria-hidden="true">merge</span>
+                  <span>次のシーンと結合</span>
+                </button>
+              </div>
+              <p class="asset-hint" id="sceneMergeHint">結合すると区切りが 1 つ消え、2 つのシーンが 1 つになります。カット・テロップ・効果音・動画レイヤーはすべて残り、<strong>残す側のシーンの設定</strong>（BGM・背景動画・ビジュアライザ・体の揺れ・トランジション）が引き継がれます。<br>逆に区切りを増やすときは、カットを選んで「操作 → ここから新しいシーンを始める」を使います。</p>
+            </div>
           </section>
 
           <section class="form-tab-panel hidden" data-scene-tab-panel="motion">

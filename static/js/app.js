@@ -12,8 +12,18 @@ import {
 import { state } from "./state.js";
 import { elements } from "./elements.js";
 import { showToast, withBusy } from "./toast.js";
+import {
+  registerPopup,
+  closeOtherPopups,
+  placeFloatingMenu,
+  clearFloatingMenu,
+} from "./popup-menu.js";
 import { initTheme } from "./theme.js";
-import { attachScenarioCutsAlias } from "./scenario.js";
+import {
+  attachScenarioCutsAlias,
+  bindScenarioNotifier,
+  restampCutsSceneByPosition,
+} from "./scenario.js";
 import { bindExport } from "./export.js";
 import {
   bindBackup,
@@ -33,6 +43,18 @@ import {
 } from "./voice-dialogue.js";
 import { openCharacterLayerEditor, bindCharacterLayerEditor } from "./character-layer-editor.js";
 import { bindCharacterLayoutDialog } from "./character-layout-dialog.js";
+import {
+  bindSceneOps,
+  splitSceneAtCut,
+  mergeSceneWithPrevious,
+  mergeSceneWithNext,
+  canSplitSceneAtCut,
+  canMergeSceneOfCut,
+  setSceneBoundary,
+  nearestCutBoundaryIndex,
+  clampItemStartToScene,
+  clampItemDurationToScene,
+} from "./scene-ops.js";
 import {
   fillPlacementPresets,
   applySelectedPlacementPreset,
@@ -66,6 +88,7 @@ import {
   addTimelineLane,
   removeEmptyTimelineLane,
   renderTelopTrack,
+  drawTimeline,
 } from "./timeline.js";
 import { shiftCharKerningForEdit } from "./renderer/text-layout.js";
 import {
@@ -538,16 +561,27 @@ function _bindGenericDropdown(dropdown, trigger, { onOpen } = {}) {
   if (!menu) return;
   const setOpen = (open) => {
     if (open) {
+      // 別のメニューが開いていたら閉じる。trigger は stopPropagation するので
+      // 「外側クリックで閉じる」document ハンドラには届かない (= 放置すると
+      // 2 枚が重なる)。
+      closeOtherPopups(dropdown);
       if (typeof onOpen === "function") onOpen(menu);
       menu.removeAttribute("hidden");
       dropdown.classList.add("open");
       trigger.setAttribute("aria-expanded", "true");
+      // overflow:hidden の祖先 (.workspace / .timeline-dock) に切られないよう
+      // fixed へ逃がす。オーバーフローメニューの中では右へ出す fly-out。
+      placeFloatingMenu(menu, trigger, {
+        side: dropdown.closest(".overflow-menu") ? "right" : "bottom",
+      });
     } else {
       menu.setAttribute("hidden", "");
+      clearFloatingMenu(menu);
       dropdown.classList.remove("open");
       trigger.setAttribute("aria-expanded", "false");
     }
   };
+  registerPopup(dropdown, () => setOpen(false));
   trigger.addEventListener("click", (e) => {
     e.stopPropagation();
     const open = trigger.getAttribute("aria-expanded") === "true";
@@ -616,6 +650,10 @@ function _bindActionDropdown() {
     show(elements.actionPasteButton, !!(state.clipboard && state.clipboard.items?.length));
     // 分割はカット / テロップ / 効果音 / 動画のすべてで可能。
     show(elements.actionSplitButton, true);
+    // シーンの区切り操作はカット選択時のみ。可否は先頭カットかどうかで決まる。
+    const cutId = state.selectedCutId;
+    show(elements.actionSceneSplitButton, target === "cut" && canSplitSceneAtCut(cutId));
+    show(elements.actionSceneMergeButton, target === "cut" && canMergeSceneOfCut(cutId));
     // 一括追加は種別に応じて。カット選択時=カット一括追加、テロップ選択時=テロップ一括追加。
     show(elements.actionAddCutBatchButton, target === "cut");
     show(elements.actionAddTelopBatchButton, target === "telop");
@@ -626,6 +664,13 @@ function _bindActionDropdown() {
   elements.actionPasteButton?.addEventListener("click", pasteFromClipboard);
   elements.actionDeleteButton?.addEventListener("click", _dispatchDelete);
   elements.actionSplitButton?.addEventListener("click", _dispatchSplit);
+  elements.actionSceneSplitButton?.addEventListener("click", () => {
+    splitSceneAtCut(state.selectedCutId);
+  });
+  elements.actionSceneMergeButton?.addEventListener("click", () => {
+    const cut = (state.scenario?.cuts || []).find((c) => c && c.id === state.selectedCutId);
+    if (cut) mergeSceneWithPrevious(cut.sceneId);
+  });
   elements.actionAddCutBatchButton?.addEventListener("click", openAddCutBatchDialog);
   elements.actionAddTelopBatchButton?.addEventListener("click", openAddTelopBatchDialog);
 }
@@ -728,6 +773,10 @@ function _pasteCutsFromClipboard(scene, clip) {
     return c;
   });
   cuts.splice(insertIdx, 0, ...cloneCuts);
+  // ★ クローンは元カットの `sceneId` を引き継いでいる。別シーンからコピーした
+  //   ものをここに貼ると「並びとシーン順の食い違い」が生じ、間のシーンが
+  //   丸ごと吸収されて消える。貼り付け先の並びから所属を取り直す。
+  restampCutsSceneByPosition(cloneCuts.map((c) => c.id));
   state.selectedCutId = cloneCuts[cloneCuts.length - 1].id;
   state.selectedCutIds = new Set(cloneCuts.map((c) => c.id));
   state.cutSelectionAnchorId = cloneCuts[0].id;
@@ -952,6 +1001,12 @@ function bindControls() {
     renderVideoLayerEditor,
     applyEditorTargetView,
     selectCutFromTimeline,
+    // シーンレーンの操作 (境界ドラッグ / ダブルクリックでシーン設定)。
+    setSceneBoundary,
+    nearestCutBoundaryIndex,
+    openSceneDialog,
+    clampItemStartToScene,
+    clampItemDurationToScene,
   });
   bindTelop({
     activeScene,
@@ -1028,6 +1083,14 @@ function bindControls() {
   });
   bindDialogueVoice();
   bindPlacementPresets({ handleEditorChanged });
+  bindSceneOps({
+    scheduleScenarioSave,
+    renderPreview,
+    drawTimeline,
+    renderCutList,
+  });
+  // scenario.js は DOM を引かないようにしているので、通知だけ注入する。
+  bindScenarioNotifier(showToast);
   bindCharacterManager({
     fillAssetControls,
     fillConfigForm,
@@ -1367,6 +1430,21 @@ function bindControls() {
   elements.sceneDialog?.addEventListener("close", () => {
     commitSceneFromDialog();
   });
+  // シーンの結合 (= 区切りを消す)。
+  // ★ 結合の前に applySceneFieldsFromDialog() を通すこと。ダイアログを閉じたとき
+  //   commitSceneFromDialog() がフォームの値を「そのとき選択中のシーン」へ書くので、
+  //   結合で選択シーンが変わったあとに未確定の入力が残っていると、残った側の
+  //   タイトル / トランジションが消えたシーンの値で上書きされる。
+  const _mergeCurrentScene = (direction) => {
+    applySceneFieldsFromDialog();
+    const sceneId = state.selectedSceneId;
+    const merged = direction === "prev"
+      ? mergeSceneWithPrevious(sceneId)
+      : mergeSceneWithNext(sceneId);
+    if (merged) fillSceneDialog();
+  };
+  elements.sceneMergePrevButton?.addEventListener("click", () => _mergeCurrentScene("prev"));
+  elements.sceneMergeNextButton?.addEventListener("click", () => _mergeCurrentScene("next"));
   elements.addSceneBgmButton?.addEventListener("click", addSceneBgmTrack);
   elements.sceneVideoEnabled?.addEventListener("change", () => {
     if (elements.sceneVideoFields) {
@@ -1377,6 +1455,9 @@ function bindControls() {
   for (const el of [
     elements.sceneTitle,
     elements.sceneBpm,
+    elements.sceneTransitionType,
+    elements.sceneTransitionDuration,
+    elements.sceneTransitionWipeDir,
     elements.sceneVideoSrc,
     elements.sceneVideoFit,
     elements.sceneVideoLoop,
