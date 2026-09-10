@@ -3053,6 +3053,12 @@ dialog::backdrop {
   letter-spacing: 0.02em;
 }
 
+/* 条件付きで無効になる入力欄 (例: 座布団の「範囲=全体」時の 行の幅 セレクト)。
+   disabled 属性だけだと見出しラベルが通常色のままで、効かない理由が伝わらない。 */
+.inline-fields label.is-disabled {
+  opacity: 0.45;
+}
+
 /* レイヤー編集ダイアログ */
 .settings-dialog.character-layer-editor-dialog {
   width: min(720px, calc(100vw - 48px));

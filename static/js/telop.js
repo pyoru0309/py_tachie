@@ -28,6 +28,7 @@ import {
 } from "./font.js";
 import { renderTelopTrack, findTelopById } from "./timeline.js";
 import { drawTextClipsOnCanvas } from "./renderer/text-clip-draw.js";
+import { TEXT_PLATE_DEFAULT } from "./renderer/text-core.js";
 import { shiftCharKerningForEdit } from "./renderer/text-layout.js";
 import { appendTextMotionSections } from "./text-motion.js";
 
@@ -197,6 +198,194 @@ export function buildColorSwatch(initialValue, fallback, onChange) {
   });
   wrap.append(input, value);
   return wrap;
+}
+
+// 座布団 (text plate) セクション。文字の仮想ボディ矩形 + XY マージンの背景 / 枠線。
+// セリフ枠と違って文字位置には影響しない (= 純粋な装飾。描画は
+// renderer/text-core.js の resolveTextPlate / paintTextPlate)。
+function buildTelopTextPlateSection(telop, editTelopStyle) {
+  const cur = { ...TEXT_PLATE_DEFAULT, ...(telop.style?.textPlate || {}) };
+  const isVertical = String(telop.style?.writingMode || "horizontal") === "vertical";
+  const details = document.createElement("div");
+  details.className = "telop-style-section character-effect-block";
+  const summary = document.createElement("h3");
+  summary.className = "telop-style-section-title";
+  summary.textContent = "座布団（背景・枠線）";
+  details.append(summary);
+
+  const update = (patch) => {
+    editTelopStyle((style) => {
+      style.textPlate = { ...TEXT_PLATE_DEFAULT, ...(style.textPlate || {}), ...patch };
+    });
+    deps.scheduleScenarioSave();
+    deps.renderPreview();
+  };
+
+  const rowEnable = document.createElement("label");
+  rowEnable.className = "checkbox-row";
+  const enableInput = document.createElement("input");
+  enableInput.type = "checkbox";
+  enableInput.checked = !!cur.enabled;
+  rowEnable.append(enableInput, document.createTextNode(" 座布団を有効にする"));
+  rowEnable.title = "文字の仮想ボディ（フォントの行高 × 行幅）に余白を足した矩形を、文字の下に敷きます。文字の位置は動きません。";
+  enableInput.addEventListener("change", () => update({ enabled: enableInput.checked }));
+  details.append(rowEnable);
+
+  // --- 形状: 全体 / 行ごと + 行ごとの幅の揃え方 + 角丸 -----------------------
+  const rowShape = document.createElement("div");
+  rowShape.className = "inline-fields";
+
+  const modeSelect = document.createElement("select");
+  for (const [value, label] of [["block", "全体を 1 枚"], ["line", isVertical ? "列ごと" : "行ごと"]]) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    modeSelect.append(opt);
+  }
+  modeSelect.value = cur.mode === "line" ? "line" : "block";
+  const modeLabel = document.createElement("label");
+  modeLabel.append("範囲", modeSelect);
+  modeLabel.title = "「全体」= 複数行をまとめて包む 1 枚。「行ごと」= 各行に独立した座布団を敷く（半透明でも重なり部分が濃くならないよう union 塗り）。";
+  rowShape.append(modeLabel);
+
+  const lineWidthSelect = document.createElement("select");
+  for (const [value, label] of [
+    ["fit", isVertical ? "列の長さに合わせる" : "行の幅に合わせる"],
+    ["uniform", isVertical ? "最長列に揃える" : "最長行に揃える"],
+  ]) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    lineWidthSelect.append(opt);
+  }
+  lineWidthSelect.value = cur.lineWidthMode === "uniform" ? "uniform" : "fit";
+  const lineWidthLabel = document.createElement("label");
+  lineWidthLabel.append(isVertical ? "列の長さ" : "行の幅", lineWidthSelect);
+  const refreshLineWidthEnabled = () => {
+    const on = modeSelect.value === "line";
+    lineWidthSelect.disabled = !on;
+    lineWidthLabel.classList.toggle("is-disabled", !on);
+  };
+  refreshLineWidthEnabled();
+  lineWidthSelect.addEventListener("change", () => update({ lineWidthMode: lineWidthSelect.value }));
+  modeSelect.addEventListener("change", () => {
+    refreshLineWidthEnabled();
+    update({ mode: modeSelect.value });
+  });
+  rowShape.append(lineWidthLabel);
+
+  const radiusInput = document.createElement("input");
+  radiusInput.type = "number";
+  radiusInput.min = "0";
+  radiusInput.max = "500";
+  radiusInput.step = "1";
+  radiusInput.value = Number(cur.radius);
+  const radiusLabel = document.createElement("label");
+  radiusLabel.append("角丸 (px)", radiusInput);
+  radiusInput.addEventListener("change", () => {
+    const v = Math.max(0, Math.min(500, Number(radiusInput.value) || 0));
+    radiusInput.value = v;
+    update({ radius: v });
+  });
+  rowShape.append(radiusLabel);
+  details.append(rowShape);
+
+  // --- 仮想ボディに対する余白 + 位置オフセット (どちらも負値可) --------------
+  //   余白 = 大きさ (両側に広がる) / オフセット = 位置だけずらす。
+  //   仮想ボディ (fontBoundingBoxAscent/Descent) の上下の余りは書体ごとに非対称なので、
+  //   「上下の余白が違って見える」ズレはオフセットYで詰める。
+  const rowMargin = document.createElement("div");
+  rowMargin.className = "inline-fields";
+  const MARGIN_FIELDS = [
+    ["marginX", "余白X (px)", "文字の仮想ボディからの左右の余白。負の値を入れると内側に食い込みます。"],
+    ["marginY", "余白Y (px)", "文字の仮想ボディからの上下の余白。負の値を入れると内側に食い込みます。"],
+    ["offsetX", "オフセットX (px)", "座布団の位置だけを左右にずらします（大きさは変わりません）。"],
+    ["offsetY", "オフセットY (px)", "座布団の位置だけを上下にずらします（大きさは変わりません）。書体によって仮想ボディの上下の余りが非対称で「上下の余白がそろわない」ときは、ここで視覚的な中心に合わせてください。"],
+  ];
+  for (const [key, label, hint] of MARGIN_FIELDS) {
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "-500";
+    input.max = "500";
+    input.step = "1";
+    input.value = Number(cur[key]);
+    const lab = document.createElement("label");
+    lab.append(label, input);
+    lab.title = hint;
+    input.addEventListener("change", () => {
+      const v = Math.max(-500, Math.min(500, Number(input.value) || 0));
+      input.value = v;
+      update({ [key]: v });
+    });
+    rowMargin.append(lab);
+  }
+  details.append(rowMargin);
+
+  // --- 塗り ------------------------------------------------------------------
+  const rowFill = document.createElement("div");
+  rowFill.className = "inline-fields";
+  const fillColorLabel = document.createElement("label");
+  fillColorLabel.append("背景色");
+  fillColorLabel.append(buildColorSwatch(cur.fillColor, "#000000", (v) => update({ fillColor: v })));
+  rowFill.append(fillColorLabel);
+
+  const fillOpInput = document.createElement("input");
+  fillOpInput.type = "number";
+  fillOpInput.min = "0";
+  fillOpInput.max = "1";
+  fillOpInput.step = "0.05";
+  fillOpInput.value = Number(cur.fillOpacity);
+  const fillOpLabel = document.createElement("label");
+  fillOpLabel.append("背景の不透明度", fillOpInput);
+  fillOpInput.addEventListener("change", () => {
+    const v = Math.max(0, Math.min(1, Number(fillOpInput.value) || 0));
+    fillOpInput.value = v;
+    update({ fillOpacity: v });
+  });
+  rowFill.append(fillOpLabel);
+  details.append(rowFill);
+
+  // --- 枠線 ------------------------------------------------------------------
+  const rowBorder = document.createElement("div");
+  rowBorder.className = "inline-fields";
+  const borderColorLabel = document.createElement("label");
+  borderColorLabel.append("枠線色");
+  borderColorLabel.append(buildColorSwatch(cur.borderColor, "#ffffff", (v) => update({ borderColor: v })));
+  rowBorder.append(borderColorLabel);
+
+  const borderWidthInput = document.createElement("input");
+  borderWidthInput.type = "number";
+  borderWidthInput.min = "0";
+  borderWidthInput.max = "60";
+  borderWidthInput.step = "1";
+  borderWidthInput.value = Number(cur.borderWidth);
+  const borderWidthLabel = document.createElement("label");
+  borderWidthLabel.append("枠線 (px)", borderWidthInput);
+  borderWidthLabel.title = "0 で枠線なし。線は矩形の輪郭を中心に引かれます。";
+  borderWidthInput.addEventListener("change", () => {
+    const v = Math.max(0, Math.min(60, Number(borderWidthInput.value) || 0));
+    borderWidthInput.value = v;
+    update({ borderWidth: v });
+  });
+  rowBorder.append(borderWidthLabel);
+
+  const borderOpInput = document.createElement("input");
+  borderOpInput.type = "number";
+  borderOpInput.min = "0";
+  borderOpInput.max = "1";
+  borderOpInput.step = "0.05";
+  borderOpInput.value = Number(cur.borderOpacity);
+  const borderOpLabel = document.createElement("label");
+  borderOpLabel.append("枠線の不透明度", borderOpInput);
+  borderOpInput.addEventListener("change", () => {
+    const v = Math.max(0, Math.min(1, Number(borderOpInput.value) || 0));
+    borderOpInput.value = v;
+    update({ borderOpacity: v });
+  });
+  rowBorder.append(borderOpLabel);
+  details.append(rowBorder);
+
+  return details;
 }
 
 function buildTelopGlowSection(telop, editTelopStyle) {
@@ -482,6 +671,7 @@ export function renderTelopEditor() {
         : { enable: !!style.enableOpticalKerning, highQuality: !!style.opticalKerningHighQuality },
       glow: { ...TELOP_GLOW_DEFAULT, ...(style.glow || {}) },
       dropShadow: { ...TELOP_DROP_SHADOW_DEFAULT, ...(style.dropShadow || {}) },
+      textPlate: { ...TEXT_PLATE_DEFAULT, ...(style.textPlate || {}) },
       // ★ Phase 3 で追加: TextClip 拡張キーも反映対象に。これらは telop の top-level 値
       //   なので、dialog.js 側で TELOP_TOP_LEVEL_KEYS を見て style ではなく直下に書く。
       renderLayer: sourceTelop.renderLayer || "overlay",
@@ -541,6 +731,13 @@ export function renderTelopEditor() {
             ? "inherit"
             : (fullDiff.opticalKerning.enable ? (fullDiff.opticalKerning.highQuality ? "high" : "standard") : "off")
         ],
+      },
+      {
+        key: "textPlate",
+        label: "座布団（背景・枠線）",
+        valueText: fullDiff.textPlate.enabled
+          ? `ON（${fullDiff.textPlate.mode === "line" ? "行ごと" : "全体"}）`
+          : "OFF",
       },
       { key: "glow", label: "光彩", valueText: fullDiff.glow.enabled ? "ON" : "OFF" },
       { key: "dropShadow", label: "ドロップシャドウ", valueText: fullDiff.dropShadow.enabled ? "ON" : "OFF" },
@@ -1063,6 +1260,7 @@ export function renderTelopEditor() {
   rowSpacing.append(kernLabel);
   body.append(rowSpacing);
 
+  body.append(buildTelopTextPlateSection(telop, editTelopStyle));
   body.append(buildTelopGlowSection(telop, editTelopStyle));
   body.append(buildTelopDropShadowSection(telop, editTelopStyle));
 

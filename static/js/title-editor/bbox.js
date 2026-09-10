@@ -29,7 +29,7 @@
 // =============================================================================
 
 import { state } from "../state.js";
-import { drawCaptionClip } from "../renderer/text-core.js";
+import { drawCaptionClip, resolveTextPlate } from "../renderer/text-core.js";
 import { verticalGlyphsEpoch } from "../renderer/text-vertical.js";
 import { fontFamilyCssStack, resolveFontWeightCss } from "../font.js";
 
@@ -80,6 +80,8 @@ function _baseFingerprint(clip) {
     s.outlineWidth, s.outlineColor, s.color,
     s.align, s.letterSpacing, s.lineSpacing,
     s.boxOpacity, s.boxBackgroundColor, s.boxPaddingX, s.boxPaddingY,
+    // 座布団 (= ink に含まれる背景矩形) の変更で焼き直す
+    s.textPlate ? JSON.stringify(s.textPlate) : "",
     s.enableOpticalKerning, s.opticalKerningHighQuality,
     s.rotation,
     // 縦書き: モードと GSUB vert グリフ取得 epoch (取得前後で ink が変わる)
@@ -160,6 +162,14 @@ function _estimateExtent(clip, mode) {
   const padY = Math.max(0, Number(s.boxPaddingY) || 0);
   const hasBox = Number(s.boxOpacity) > 0 && !!s.boxBackgroundColor;
 
+  // 座布団 (text plate) は文字の仮想ボディの外側へ marginX/Y + 枠線の半幅ぶん
+  // はみ出す。scan canvas に含めないと右端 / 下端が切れて bbox が過小になる。
+  const plate = resolveTextPlate(s);
+  const plateX = plate
+    ? Math.max(0, plate.marginX) + Math.abs(plate.offsetX) + plate.borderWidth / 2 : 0;
+  const plateY = plate
+    ? Math.max(0, plate.marginY) + Math.abs(plate.offsetY) + plate.borderWidth / 2 : 0;
+
   let glowBlur = 0, shadowBlur = 0, shadowOx = 0, shadowOy = 0;
   if (mode === "visual") {
     if (s.glow?.enabled) {
@@ -184,9 +194,9 @@ function _estimateExtent(clip, mode) {
 
   // 行幅: max advance + outline*2 + (box padding*2) + halo*2 + 余裕
   // 行高: line 数 * fs * 1.6 + outline*2 + (box padding*2) + halo*2 + 余裕
-  let widthEstimate = maxAdvance + outline * 2 + (hasBox ? padX * 2 : 0) + haloMargin * 2 + 64;
+  let widthEstimate = maxAdvance + outline * 2 + (hasBox ? padX * 2 : 0) + plateX * 2 + haloMargin * 2 + 64;
   let heightEstimate = lines.length * fs * 1.6 + outline * 2 * lines.length
-    + (hasBox ? padY * 2 : 0) + haloMargin * 2 + 64;
+    + (hasBox ? padY * 2 : 0) + plateY * 2 + haloMargin * 2 + 64;
 
   // rotation が掛かると AABB が広がる。任意角度の包絡矩形:
   //   aw = |w cos θ| + |h sin θ|
@@ -203,7 +213,10 @@ function _estimateExtent(clip, mode) {
   }
 
   // anchor は canvas 内側にマージンを取って配置 (= clipping を回避)
-  const anchorOff = Math.max(32, Math.ceil(haloMargin + Math.max(padX, padY) + outline + 32));
+  const anchorOff = Math.max(
+    32,
+    Math.ceil(haloMargin + Math.max(padX, padY) + Math.max(plateX, plateY) + outline + 32),
+  );
   // 上限: ノートPCでも getImageData が現実的な範囲に収める
   const canvasW = Math.max(96, Math.min(3072, Math.ceil(widthEstimate + anchorOff * 2)));
   const canvasH = Math.max(96, Math.min(2048, Math.ceil(heightEstimate + anchorOff * 2)));

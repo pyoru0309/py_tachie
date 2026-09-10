@@ -287,6 +287,8 @@ function _staticClipFingerprint(clip) {
     s.color, s.outlineColor, s.outlineWidth,
     s.boxBackgroundColor ?? "", s.boxOpacity ?? "",
     s.boxPaddingX ?? "", s.boxPaddingY ?? "",
+    // ★ 座布団 (text plate)。キー数が多いので JSON 丸ごと。
+    s.textPlate ? JSON.stringify(s.textPlate) : "",
     s.align, s.letterSpacing ?? 0, s.lineSpacing ?? 0,
     s.enableOpticalKerning ? 1 : 0,
     s.opticalKerningHighQuality ? 1 : 0,

@@ -404,8 +404,9 @@ X/Y はキャラ基準位置からの相対オフセット、拡大率はキャ�
 | `x` / `y` | 任意座標 (px)。`position` が `custom` のときに有効。`null` のままなら定型位置のフォールバックが使われる |
 | `style.align` | 文字揃え。`left` / `center` / `right` |
 | `style.charKerning` | 個別字間。`{ "<文字間index>": <delta 1/1000em> }` の疎マップ。指定した位置の字間だけを詰める / 空ける。本文編集時はキー位置が自動シフトされる。一括スタイル反映の対象外 (本文ごとに位置が変わるため)。セリフ本文側 (`state.textStyle`) も同じ `charKerning` を持つ |
+| `style.textPlate` | 座布団 (文字の裏に敷く矩形)。`{enabled, mode, lineWidthMode, marginX, marginY, offsetX, offsetY, fillColor, fillOpacity, borderColor, borderWidth, borderOpacity, radius}`。`mode` は `block` (全行を包む 1 枚) / `line` (行ごと・縦書きでは列ごと)、`lineWidthMode` は `mode=line` のときだけ効き `fit` (行の実寸) / `uniform` (最長行に揃える)。`marginX` / `marginY` は **文字の仮想ボディ** からの余白 px で負値可 (−500〜500)。`offsetX` / `offsetY` (−500〜500) は大きさを変えずに位置だけずらす補正で、書体ごとの ascent/descent の偏りで上下の余白が非対称に見えるときに使う。テキストの配置には影響しない (セリフ枠の `boxPadding*` との違い)。キーが無いテロップには生成されない (遅延生成) |
 | `style.glow` / `style.dropShadow` | テロップ文字の光彩 / ドロップシャドウ (各 `{enabled, color, blurPx, opacity, intensity[, offsetX, offsetY]}`)。テロップ既定値 (`telopDefaults.glow` / `telopDefaults.dropShadow`) の上書き。`intensity` (1〜8, 既定 1, 2026-06 追加) はぼかしで薄くなった発光・影を濃くするスタック合成回数 |
-| `style` | 書体・色・アウトライン・サイズ・文字揃え・行間・字間・光彩・ドロップシャドウ |
+| `style` | 書体・色・アウトライン・サイズ・文字揃え・行間・字間・光彩・ドロップシャドウ・座布団 |
 | `linkedCutId` | 任意。設定時はその ID のカットに紐付き、カット並び替え / 複製 / 削除 / duration 変更に追従する。存在しない ID を指していたら正規化で `null` に倒される。`soundEffects[]` / `videoLayers[]` も同名のフィールドで同じ意味 |
 
 テロップはカットに依存せず、シーン全体の任意の区間に置けます。タイムライン下のテロップ帯で開始・終了・スタイルを編集します (`s` / `e` キーで再生ヘッドにスナップ)。

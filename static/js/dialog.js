@@ -1409,7 +1409,7 @@ export async function applyTelopDefaultsToAllTelops(diff, options = {}) {
         telop[key] = (value && typeof value === "object")
           ? JSON.parse(JSON.stringify(value))
           : value;
-      } else if (key === "glow" || key === "dropShadow") {
+      } else if (key === "glow" || key === "dropShadow" || key === "textPlate") {
         telop.style[key] = { ...(telop.style[key] || {}), ...(value || {}) };
       } else if (key === "opticalKerning") {
         // 仮想キー: enable + highQuality をペアで反映。"inherit"/null は両キー削除 (= 全体設定に従う)。

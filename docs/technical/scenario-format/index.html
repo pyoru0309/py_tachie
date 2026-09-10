@@ -2109,12 +2109,16 @@
 <td>個別字間。<code>{ "&lt;文字間index&gt;": &lt;delta 1/1000em&gt; }</code> の疎マップ。指定した位置の字間だけを詰める / 空ける。本文編集時はキー位置が自動シフトされる。一括スタイル反映の対象外 (本文ごとに位置が変わるため)。セリフ本文側 (<code>state.textStyle</code>) も同じ <code>charKerning</code> を持つ</td>
 </tr>
 <tr>
+<td><code>style.textPlate</code></td>
+<td>座布団 (文字の裏に敷く矩形)。<code>{enabled, mode, lineWidthMode, marginX, marginY, offsetX, offsetY, fillColor, fillOpacity, borderColor, borderWidth, borderOpacity, radius}</code>。<code>mode</code> は <code>block</code> (全行を包む 1 枚) / <code>line</code> (行ごと・縦書きでは列ごと)、<code>lineWidthMode</code> は <code>mode=line</code> のときだけ効き <code>fit</code> (行の実寸) / <code>uniform</code> (最長行に揃える)。<code>marginX</code> / <code>marginY</code> は <strong>文字の仮想ボディ</strong> からの余白 px で負値可 (−500〜500)。<code>offsetX</code> / <code>offsetY</code> (−500〜500) は大きさを変えずに位置だけずらす補正で、書体ごとの ascent/descent の偏りで上下の余白が非対称に見えるときに使う。テキストの配置には影響しない (セリフ枠の <code>boxPadding*</code> との違い)。キーが無いテロップには生成されない (遅延生成)</td>
+</tr>
+<tr>
 <td><code>style.glow</code> / <code>style.dropShadow</code></td>
 <td>テロップ文字の光彩 / ドロップシャドウ (各 <code>{enabled, color, blurPx, opacity, intensity[, offsetX, offsetY]}</code>)。テロップ既定値 (<code>telopDefaults.glow</code> / <code>telopDefaults.dropShadow</code>) の上書き。<code>intensity</code> (1〜8, 既定 1, 2026-06 追加) はぼかしで薄くなった発光・影を濃くするスタック合成回数</td>
 </tr>
 <tr>
 <td><code>style</code></td>
-<td>書体・色・アウトライン・サイズ・文字揃え・行間・字間・光彩・ドロップシャドウ</td>
+<td>書体・色・アウトライン・サイズ・文字揃え・行間・字間・光彩・ドロップシャドウ・座布団</td>
 </tr>
 <tr>
 <td><code>linkedCutId</code></td>

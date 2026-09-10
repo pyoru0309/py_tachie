@@ -457,6 +457,221 @@ export function tintSilhouetteCanvas(silCanvas, hexColor, opacity, slot) {
   return out;
 }
 
+// =============================================================================
+// 座布団 (text plate)
+//
+// 文字の「仮想ボディ」矩形に XY マージンを足した矩形を、文字の下に敷く装飾。
+// セリフ枠 (dialogue box) との違い:
+//   ・基準が **文字の仮想ボディ** (= フォント固有の fontBoundingBox 由来の行高 ×
+//     行の advance 幅)。ink bbox ではないので、同じ書体・サイズなら本文が変わっても
+//     座布団の厚みが行ごとに揺れない。
+//   ・marginX / marginY は任意の数値。負値も許容する (= 文字に食い込ませる)。
+//   ・mode="block" で複数行を包む 1 枚、mode="line" で行 (縦書きなら列) ごとに
+//     独立した矩形を敷ける。
+//   ・**テキストの配置には一切影響しない**。セリフ枠の padding は帯の大きさ =
+//     折り返し幅を決めるが、座布団はレイアウト確定後に敷くだけの装飾レイヤー。
+//
+// 描画順は「座布団 → ドロップシャドウ → 光彩 → アウトライン → 本体 fill」。
+// 影と光彩が座布団の上に乗るので、座布団に落ちる影という自然な見え方になる。
+// =============================================================================
+
+export const TEXT_PLATE_DEFAULT = {
+  enabled: false,
+  // "block" = 全行を包む 1 枚 / "line" = 行 (縦書きなら列) ごとに 1 枚
+  mode: "block",
+  // mode="line" のときのみ: "fit" = 行ごとの実寸幅 / "uniform" = 最長行に揃える
+  lineWidthMode: "fit",
+  marginX: 24,
+  marginY: 12,
+  // 仮想ボディの上下左右の余りは書体ごとに非対称 (fontBoundingBoxAscent/Descent が
+  // 実際のインク位置と一致しない)。その視覚的なズレを手で補正するための平行移動 px。
+  offsetX: 0,
+  offsetY: 0,
+  fillColor: "#000000",
+  fillOpacity: 0.6,
+  borderColor: "#ffffff",
+  borderWidth: 0,
+  borderOpacity: 1,
+  radius: 0,
+};
+
+// style.textPlate を描画用に正規化する。描くものが何も無ければ null。
+// bbox 見積り (title-editor/bbox.js) からも使うので export する。
+export function resolveTextPlate(style) {
+  const raw = (style && typeof style.textPlate === "object") ? style.textPlate : null;
+  if (!raw || !raw.enabled) return null;
+  // null / undefined / "" は「未指定」= 既定値。Number(null) === 0 に落ちて
+  // 「余白 0」になってしまうのを避ける。
+  const num = (v, fallback) => {
+    if (v === null || v === undefined || v === "") return fallback;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const plate = {
+    mode: String(raw.mode || TEXT_PLATE_DEFAULT.mode).toLowerCase() === "line" ? "line" : "block",
+    lineWidthMode:
+      String(raw.lineWidthMode || TEXT_PLATE_DEFAULT.lineWidthMode).toLowerCase() === "uniform"
+        ? "uniform" : "fit",
+    // マージンは負値可 (= 仮想ボディより内側に食い込ませる)。
+    marginX: num(raw.marginX, TEXT_PLATE_DEFAULT.marginX),
+    marginY: num(raw.marginY, TEXT_PLATE_DEFAULT.marginY),
+    // 位置だけずらす (大きさは変えない)。marginY と組み合わせると上下の縁を独立に決められる。
+    offsetX: num(raw.offsetX, TEXT_PLATE_DEFAULT.offsetX),
+    offsetY: num(raw.offsetY, TEXT_PLATE_DEFAULT.offsetY),
+    fillColor: raw.fillColor || TEXT_PLATE_DEFAULT.fillColor,
+    fillOpacity: Math.max(0, Math.min(1, num(raw.fillOpacity, TEXT_PLATE_DEFAULT.fillOpacity))),
+    borderColor: raw.borderColor || TEXT_PLATE_DEFAULT.borderColor,
+    borderWidth: Math.max(0, num(raw.borderWidth, TEXT_PLATE_DEFAULT.borderWidth)),
+    borderOpacity: Math.max(0, Math.min(1, num(raw.borderOpacity, TEXT_PLATE_DEFAULT.borderOpacity))),
+    radius: Math.max(0, num(raw.radius, TEXT_PLATE_DEFAULT.radius)),
+  };
+  const paintsFill = plate.fillOpacity > 0;
+  const paintsBorder = plate.borderWidth > 0 && plate.borderOpacity > 0;
+  if (!paintsFill && !paintsBorder) return null;
+  return plate;
+}
+
+// 行 (縦書きなら列) ごとの仮想ボディ矩形。座標系・進み方は drawTextLines /
+// drawTextColumns の実装と 1:1 で対応させること (ずれると座布団だけ浮く)。
+function _textBodyRects(params) {
+  const {
+    textLeft, textTop, lines, baseLineWidths, baseLineHeights,
+    baseW, lineGap, outlineWidth, align, vertical,
+  } = params;
+  const rects = [];
+  const lineIsEmpty = (i) => !String(lines?.[i] ?? "").trim();
+  if (vertical) {
+    // 縦書き: 1 行 = 1 カラム。columns[0] が最右カラム (drawTextColumns と同じ)。
+    const { columns, colWidth, colGap, baseH } = vertical;
+    const nCols = columns.length;
+    const colStride = colWidth + colGap + outlineWidth * 2;
+    const blockY = textTop + outlineWidth;
+    for (let i = 0; i < nCols; i += 1) {
+      const col = columns[i];
+      const colX = textLeft + outlineWidth + (nCols - 1 - i) * colStride;
+      let colTop = blockY;
+      if (align === "right") colTop += baseH - col.height;
+      else if (align !== "left") colTop += (baseH - col.height) / 2;
+      rects.push({
+        x: colX, y: colTop, w: colWidth, h: col.height,
+        // uniform 時に使う「行送り軸方向のブロック全長」
+        uniformY: blockY, uniformH: baseH,
+        empty: lineIsEmpty(i),
+      });
+    }
+    return rects;
+  }
+  const blockX = textLeft + outlineWidth;
+  let top = textTop + outlineWidth;
+  for (let i = 0; i < lines.length; i += 1) {
+    const lineW = baseLineWidths[i];
+    let x = blockX;
+    if (align === "right") x += baseW - lineW;
+    else if (align !== "left") x += (baseW - lineW) / 2;
+    rects.push({
+      x, y: top, w: lineW, h: baseLineHeights[i],
+      uniformX: blockX, uniformW: baseW,
+      empty: lineIsEmpty(i),
+    });
+    top += baseLineHeights[i] + lineGap + outlineWidth * 2;
+  }
+  return rects;
+}
+
+function _inflateRect(x, y, w, h, plate) {
+  return {
+    x: x - plate.marginX + plate.offsetX,
+    y: y - plate.marginY + plate.offsetY,
+    w: w + plate.marginX * 2,
+    h: h + plate.marginY * 2,
+  };
+}
+
+// 仮想ボディ矩形 → 実際に塗る矩形の配列。
+export function computeTextPlateRects(plate, params) {
+  const bodies = _textBodyRects(params);
+  if (bodies.length === 0) return [];
+  const isVertical = !!params.vertical;
+  if (plate.mode === "line") {
+    const out = [];
+    for (const b of bodies) {
+      // 空行に座布団は敷かない (改行だけの行に板が出るのを避ける)。
+      if (b.empty) continue;
+      let { x, y, w, h } = b;
+      if (plate.lineWidthMode === "uniform") {
+        // 行送りと直交する軸をブロック全長に揃える (横書き=幅、縦書き=高さ)。
+        if (isVertical) { y = b.uniformY; h = b.uniformH; }
+        else { x = b.uniformX; w = b.uniformW; }
+      }
+      out.push(_inflateRect(x, y, w, h, plate));
+    }
+    return out;
+  }
+  // block: 全行の仮想ボディを包む 1 枚 (空行も行送りぶんは含める)。
+  let left = Infinity; let top = Infinity; let right = -Infinity; let bottom = -Infinity;
+  for (const b of bodies) {
+    left = Math.min(left, b.x);
+    top = Math.min(top, b.y);
+    right = Math.max(right, b.x + b.w);
+    bottom = Math.max(bottom, b.y + b.h);
+  }
+  if (!Number.isFinite(left) || !Number.isFinite(top)) return [];
+  return [_inflateRect(left, top, right - left, bottom - top, plate)];
+}
+
+// 時計回りの角丸矩形 subpath。巻き方向を揃えることで、mode="line" で行が
+// 重なっても nonzero fill が union になり、半透明の濃度ムラが出ない。
+// Path2D.roundRect はブラウザ間で可用性がまちまちなので arcTo で自前実装する。
+function _roundRectSubpath(path, x, y, w, h, radius) {
+  const r = Math.max(0, Math.min(radius, Math.min(w, h) / 2));
+  if (r <= 0) {
+    path.rect(x, y, w, h);
+    return;
+  }
+  const right = x + w;
+  const bottom = y + h;
+  path.moveTo(x + r, y);
+  path.lineTo(right - r, y);
+  path.arcTo(right, y, right, y + r, r);
+  path.lineTo(right, bottom - r);
+  path.arcTo(right, bottom, right - r, bottom, r);
+  path.lineTo(x + r, bottom);
+  path.arcTo(x, bottom, x, bottom - r, r);
+  path.lineTo(x, y + r);
+  path.arcTo(x, y, x + r, y, r);
+  path.closePath();
+}
+
+// ctx の filter / globalCompositeOperation / globalAlpha は触らない。
+// fade 系アニメの globalAlpha をそのまま継承させて、文字と一緒に座布団も
+// フェードさせるため (= 装飾は本体と同じ透明度で動くのが自然)。
+export function paintTextPlate(ctx, rects, plate) {
+  if (!Array.isArray(rects) || rects.length === 0) return;
+  const path = new Path2D();
+  let any = false;
+  for (const r of rects) {
+    if (!(r.w > 0) || !(r.h > 0)) continue;  // 負マージンで潰れた矩形は捨てる
+    _roundRectSubpath(path, r.x, r.y, r.w, r.h, plate.radius);
+    any = true;
+  }
+  if (!any) return;
+  ctx.save();
+  if (plate.fillOpacity > 0) {
+    ctx.fillStyle = hexToRgba(plate.fillColor, plate.fillOpacity);
+    ctx.fill(path);
+  }
+  if (plate.borderWidth > 0 && plate.borderOpacity > 0) {
+    ctx.strokeStyle = hexToRgba(plate.borderColor, plate.borderOpacity);
+    ctx.lineWidth = plate.borderWidth;
+    // 角丸 0 のときに外側の角を丸められたくないので miter で留める
+    // (90° の join は miter 比 1.41 なので既定の miterLimit=10 で十分)。
+    ctx.lineJoin = "miter";
+    ctx.miterLimit = 10;
+    ctx.stroke(path);
+  }
+  ctx.restore();
+}
+
 // telop 1 件を ctx に描画。drawTelopsOnCanvas / drawTextClip(kind=caption) の
 // どちらからも呼ばれる。
 //
@@ -762,6 +977,15 @@ export function drawCaptionClip(ctx, telop, timelineSec) {
     // 縦書き: drawTextLines 冒頭で drawTextColumns へディスパッチされる。
     vertical: verticalData,
   };
+
+  // ★ 座布団 (text plate): 文字の仮想ボディ + マージンの矩形を本体より下に敷く。
+  //   ここで描くことで、以降のドロップシャドウ / 光彩 / アウトライン / 本体 fill が
+  //   すべて座布団の上に乗る。anchor / textLeft / textTop は既に確定済みなので、
+  //   座布団を有効にしても文字位置は 1px も動かない (= セリフ枠との決定的な違い)。
+  const textPlate = resolveTextPlate(style);
+  if (textPlate) {
+    paintTextPlate(ctx, computeTextPlateRects(textPlate, drawParams), textPlate);
+  }
 
   const glow = style.glow && typeof style.glow === "object" ? style.glow : null;
   const shadow = style.dropShadow && typeof style.dropShadow === "object" ? style.dropShadow : null;

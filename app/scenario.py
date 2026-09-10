@@ -1682,6 +1682,47 @@ def _normalize_effect_intensity(value: Any) -> float:
     return round(max(1.0, min(8.0, n)), 2)
 
 
+# 座布団 (text plate): 文字の仮想ボディ矩形に XY マージンを足した背景 + 枠線。
+# セリフ枠と違い「レイアウトに影響しない純粋な装飾」なので、値域だけ守れば
+# クライアント (renderer/text-core.js: resolveTextPlate) がそのまま描画に使える。
+_TEXT_PLATE_MODES = ("block", "line")
+_TEXT_PLATE_LINE_WIDTH_MODES = ("fit", "uniform")
+
+
+def _normalize_text_plate_style(raw: dict[str, Any]) -> dict[str, Any]:
+    def _num(key: str, fallback: float) -> float:
+        try:
+            value = raw.get(key)
+            return float(fallback if value is None else value)
+        except (TypeError, ValueError):
+            return float(fallback)
+
+    mode = str(raw.get("mode") or "block").lower()
+    if mode not in _TEXT_PLATE_MODES:
+        mode = "block"
+    line_width_mode = str(raw.get("lineWidthMode") or "fit").lower()
+    if line_width_mode not in _TEXT_PLATE_LINE_WIDTH_MODES:
+        line_width_mode = "fit"
+    return {
+        "enabled": bool(raw.get("enabled", False)),
+        "mode": mode,
+        "lineWidthMode": line_width_mode,
+        # マージンは負値可 (= 仮想ボディより内側へ食い込ませる)。
+        "marginX": round(max(-500.0, min(500.0, _num("marginX", 24.0))), 2),
+        "marginY": round(max(-500.0, min(500.0, _num("marginY", 12.0))), 2),
+        # 書体ごとの仮想ボディの偏り (ascent/descent と実インク位置のズレ) を
+        # 手で補正するための平行移動。大きさは変えない。
+        "offsetX": round(max(-500.0, min(500.0, _num("offsetX", 0.0))), 2),
+        "offsetY": round(max(-500.0, min(500.0, _num("offsetY", 0.0))), 2),
+        "fillColor": _normalize_hex_color(raw.get("fillColor"), "#000000"),
+        "fillOpacity": round(max(0.0, min(1.0, _num("fillOpacity", 0.6))), 3),
+        "borderColor": _normalize_hex_color(raw.get("borderColor"), "#ffffff"),
+        "borderWidth": round(max(0.0, min(60.0, _num("borderWidth", 0.0))), 2),
+        "borderOpacity": round(max(0.0, min(1.0, _num("borderOpacity", 1.0))), 3),
+        "radius": round(max(0.0, min(500.0, _num("radius", 0.0))), 2),
+    }
+
+
 def _normalize_drop_shadow_style(raw: dict[str, Any]) -> dict[str, Any]:
     try:
         blur_px = max(0.0, float(raw.get("blurPx") if raw.get("blurPx") is not None else 6.0))
@@ -1840,6 +1881,12 @@ def _normalize_telop(telop: dict[str, Any], index: int) -> dict[str, Any]:
         shadow_raw = style_raw.get("dropShadow")
         if isinstance(shadow_raw, dict):
             style["dropShadow"] = _normalize_drop_shadow_style(shadow_raw)
+        # ★ 座布団 (text plate)。style に無いテロップには生やさない (= 遅延生成)
+        #   ので、既存プロジェクトの JSON は 1 バイトも増えない。無効化しても
+        #   キーは残す (色・マージンの設定を保ったまま ON/OFF できるように)。
+        plate_raw = style_raw.get("textPlate")
+        if isinstance(plate_raw, dict):
+            style["textPlate"] = _normalize_text_plate_style(plate_raw)
     # R8: 個別文字間カーニングは schema 強制 (空なら出力しない)。
     if "charKerning" in style:
         ck = _normalize_char_kerning(style.get("charKerning"))
