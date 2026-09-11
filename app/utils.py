@@ -20,9 +20,16 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from .global_config import current_projects_dir
 from .log_setup import app_logger
 from .paths import ACTIVE_PROJECT_PATH, DEFAULT_PROJECT_ID, PROJECT_ROOT, STATE_DIR
+from .project_locations import (
+    default_projects_dir,
+    find_project_location,
+    invalidate_project_scan_cache,
+    iter_project_files,
+    load_locations,
+    project_id_exists,
+)
 
 _log = app_logger("project")
 
@@ -53,10 +60,17 @@ def slugify_project_id(value: str) -> str:
 
 
 def unique_project_id(raw_id: str) -> str:
+    """**全保管場所を通じて**衝突しない project_id を返す。
+
+    project_id はディスク上のディレクトリ名であると同時に、URL
+    (``/project-cache/<id>/``) やシナリオ内のアセットパス (``projects/<id>/assets/...``)
+    のキーでもある。保管場所が複数あっても一意でないと参照が曖昧になるので、
+    衝突判定は 1 箇所ではなく全保管場所に対して行う。
+    """
     base_id = slugify_project_id(raw_id)
     project_id = base_id
     suffix = 2
-    while (current_projects_dir() / project_id / "project.json").exists():
+    while project_id_exists(project_id):
         project_id = f"{base_id}_{suffix}"
         suffix += 1
     return project_id
@@ -64,10 +78,16 @@ def unique_project_id(raw_id: str) -> str:
 
 def project_context(project_id: str | None = None) -> ProjectContext:
     project_id = slugify_project_id(project_id or active_project_id())
-    # 既存プロジェクトならディスク上の実フォルダ名に寄せる (NFD/NFC のブレ吸収)。
-    # 新規作成時は実在しないので slug のまま使う。
-    project_id = resolve_project_dir_name(project_id) or project_id
-    root = current_projects_dir() / project_id
+    # 既存プロジェクトなら「どの保管場所の、ディスク上のどの綴りか」を引く
+    # (NFD/NFC のブレ吸収 + 外付けディスク等の別保管場所への追従)。
+    # 新規作成時は実在しないので slug のまま、既定保管場所の下に置く。
+    found = find_project_location(project_id)
+    if found is not None:
+        _location, project_dir = found
+        project_id = project_dir.name
+        root = project_dir
+    else:
+        root = default_projects_dir() / project_id
     return ProjectContext(
         id=project_id,
         root=root,
@@ -96,18 +116,8 @@ def resolve_project_dir_name(candidate: str) -> str | None:
     """
     if not candidate:
         return None
-    root = current_projects_dir()
-    direct = root / candidate
-    if (direct / "project.json").exists():
-        # 実際に存在するが、NFD/NFC が違うと `direct.name` は candidate のまま。
-        # ディスク側の綴りへ寄せるため下の総当たりも通す。
-        pass
-    target = unicodedata.normalize("NFC", candidate)
-    for project_file in root.glob("*/project.json"):
-        name = project_file.parent.name
-        if name == candidate or unicodedata.normalize("NFC", name) == target:
-            return name
-    return None
+    found = find_project_location(candidate)
+    return found[1].name if found is not None else None
 
 
 def fallback_project_id() -> str:
@@ -119,7 +129,7 @@ def fallback_project_id() -> str:
     """
     best_name = ""
     best_key = ""
-    for project_file in sorted(current_projects_dir().glob("*/project.json")):
+    for project_file in sorted(iter_project_files(), key=lambda p: p.parent.name):
         name = project_file.parent.name
         try:
             with project_file.open("r", encoding="utf-8") as handle:
@@ -172,8 +182,74 @@ def relative_to_root(path: Path) -> str:
     Windows 上で OS native の ``str(Path)`` を使うとバックスラッシュが入って
     フォント未登録・前景解決失敗・JSON 異種混在を引き起こす (実際 Windows 移行で
     プレビュー描画が崩れる事例があった)。よって常に POSIX に正規化して返す。
+
+    ★ 保管場所が複数ある場合、プロジェクトは PROJECT_ROOT の外 (外付けディスク等) に
+      置かれうる。その場合でも **論理パスは従来どおり ``projects/<id>/...``** を返す。
+      シナリオ JSON に埋まっているアセットパスや ``/assets/...`` ルートの形を変えずに
+      済ませるためで、逆変換は ``resolve_root_rel`` が保管場所を横断して行う。
     """
-    return path.relative_to(PROJECT_ROOT).as_posix()
+    try:
+        return path.relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        pass
+    resolved = path.resolve(strict=False)
+    for location in load_locations():
+        try:
+            rel = resolved.relative_to(location.path.resolve(strict=False))
+        except ValueError:
+            continue
+        # <保管場所>/<project_id>/... → projects/<project_id>/...
+        return Path("projects").joinpath(rel).as_posix()
+    raise ValueError(f"{path!r} is not under PROJECT_ROOT or any project location")
+
+
+def allowed_asset_roots() -> list[Path]:
+    """アセットとして読み書きを許すディレクトリの一覧 (resolve 済み)。
+
+    従来は PROJECT_ROOT だけだったが、プロジェクトの保管場所を複数持てるように
+    なったため、**登録済み保管場所も許可範囲に含める**。ここに含まれないパスへの
+    アクセスは traversal とみなして拒否する (allowlist 方式は据え置き)。
+    """
+    roots = [PROJECT_ROOT.resolve()]
+    for location in load_locations():
+        try:
+            resolved = location.path.resolve(strict=False)
+        except OSError:
+            continue
+        if resolved not in roots:
+            roots.append(resolved)
+    return roots
+
+
+def is_inside_allowed_roots(path: Path) -> bool:
+    """``path`` が PROJECT_ROOT か登録済み保管場所の内側にあるか。"""
+    try:
+        target = path.resolve(strict=False)
+    except OSError:
+        return False
+    for root in allowed_asset_roots():
+        try:
+            target.relative_to(root)
+            return True
+        except ValueError:
+            continue
+    return False
+
+
+def resolve_root_rel(rel_path: str | Path) -> Path:
+    """``relative_to_root`` の逆。論理相対パスを実ファイルパスへ解決する。
+
+    ``projects/<id>/...`` はプロジェクトの実際の保管場所を引いてから join する。
+    それ以外 (``assets/...`` / ``static/...`` など) は従来どおり PROJECT_ROOT 起点。
+    存在チェックはしないので、呼び出し側で ``is_file()`` 等を確認すること。
+    """
+    rel = str(rel_path).replace("\\", "/").lstrip("/")
+    parts = [p for p in rel.split("/") if p not in ("", ".")]
+    if len(parts) >= 2 and parts[0] == "projects":
+        found = find_project_location(parts[1])
+        if found is not None:
+            return found[1].joinpath(*parts[2:]) if len(parts) > 2 else found[1]
+    return PROJECT_ROOT.joinpath(*parts) if parts else PROJECT_ROOT
 
 
 def copy_if_missing(source: Path, destination: Path) -> None:
@@ -199,6 +275,9 @@ def ensure_project(project_id: str | None = None) -> ProjectContext:
         directory.mkdir(parents=True, exist_ok=True)
 
     if not ctx.project_file.exists():
+        # 新しいプロジェクトディレクトリが増えるので、保管場所の索引を落とす。
+        # (ディレクトリ mtime でも大抵は外れるが、粒度をすり抜けたときの保険)
+        invalidate_project_scan_cache()
         project = {
             "version": 1,
             "id": ctx.id,

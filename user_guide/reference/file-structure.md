@@ -116,7 +116,7 @@ projects/<project_id>/
 
 ## `app_state/global_config.json`
 
-全体設定 (動画プリセット / ffmpeg のパス / プロジェクトフォルダ / Undo 履歴サイズ / quietMode / `vendor.useCdn` / `fontWeightOverrides` / `tts.voicevoxAppPath` / `tts.voicevoxBaseUrl` / `tts.voicepeakBinPath` / `backup.autoIntervalMinutes` / `backup.autoRetentionCount` / `cache.autoPruneOnStartup` / `cache.autoPruneOlderThanDays` 等) を保存します。
+全体設定 (動画プリセット / ffmpeg のパス / プロジェクトの保管場所 (`projectsPath` / `projectLocations` / `defaultProjectLocationId`) / Undo 履歴サイズ / quietMode / `vendor.useCdn` / `fontWeightOverrides` / `tts.voicevoxAppPath` / `tts.voicevoxBaseUrl` / `tts.voicepeakBinPath` / `backup.autoIntervalMinutes` / `backup.autoRetentionCount` / `cache.autoPruneOnStartup` / `cache.autoPruneOlderThanDays` 等) を保存します。
 複数のリポジトリで使い回したい場合は、このファイルを共有 / バージョン管理から外すなどで運用してください。
 
 ## `app_state/voice_catalog.json`
@@ -132,6 +132,7 @@ three.js / mp4box.js のローカル取得状況を記録します。サーバ�
 ## プロジェクト ZIP アーカイブの構造
 
 ダッシュボードの `アーカイブ` で書き出される zip は、トップに `<project_id>/` を 1 段持ちます。
+ファイル名 / zip 内のエントリ名は常に **NFC** に正規化されます (macOS が濁音を NFD で保持していても、Windows で解凍したときに文字化けや参照切れが起きないようにするため)。
 
 ```text
 <project_id>.splite.zip

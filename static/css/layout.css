@@ -709,14 +709,22 @@
   justify-content: flex-end;
 }
 
+/* 保管場所フィルタは「保管場所が 2 つ以上あるときだけ」出る (JS が hidden を
+   立てる) ため、列数固定の grid ではなく wrap する flex にしてある。 */
 .dashboard-tools {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) 180px 190px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
   margin-bottom: 18px;
 }
 
 .dashboard-tools label {
+  flex: 0 1 190px;
   margin-top: 0;
+}
+
+.dashboard-tools label:first-child {
+  flex: 1 1 220px;
 }
 
 .project-grid {
@@ -786,8 +794,16 @@
 
 .project-card-actions {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
   justify-content: flex-end;
+}
+
+/* flex 子は既定で flex-shrink:1 なので、ボタンが増えると横に潰されてラベルが
+   「名称変 / 更」のように改行される。潰さず折り返す。 */
+.project-card-actions button {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .dashboard-empty {

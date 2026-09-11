@@ -228,7 +228,8 @@ git reset --hard origin/main
 | `app/render.py` | フレーム生成・タイムコード解決・キャラ補間 |
 | `app/export_video.py` | 動画書き出し補助 (ffmpeg 引数 / amix / 音声レベル算出) |
 | `app/v2_export.py` | WebGL/three.js 経路の動画書き出し (本線) |
-| `app/global_config.py` | 全体設定 (動画プリセット・ffmpeg パス・プロジェクトフォルダ・vendor) |
+| `app/global_config.py` | 全体設定 (動画プリセット・ffmpeg パス・プロジェクトの保管場所・vendor) |
+| `app/project_locations.py` | プロジェクトの保管場所 (組み込み + 追加フォルダ) の解決・横断走査 |
 | `app/vendor.py` | three.js / mp4box.js を `static/vendor/` へ取得 / active 切替 |
 | `app/fonts.py` | Noto Sans JP などのデフォルトフォントを `assets/fonts/` へ取得 |
 | `app/project_archive.py` | プロジェクトディレクトリ → ZIP の書き出し |
@@ -240,7 +241,7 @@ git reset --hard origin/main
 | `static/vendor/` | three.js / mp4box.js のローカル vendor (`active.json` で現行 version) |
 | `assets/` | 共通素材 (キャラクター・背景・音声・フォント・装飾) |
 | `assets/characters/<id>/` | 共通キャラ素材。通常は READ ONLY |
-| `projects/<id>/` | プロジェクト固有データ (`project.json` / `config.json` / `scenarios/` / `assets/` / `outputs/` / `cache/`) |
+| `projects/<id>/` | プロジェクト固有データ (`project.json` / `config.json` / `scenarios/` / `assets/` / `outputs/` / `cache/`)。全体設定で保管場所を追加すると、外付けディスク等の別フォルダにも同じ構造で置ける |
 | `app_state/` | アプリ状態 (起動中プロジェクト・全体設定 `global_config.json`) |
 | `cache/` / `outputs/` | グローバルキャッシュ・書き出し置き場 (Git 管理外) |
 | `tools/` | PSD 取り込み・旧素材移行 |

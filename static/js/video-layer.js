@@ -26,7 +26,7 @@ import {
   videoLayerDurationSec,
 } from "./scenario.js";
 import { showToast } from "./toast.js";
-import { recordHistory } from "./history.js";
+import { recordHistory, beginCoalescedHistory } from "./history.js";
 import { renderTelopTrack } from "./timeline.js";
 import { invalidateRendererCachesForConfigChange } from "./playback.js";
 
@@ -643,6 +643,15 @@ export function renderVideoLayerEditor() {
   if (empty) empty.hidden = true;
 
   const live = () => findVideoLayerById(vlId);
+  // 履歴フック: この編集パネルの変更はすべて saveWithHistory() を通す。
+  // 個別ハンドラに recordHistory を撒くと必ず漏れが出て、漏れた編集は
+  // 「次に履歴を積む操作」のエントリに吸収され、undo 1 回で複数項目が
+  // まとめて巻き戻る (テロップ本文で実際に起きた症状と同根)。
+  // 対象 (= vlId) をキーにするので、別項目へ移った瞬間に前の項目が確定する。
+  const saveWithHistory = () => {
+    beginCoalescedHistory(`vl:${vlId}`);
+    deps.scheduleScenarioSave();
+  };
   const refreshPanel = () => {
     // duration が後から fetch されてきた場合に trim 入力の最大値を更新するため
     // 編集パネル全体を再描画。
@@ -693,7 +702,7 @@ export function renderVideoLayerEditor() {
     // 末尾までを使うデフォルトにする。
     cur.trimStartSec = 0;
     cur.trimEndSec = null;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     renderTelopTrack();
     // src 変更でテクスチャ / provider / audio が変わるので active scene を捨てる。
     invalidateRendererCachesForConfigChange();
@@ -738,7 +747,7 @@ export function renderVideoLayerEditor() {
       const cur = live();
       if (!cur) return;
       cur.startFrame = Math.max(0, frames | 0);
-      deps.scheduleScenarioSave();
+      saveWithHistory();
       renderTelopTrack();
       deps.renderPreview();
     },
@@ -766,7 +775,7 @@ export function renderVideoLayerEditor() {
     const dur = _videoDurationSecFor(cur);
     const trimEnd = videoLayerTrimEndSec(cur, dur);
     cur.trimStartSec = Math.max(0, Math.min(trimEnd - 0.05, v));
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     renderTelopTrack();
     deps.renderPreview();
   });
@@ -793,7 +802,7 @@ export function renderVideoLayerEditor() {
     const dur = _videoDurationSecFor(cur);
     const max = dur > 0 ? dur : v;
     cur.trimEndSec = Math.max((cur.trimStartSec ?? 0) + 0.05, Math.min(max, v));
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     renderTelopTrack();
     deps.renderPreview();
   });
@@ -829,7 +838,7 @@ export function renderVideoLayerEditor() {
     const cur = live();
     if (!cur) return;
     cur.fit = fitSelect.value;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     deps.renderPreview();
   });
   fitLabel.append(fitSelect);
@@ -848,7 +857,7 @@ export function renderVideoLayerEditor() {
     if (!cur) return;
     const v = Number(scaleInput.value);
     cur.scale = Number.isFinite(v) ? Math.max(0.05, Math.min(4, v)) : 1.0;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     deps.renderPreview();
   });
   scaleLabel.append(scaleInput);
@@ -871,7 +880,7 @@ export function renderVideoLayerEditor() {
     if (!cur) return;
     const v = Number(offXInput.value);
     cur.offsetX = Number.isFinite(v) ? Math.max(-2000, Math.min(2000, v)) : 0;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     deps.renderPreview();
   });
   offXLabel.append(offXInput);
@@ -890,7 +899,7 @@ export function renderVideoLayerEditor() {
     if (!cur) return;
     const v = Number(offYInput.value);
     cur.offsetY = Number.isFinite(v) ? Math.max(-2000, Math.min(2000, v)) : 0;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     deps.renderPreview();
   });
   offYLabel.append(offYInput);
@@ -915,7 +924,7 @@ export function renderVideoLayerEditor() {
     const cur = live();
     if (!cur) return;
     cur.layer = layerSelect.value;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     renderTelopTrack();
     // z-stack 変更で plane の renderLayer が変わるので active scene を捨てて再 build
     invalidateRendererCachesForConfigChange();
@@ -963,7 +972,7 @@ export function renderVideoLayerEditor() {
     if (!cur) return;
     const v = Number(opacityInput.value);
     cur.opacity = Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1.0;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     deps.renderPreview();
   });
   opacityLabel.append(opacityInput);
@@ -982,7 +991,7 @@ export function renderVideoLayerEditor() {
     const cur = live();
     if (!cur) return;
     cur.fadeInEnabled = fadeInToggle.checked;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     deps.renderPreview();
   });
   fadeInToggleLabel.append(fadeInToggle, document.createTextNode(" フェードイン"));
@@ -1000,7 +1009,7 @@ export function renderVideoLayerEditor() {
     if (!cur) return;
     const v = Number(fadeInSecInput.value);
     cur.fadeInSec = Number.isFinite(v) ? Math.max(0, Math.min(60, v)) : 0;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     deps.renderPreview();
   });
   fadeInSecLabel.append(fadeInSecInput);
@@ -1019,7 +1028,7 @@ export function renderVideoLayerEditor() {
     const cur = live();
     if (!cur) return;
     cur.fadeOutEnabled = fadeOutToggle.checked;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     deps.renderPreview();
   });
   fadeOutToggleLabel.append(fadeOutToggle, document.createTextNode(" フェードアウト"));
@@ -1037,7 +1046,7 @@ export function renderVideoLayerEditor() {
     if (!cur) return;
     const v = Number(fadeOutSecInput.value);
     cur.fadeOutSec = Number.isFinite(v) ? Math.max(0, Math.min(60, v)) : 0;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     deps.renderPreview();
   });
   fadeOutSecLabel.append(fadeOutSecInput);
@@ -1056,7 +1065,7 @@ export function renderVideoLayerEditor() {
     const cur = live();
     if (!cur) return;
     cur.muted = mutedInput.checked;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     deps.renderPreview();
   });
   mutedLabel.append(mutedInput, document.createTextNode(" 音声をミュート"));
@@ -1075,7 +1084,7 @@ export function renderVideoLayerEditor() {
     if (!cur) return;
     const v = Number(volInput.value);
     cur.volume = Number.isFinite(v) ? Math.max(0, Math.min(2, v)) : 1.0;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
   });
   volLabel.append(volInput);
   audioRow.append(volLabel);

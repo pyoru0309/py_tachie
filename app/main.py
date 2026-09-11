@@ -66,13 +66,31 @@ from .global_config import (
     resolve_video_preset,
     save_global_config,
 )
+from .project_locations import (
+    BUILTIN_LOCATION_ID,
+    default_location,
+    default_location_id,
+    default_projects_dir,
+    duplicate_project_ids,
+    find_project_location,
+    iter_project_dirs,
+    iter_project_files,
+    invalidate_project_scan_cache,
+    load_locations,
+    location_by_id,
+    project_id_exists,
+    slugify_location_id,
+    unique_project_id_across_locations,
+)
 from .utils import (
     ProjectContext,
     active_project_id,
     copy_if_missing,
     current_project,
     ensure_project,
+    is_inside_allowed_roots,
     project_context,
+    resolve_root_rel,
     project_thumbnail_path,
     read_project_file,
     relative_to_root,
@@ -544,9 +562,18 @@ async def _install_benign_connection_error_filter() -> None:
 
 @app.get("/api/projects")
 def list_projects() -> dict[str, Any]:
+    """全保管場所を横断してプロジェクトを列挙する。
+
+    各プロジェクトには「どの保管場所にあるか」(locationId / locationName) を付ける。
+    外れている保管場所 (未接続の外付けディスク等) はそもそも走査されないので、単に
+    一覧に出てこない — その事実は ``locations[].available`` から UI 側で分かる。
+    """
     projects = []
-    for project_file in sorted(current_projects_dir().glob("*/project.json")):
-        ctx = project_context(project_file.parent.name)
+    active_id = active_project_id()
+    location_counts: dict[str, int] = {}
+    for location, project_dir in sorted(iter_project_dirs(), key=lambda item: item[1].name):
+        location_counts[location.id] = location_counts.get(location.id, 0) + 1
+        ctx = project_context(project_dir.name)
         project = read_project_file(ctx)
         timestamp = project.get("lastOpenedAt") or project.get("updatedAt") or project.get("createdAt") or ""
         projects.append(
@@ -560,10 +587,156 @@ def list_projects() -> dict[str, Any]:
                 "currentScenario": project.get("currentScenario", "scenarios/main.json"),
                 "thumbnail": project_thumbnail_path(ctx),
                 "lastPlayheadFrame": int(project.get("lastPlayheadFrame") or 0),
-                "active": ctx.id == active_project_id(),
+                "active": ctx.id == active_id,
+                "locationId": location.id,
+                "locationName": location.name,
             }
         )
-    return {"activeProjectId": active_project_id(), "projects": projects}
+    default_id = default_location_id()
+    locations = []
+    for loc in load_locations():
+        entry = loc.to_dict(default_id=default_id)
+        entry["projectCount"] = location_counts.get(loc.id, 0)
+        locations.append(entry)
+    return {
+        "activeProjectId": active_id,
+        "projects": projects,
+        "locations": locations,
+        "defaultLocationId": default_id,
+        # 同じ ID のプロジェクトが複数の保管場所にあると、先勝ちで 1 つしか使えない。
+        # 黙って消えるのが一番まずいので UI へ報告する。
+        "duplicateIds": duplicate_project_ids(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# 保管場所 (storage locations)
+# ---------------------------------------------------------------------------
+# 「完成したプロジェクトを外付けディスクへ寄せつつ、一覧からは今までどおり見える」
+# ようにするための仕組み。実体解決は app/project_locations.py。
+def _locations_response() -> dict[str, Any]:
+    default_id = default_location_id()
+    locations = [loc.to_dict(default_id=default_id) for loc in load_locations()]
+    counts: dict[str, int] = {loc["id"]: 0 for loc in locations}
+    for location, _project_dir in iter_project_dirs():
+        counts[location.id] = counts.get(location.id, 0) + 1
+    for loc in locations:
+        loc["projectCount"] = counts.get(loc["id"], 0)
+    return {
+        "locations": locations,
+        "defaultLocationId": default_id,
+        "duplicateIds": duplicate_project_ids(),
+    }
+
+
+@app.get("/api/project-locations")
+def get_project_locations() -> dict[str, Any]:
+    return _locations_response()
+
+
+def _save_locations(entries: list[dict[str, Any]], default_id: str | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {"projectLocations": entries}
+    if default_id is not None:
+        payload["defaultProjectLocationId"] = default_id
+    try:
+        save_global_config(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    invalidate_project_scan_cache()
+    return _locations_response()
+
+
+def _extra_location_entries() -> list[dict[str, Any]]:
+    """組み込みを除いた保管場所を、保存形式 ([{id,name,path}]) で返す。"""
+    return [
+        {"id": loc.id, "name": loc.name, "path": str(loc.path)}
+        for loc in load_locations()
+        if not loc.builtin
+    ]
+
+
+@app.post("/api/project-locations")
+def add_project_location(payload: dict[str, Any]) -> dict[str, Any]:
+    """保管場所を追加する。
+
+    ``create=true`` かつ親ディレクトリが存在するときだけディレクトリを作る。
+    ``/Volumes/<未接続>/...`` に対して mkdir(parents=True) をすると起動ディスク上に
+    空のマウントポイントを作ってしまうので、親の存在確認は必須。
+    """
+    raw_path = str((payload or {}).get("path") or "").strip()
+    if not raw_path:
+        raise HTTPException(status_code=400, detail="保管場所のパスを入力してください")
+    path = Path(raw_path).expanduser()
+    if not path.is_absolute():
+        raise HTTPException(status_code=400, detail="保管場所は絶対パスで指定してください")
+    if bool((payload or {}).get("create")) and not path.is_dir():
+        if not path.parent.is_dir():
+            raise HTTPException(
+                status_code=400,
+                detail=f"親フォルダが存在しません: {path.parent}（外付けディスクなら接続を確認してください）",
+            )
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise HTTPException(status_code=400, detail=f"フォルダを作成できません: {exc}") from exc
+    if path.exists() and not path.is_dir():
+        raise HTTPException(status_code=400, detail=f"ディレクトリではありません: {path}")
+    resolved = path.resolve(strict=False)
+    for existing in load_locations():
+        if existing.path.resolve(strict=False) == resolved:
+            raise HTTPException(status_code=409, detail=f"すでに登録されています: {existing.name}")
+    entries = _extra_location_entries()
+    name = str((payload or {}).get("name") or "").strip() or path.name
+    entries.append({"id": slugify_location_id(str((payload or {}).get("id") or "") or path.name),
+                    "name": name, "path": str(path)})
+    return _save_locations(entries)
+
+
+@app.patch("/api/project-locations/{location_id}")
+def update_project_location(location_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """保管場所の表示名 / パスを変更する (組み込みは表示名変更不可、パスは projectsPath 側)。"""
+    target = location_by_id(location_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="保管場所が見つかりません")
+    if target.builtin:
+        raise HTTPException(
+            status_code=400,
+            detail="組み込みの保管場所は「プロジェクトフォルダの場所」から変更してください",
+        )
+    entries = _extra_location_entries()
+    for entry in entries:
+        if entry["id"] != target.id:
+            continue
+        if isinstance(payload.get("name"), str) and payload["name"].strip():
+            entry["name"] = payload["name"].strip()
+        if isinstance(payload.get("path"), str) and payload["path"].strip():
+            candidate = Path(payload["path"].strip()).expanduser()
+            if not candidate.is_absolute():
+                raise HTTPException(status_code=400, detail="保管場所は絶対パスで指定してください")
+            entry["path"] = str(candidate)
+    return _save_locations(entries)
+
+
+@app.delete("/api/project-locations/{location_id}")
+def delete_project_location(location_id: str) -> dict[str, Any]:
+    """保管場所の**登録を外す**。ディスク上のファイルには一切触れない。"""
+    target = location_by_id(location_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="保管場所が見つかりません")
+    if target.builtin:
+        raise HTTPException(status_code=400, detail="組み込みの保管場所は削除できません")
+    entries = [e for e in _extra_location_entries() if e["id"] != target.id]
+    default_id = default_location_id()
+    return _save_locations(entries, default_id=("" if default_id == target.id else default_id))
+
+
+@app.post("/api/project-locations/default")
+def set_default_project_location(payload: dict[str, Any]) -> dict[str, Any]:
+    """新規プロジェクト / ZIP 取り込みの保存先を切り替える。"""
+    wanted = str((payload or {}).get("id") or "").strip() or BUILTIN_LOCATION_ID
+    if location_by_id(wanted) is None:
+        raise HTTPException(status_code=404, detail="保管場所が見つかりません")
+    return _save_locations(_extra_location_entries(), default_id=("" if wanted == BUILTIN_LOCATION_ID else wanted))
 
 
 @app.post("/api/projects")
@@ -596,9 +769,14 @@ def update_project(project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     desired_slug = slugify_project_id(title)
     new_id = ctx.id
     if desired_slug != ctx.id:
-        projects_dir = current_projects_dir()
+        # リネームしてもプロジェクトは **今いる保管場所のまま**。移動は
+        # /api/projects/{id}/move が担当する。
+        projects_dir = ctx.root.parent
         # 他プロジェクトと slug が衝突するときは連番で回避 (タイトル衝突自体は
         # 許容する仕様なので、フォルダ名だけは数字 suffix で住み分ける)。
+        # 衝突判定は **全保管場所** に対して行う: project_id は URL / シナリオ内の
+        # アセットパスのキーでもあるので、別ディスク上の同名プロジェクトと被ると
+        # 参照が曖昧になる。
         # 「自分自身」との衝突判定は samefile() (= inode 比較) で行う。case-insensitive
         # FS (APFS default / NTFS) では `Foo` → `foo` のリネームで両 path が同じ
         # ディレクトリを指すため、単純な文字列比較 `candidate != ctx.id` だと
@@ -606,11 +784,11 @@ def update_project(project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         candidate = desired_slug
         suffix = 2
         while True:
-            candidate_root = projects_dir / candidate
-            if not (candidate_root / "project.json").exists():
+            found = find_project_location(candidate)
+            if found is None:
                 break
             try:
-                if candidate_root.samefile(ctx.root):
+                if found[1].samefile(ctx.root):
                     break  # 同じディレクトリを指している (case-only リネーム等)
             except (OSError, ValueError):
                 pass
@@ -638,6 +816,7 @@ def update_project(project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
                 ) from exc
             # active project pointer も追従。これを忘れると次回 active_project_id()
             # が空文字を返し、初期化時に別プロジェクトへ勝手に切り替わる。
+            invalidate_project_scan_cache()
             if active_project_id() == ctx.id:
                 set_active_project(new_id)
             ctx = project_context(new_id)
@@ -744,9 +923,86 @@ async def upload_project_render_png(project_id: str, request: Request) -> dict[s
     }
 
 
+def _rewrite_project_scoped_paths(project_root: Path, old_id: str, new_id: str) -> None:
+    """``projects/<old_id>/...`` を ``projects/<new_id>/...`` へ書き換える。
+
+    プロジェクト固有アセットのパスはシナリオ / config に ``projects/<id>/assets/...``
+    の形で埋まっている。ID が変わる複製・移動でここを直さないと、複製先が複製元の
+    アセットを参照し続け、複製元を消すと壊れる。
+    共通アセット (``assets/...``) は不変なので触らない。複製元以外の
+    ``projects/<other>/`` を指す cross-project パスも、実体は動いていないので
+    意図的にそのまま残す。
+    """
+    if old_id == new_id:
+        return
+    old_prefix = f"projects/{old_id}/"
+    new_prefix = f"projects/{new_id}/"
+    rewrite_targets = list(project_root.glob("scenarios/*.json"))
+    for name in ("project.json", "config.json", "expression_presets.json", "placement_presets.json"):
+        candidate = project_root / name
+        if candidate.exists():
+            rewrite_targets.append(candidate)
+    for target in rewrite_targets:
+        try:
+            text = target.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if old_prefix in text:
+            target.write_text(text.replace(old_prefix, new_prefix), encoding="utf-8")
+
+
+def _ignore_top_level_only(root: Path, names: set[str]):
+    """``shutil.copytree`` 用 ignore。**プロジェクト直下**の指定名だけを除外する。
+
+    ``shutil.ignore_patterns("cache")`` は**階層を問わず名前で一致する**ため、ユーザが
+    Finder で置いた ``参考資料/cache/`` のようなフォルダまで巻き添えで落ちる。移動は元を
+    消すので、これは復旧不能なデータ損失になる。除外はトップレベルに限定すること。
+    """
+    root_resolved = root.resolve()
+
+    def _ignore(directory: str, entries: list[str]) -> set[str]:
+        try:
+            here = Path(directory).resolve()
+        except OSError:
+            return set()
+        if here != root_resolved:
+            return set()
+        return {entry for entry in entries if entry in names}
+
+    return _ignore
+
+
+def _resolve_target_location(location_id: Any, *, purpose: str):
+    """payload の locationId から保管場所を解決する。空なら既定保管場所。"""
+    raw = str(location_id or "").strip()
+    location = location_by_id(raw) if raw else default_location()
+    if location is None:
+        raise HTTPException(status_code=404, detail=f"保管場所が見つかりません: {raw}")
+    if not location.available:
+        # 外付けディスクが外れている等。作れる場所なら作る (親があるときだけ)。
+        try:
+            if location.path.parent.is_dir():
+                location.path.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+    if not location.available:
+        raise HTTPException(
+            status_code=409,
+            detail=f"保管場所「{location.name}」が見つかりません（{location.path}）。"
+                   f"外付けディスクなら接続してから{purpose}してください。",
+        )
+    return location
+
+
 @app.post("/api/projects/{project_id}/duplicate")
 def duplicate_project(project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    """プロジェクト一式をディスクごと複製。新しい title は既存と被ってはならない。"""
+    """プロジェクト一式をディスクごと複製。新しい title は既存と被ってはならない。
+
+    ``locationId`` を渡すと別の保管場所 (外付けディスク等) へ複製する。省略時は既定。
+    ``includeOutputs=False`` を渡すと ``outputs/`` (書き出した動画 / PNG / 字幕) を
+    持っていかない。既定は **含める** — 手で置いたサムネや過去バージョンの書き出しも
+    「フォルダの複製」として運ぶのが素直なため。
+    """
     src_ctx = project_context(project_id)
     if not src_ctx.project_file.exists():
         raise HTTPException(status_code=404, detail="Project not found")
@@ -754,7 +1010,7 @@ def duplicate_project(project_id: str, payload: dict[str, Any]) -> dict[str, Any
     if not new_title:
         raise HTTPException(status_code=400, detail="新しいプロジェクト名を入力してください")
     # 既存タイトル衝突チェック
-    for existing in current_projects_dir().glob("*/project.json"):
+    for existing in iter_project_files():
         try:
             with existing.open("r", encoding="utf-8") as handle:
                 title = str(json.load(handle).get("title", "")).strip()
@@ -762,34 +1018,34 @@ def duplicate_project(project_id: str, payload: dict[str, Any]) -> dict[str, Any
             continue
         if title == new_title:
             raise HTTPException(status_code=409, detail=f"プロジェクト名「{new_title}」は既に使われています")
+    target_location = _resolve_target_location((payload or {}).get("locationId"), purpose="複製")
     new_project_id = unique_project_id(new_title)
-    dst_root = current_projects_dir() / new_project_id
+    dst_root = target_location.path / new_project_id
     if dst_root.exists():
         raise HTTPException(status_code=409, detail="複製先のフォルダがすでに存在します")
-    # ディスク上をまるごとコピー（cache/output/export 含む。重い場合は将来 ignore_patterns 検討）
-    shutil.copytree(src_ctx.root, dst_root, ignore=shutil.ignore_patterns("cache", "outputs"))
+    # ディスク上をフォルダごとコピーする。除外は **プロジェクト直下のこの名前だけ**で、
+    # ユーザが手で置いたファイルや手作りのサブフォルダには一切触れない
+    # (`shutil.ignore_patterns` は階層を問わず名前一致するので使わない)。
+    #   - cache/   : 常に除外。preview はシナリオ内の projects/<id>/... を含む token で
+    #                引くので、ID が変わる複製先では 1 枚も再利用できない死重になる。
+    #   - outputs/ : 既定は含める。includeOutputs=False で省ける (数百 MB あるため)。
+    skip = {"cache"}
+    include_outputs = (payload or {}).get("includeOutputs", True)
+    if not include_outputs:
+        skip.add("outputs")
+    try:
+        shutil.copytree(
+            src_ctx.root,
+            dst_root,
+            symlinks=True,
+            ignore=_ignore_top_level_only(src_ctx.root, skip),
+        )
+    except OSError as exc:
+        shutil.rmtree(dst_root, ignore_errors=True)
+        raise HTTPException(status_code=500, detail=f"複製に失敗しました: {exc}") from exc
+    invalidate_project_scan_cache()
     new_ctx = project_context(new_project_id)
-    # 複製元 ID を埋め込んだ project-scoped アセットパス (projects/<old_id>/assets/...)
-    # を複製先 ID に書き換える。copytree で実体はコピー済みだが、シナリオ等に旧 ID の
-    # パスが残ると複製先が旧プロジェクトのアセットを参照し続け、旧プロジェクトを削除
-    # すると複製が壊れる (= 報告されたバグ)。共通アセット (assets/...) は不変で正しい。
-    # 他プロジェクトを参照する cross-project パス (= 複製元以外の projects/<x>/) は
-    # 実体が複製されないため、意図的に書き換えず元の場所を指したままにする。
-    old_path_prefix = f"projects/{src_ctx.id}/"
-    new_path_prefix = f"projects/{new_ctx.id}/"
-    if old_path_prefix != new_path_prefix:
-        rewrite_targets = list(dst_root.glob("scenarios/*.json"))
-        for name in ("project.json", "config.json", "expression_presets.json", "placement_presets.json"):
-            candidate = dst_root / name
-            if candidate.exists():
-                rewrite_targets.append(candidate)
-        for target in rewrite_targets:
-            try:
-                text = target.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
-                continue
-            if old_path_prefix in text:
-                target.write_text(text.replace(old_path_prefix, new_path_prefix), encoding="utf-8")
+    _rewrite_project_scoped_paths(dst_root, src_ctx.id, new_ctx.id)
     # project.json を新 ID／タイトル／タイムスタンプで上書き
     now = datetime.now().isoformat(timespec="seconds")
     project = read_project_file(new_ctx)
@@ -802,7 +1058,119 @@ def duplicate_project(project_id: str, payload: dict[str, Any]) -> dict[str, Any
     })
     with new_ctx.project_file.open("w", encoding="utf-8") as handle:
         json.dump(project, handle, ensure_ascii=False, indent=2)
-    return {"project": project, "id": new_ctx.id, "sourceId": src_ctx.id}
+    return {
+        "project": project,
+        "id": new_ctx.id,
+        "sourceId": src_ctx.id,
+        "locationId": target_location.id,
+        "locationName": target_location.name,
+        "includedOutputs": bool(include_outputs),
+    }
+
+
+@app.get("/api/projects/{project_id}/storage")
+def get_project_storage(project_id: str) -> dict[str, Any]:
+    """プロジェクトフォルダの内訳サイズ。複製ダイアログで「outputs はこの容量です」と
+    見せるためのもの (一覧に載せると 27 件ぶん rglob することになるので単発 API)。"""
+    ctx = project_context(project_id)
+    if not ctx.project_file.exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+    total_bytes, total_count = _dir_size_bytes(ctx.root)
+    outputs_bytes, outputs_count = _dir_size_bytes(ctx.output_dir)
+    cache_bytes, cache_count = _dir_size_bytes(ctx.cache_dir)
+    return {
+        "id": ctx.id,
+        "total": {"bytes": total_bytes, "count": total_count},
+        "outputs": {"bytes": outputs_bytes, "count": outputs_count},
+        "cache": {"bytes": cache_bytes, "count": cache_count},
+    }
+
+
+@app.post("/api/projects/{project_id}/move")
+def move_project(project_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """プロジェクトを別の保管場所へ**移動**する (中身はそのまま、置き場所だけ変える)。
+
+    - 同一ボリューム内なら ``os.rename`` で一瞬。別ボリュームは copytree + rmtree に
+      フォールバックする。**どちらの経路でも中身は一切間引かない** (書き出し / キャッシュ /
+      ユーザが手で置いたファイルまでフォルダごと運ぶ)。移動は元を消すため、落とすものが
+      あってはいけない。
+    - 移動先に同名ディレクトリがあれば ID を連番でずらし、``projects/<id>/...`` の
+      アセットパスを追従させる。
+    - アクティブプロジェクトなら active pointer も追従させる (忘れると次回起動で
+      「プロジェクトが見つからない」になる)。
+    """
+    ctx = project_context(project_id)
+    if not ctx.project_file.exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+    source_location = find_project_location(ctx.id)
+    target_location = _resolve_target_location((payload or {}).get("locationId"), purpose="移動")
+    if source_location is not None and source_location[0].id == target_location.id:
+        raise HTTPException(status_code=400, detail="すでにその保管場所にあります")
+
+    was_active = active_project_id() == ctx.id
+    new_id = ctx.id
+    dst_root = target_location.path / new_id
+    if dst_root.exists():
+        new_id = unique_project_id_across_locations(ctx.id)
+        dst_root = target_location.path / new_id
+
+    old_root = ctx.root
+    moved_by_copy = False
+    warning = ""
+    try:
+        os.rename(old_root, dst_root)
+    except OSError:
+        # 別ボリューム (EXDEV) など。**除外は一切しない** — 移動は元フォルダを消すので、
+        # 落としたものは復旧できない。ユーザが Finder で置いたファイル・書き出し・
+        # 手作りのサブフォルダまで含めて、フォルダをそのまま運ぶ (os.rename と同じ意味)。
+        moved_by_copy = True
+        try:
+            shutil.copytree(old_root, dst_root, symlinks=True)
+        except OSError as exc:
+            # コピーが途中で失敗した場合だけ、作りかけの移動先を掃除して中止する。
+            # (元データは触っていないので巻き戻しは安全)
+            shutil.rmtree(dst_root, ignore_errors=True)
+            raise HTTPException(status_code=500, detail=f"移動に失敗しました: {exc}") from exc
+        try:
+            shutil.rmtree(old_root)
+        except OSError as exc:
+            # コピーは完了済み。ここで移動先を消す「巻き戻し」は危険 — rmtree は途中まで
+            # 消してから失敗しうるので、健全なコピーを捨てて壊れた元だけが残りかねない。
+            # よってコピーを正本として残し、**元と ID がぶつからないよう別 ID へ逃がして**
+            # から、残骸の掃除だけをユーザに促す。
+            app_logger("project").warning("move: 元フォルダを削除できませんでした: %s", exc)
+            invalidate_project_scan_cache()
+            if old_root.exists():
+                fallback_id = unique_project_id_across_locations(ctx.id)
+                if fallback_id != new_id:
+                    fallback_root = target_location.path / fallback_id
+                    try:
+                        os.rename(dst_root, fallback_root)
+                        new_id, dst_root = fallback_id, fallback_root
+                    except OSError:
+                        pass
+            warning = (
+                f"コピーは完了しましたが、移動元フォルダを削除できませんでした: {old_root}"
+                "（手動で削除してください）"
+            )
+
+    invalidate_project_scan_cache()
+    _rewrite_project_scoped_paths(dst_root, ctx.id, new_id)
+    new_ctx = project_context(new_id)
+    write_project_file(new_ctx, {"id": new_id}, bump_updated_at=False)
+    if was_active:
+        set_active_project(new_id)
+    result = {
+        "id": new_id,
+        "previousId": ctx.id,
+        "locationId": target_location.id,
+        "locationName": target_location.name,
+        "copiedAcrossVolumes": moved_by_copy,
+        "activeProjectId": active_project_id(),
+    }
+    if warning:
+        result["warning"] = warning
+    return result
 
 
 @app.get("/api/projects/{project_id}/archive")
@@ -828,15 +1196,20 @@ def archive_project(project_id: str) -> FileResponse:
     except (OSError, json.JSONDecodeError):
         pass
 
-    safe_title = re.sub(r"[^A-Za-z0-9._\-]+", "_", title or ctx.id)[:64] or ctx.id
-    download_name = f"{safe_title}.splite.zip"
+    # 日本語だけのプロジェクト名でもファイル名が残るよう、Content-Disposition は
+    # 自前で組む (RFC 5987 の filename* + ASCII フォールバックの二本立て)。
+    # FileResponse(filename=...) に任せると filename* しか出ず、旧実装の ASCII 潰しでは
+    # 日本語名が丸ごと消えていた。
+    download_name = project_archive_mod.archive_download_name(title, ctx.id)
 
     background = BackgroundTasks()
     background.add_task(project_archive_mod.cleanup_archive_file, zip_path)
     return FileResponse(
         zip_path,
         media_type="application/zip",
-        filename=download_name,
+        headers={
+            "content-disposition": project_archive_mod.content_disposition_attachment(download_name),
+        },
         background=background,
     )
 
@@ -854,11 +1227,14 @@ async def import_project_endpoint(file: UploadFile = File(...)) -> dict[str, Any
     try:
         result = project_import_mod.import_project_zip(
             zip_bytes=data,
-            projects_dir=current_projects_dir(),
+            projects_dir=default_projects_dir(),
             original_filename=file.filename,
+            # project_id は全保管場所で一意でなければならない (URL / アセットパスのキー)。
+            id_taken=project_id_exists,
         )
     except project_import_mod.ProjectImportError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    invalidate_project_scan_cache()
     return {"ok": True, **result}
 
 
@@ -977,6 +1353,7 @@ def delete_project(project_id: str, payload: dict[str, Any] | None = None) -> di
     if confirmation not in {expected_name, ctx.id}:
         raise HTTPException(status_code=400, detail="Project name confirmation does not match")
     shutil.rmtree(ctx.root)
+    invalidate_project_scan_cache()
     if was_active:
         # 削除したのがアクティブなら「最後に開いたプロジェクト」へ寄せる。
         # 旧実装はアルファベット順の先頭を選んでいたため、まったく関係の無い
@@ -1068,7 +1445,7 @@ def _filter_missing_font_candidates(config: dict[str, Any]) -> dict[str, Any]:
                 if not isinstance(p, str):
                     continue
                 if p.startswith("assets/") or p.startswith("projects/"):
-                    if (PROJECT_ROOT / p).exists():
+                    if resolve_root_rel(p).exists():
                         filtered.append(p)
                     else:
                         continue
@@ -1138,11 +1515,10 @@ def get_asset_expression_presets(assetRoot: str) -> dict[str, Any]:
     asset_root = str(assetRoot or "").strip().replace("\\", "/")
     if not asset_root:
         raise HTTPException(status_code=400, detail="assetRoot が必要です")
-    target_root = (PROJECT_ROOT / asset_root).resolve()
-    try:
-        target_root.relative_to(PROJECT_ROOT.resolve())
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="許可されていないパスです") from exc
+    target_root = resolve_root_rel(asset_root).resolve()
+    # PROJECT_ROOT だけでなく、登録済みの保管場所 (外付けディスク等) の内側も許可。
+    if not is_inside_allowed_roots(target_root):
+        raise HTTPException(status_code=400, detail="許可されていないパスです")
     if not target_root.exists() or not target_root.is_dir():
         raise HTTPException(status_code=404, detail="キャラクターディレクトリが見つかりません")
     from .scenario import read_asset_expression_presets as _read_asset_expression_presets
@@ -1154,7 +1530,7 @@ def get_asset_expression_presets(assetRoot: str) -> dict[str, Any]:
         char_def = next(
             (
                 c for c in manifest.get("characters") or []
-                if (PROJECT_ROOT / c.get("assetRoot", "")).resolve() == target_root
+                if resolve_root_rel(c.get("assetRoot", "")).resolve() == target_root
             ),
             None,
         )
@@ -1163,7 +1539,7 @@ def get_asset_expression_presets(assetRoot: str) -> dict[str, Any]:
         char_def = next(
             (
                 c for c in manifest.get("characters") or []
-                if (PROJECT_ROOT / c.get("assetRoot", "")).resolve() == target_root
+                if resolve_root_rel(c.get("assetRoot", "")).resolve() == target_root
             ),
             None,
         )
@@ -1176,11 +1552,10 @@ def get_asset_hairstyle_presets(assetRoot: str) -> dict[str, Any]:
     asset_root = str(assetRoot or "").strip().replace("\\", "/")
     if not asset_root:
         raise HTTPException(status_code=400, detail="assetRoot が必要です")
-    target_root = (PROJECT_ROOT / asset_root).resolve()
-    try:
-        target_root.relative_to(PROJECT_ROOT.resolve())
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="許可されていないパスです") from exc
+    target_root = resolve_root_rel(asset_root).resolve()
+    # PROJECT_ROOT だけでなく、登録済みの保管場所 (外付けディスク等) の内側も許可。
+    if not is_inside_allowed_roots(target_root):
+        raise HTTPException(status_code=400, detail="許可されていないパスです")
     if not target_root.exists() or not target_root.is_dir():
         raise HTTPException(status_code=404, detail="キャラクターディレクトリが見つかりません")
     from .scenario import read_asset_hairstyle_presets as _read_asset_hairstyle_presets
@@ -1192,7 +1567,7 @@ def get_asset_hairstyle_presets(assetRoot: str) -> dict[str, Any]:
     char_def = next(
         (
             c for c in manifest.get("characters") or []
-            if (PROJECT_ROOT / c.get("assetRoot", "")).resolve() == target_root
+            if resolve_root_rel(c.get("assetRoot", "")).resolve() == target_root
         ),
         None,
     )
@@ -1212,11 +1587,10 @@ def post_asset_hairstyle_presets(payload: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="assetRoot が必要です")
     if not isinstance(presets_payload, list):
         raise HTTPException(status_code=400, detail="presets が配列ではありません")
-    target_root = (PROJECT_ROOT / asset_root).resolve()
-    try:
-        target_root.relative_to(PROJECT_ROOT.resolve())
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="許可されていないパスです") from exc
+    target_root = resolve_root_rel(asset_root).resolve()
+    # PROJECT_ROOT だけでなく、登録済みの保管場所 (外付けディスク等) の内側も許可。
+    if not is_inside_allowed_roots(target_root):
+        raise HTTPException(status_code=400, detail="許可されていないパスです")
     if not target_root.exists() or not target_root.is_dir():
         raise HTTPException(status_code=404, detail="キャラクターディレクトリが見つかりません")
     from .scenario import write_asset_hairstyle_presets as _write_asset_hairstyle_presets
@@ -1229,7 +1603,7 @@ def post_asset_hairstyle_presets(payload: dict[str, Any]) -> dict[str, Any]:
     char_def = next(
         (
             c for c in manifest.get("characters") or []
-            if (PROJECT_ROOT / c.get("assetRoot", "")).resolve() == target_root
+            if resolve_root_rel(c.get("assetRoot", "")).resolve() == target_root
         ),
         None,
     )
@@ -1264,11 +1638,10 @@ def post_asset_expression_presets(payload: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="assetRoot が必要です")
     if not isinstance(presets_payload, list):
         raise HTTPException(status_code=400, detail="presets が配列ではありません")
-    target_root = (PROJECT_ROOT / asset_root).resolve()
-    try:
-        target_root.relative_to(PROJECT_ROOT.resolve())
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="許可されていないパスです") from exc
+    target_root = resolve_root_rel(asset_root).resolve()
+    # PROJECT_ROOT だけでなく、登録済みの保管場所 (外付けディスク等) の内側も許可。
+    if not is_inside_allowed_roots(target_root):
+        raise HTTPException(status_code=400, detail="許可されていないパスです")
     if not target_root.exists() or not target_root.is_dir():
         raise HTTPException(status_code=404, detail="キャラクターディレクトリが見つかりません")
     from .scenario import write_asset_expression_presets as _write_asset_expression_presets
@@ -1284,7 +1657,7 @@ def post_asset_expression_presets(payload: dict[str, Any]) -> dict[str, Any]:
     char_def = next(
         (
             c for c in manifest.get("characters") or []
-            if (PROJECT_ROOT / c.get("assetRoot", "")).resolve() == target_root
+            if resolve_root_rel(c.get("assetRoot", "")).resolve() == target_root
         ),
         None,
     )
@@ -1531,11 +1904,10 @@ def post_psd_importer_convert(payload: dict[str, Any]) -> dict[str, Any]:
     if mode == "append":
         if not asset_root:
             raise HTTPException(status_code=400, detail="追加インポートには assetRoot が必要です")
-        target_root = (PROJECT_ROOT / asset_root).resolve()
-        try:
-            target_root.relative_to(PROJECT_ROOT.resolve())
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail="許可されていないパスです") from exc
+        target_root = resolve_root_rel(asset_root).resolve()
+        # PROJECT_ROOT だけでなく、登録済みの保管場所 (外付けディスク等) の内側も許可。
+        if not is_inside_allowed_roots(target_root):
+            raise HTTPException(status_code=400, detail="許可されていないパスです")
         if not target_root.exists() or not target_root.is_dir():
             raise HTTPException(status_code=404, detail="キャラクターディレクトリが見つかりません")
         manifest_path = target_root / "character_manifest.json"
@@ -1603,11 +1975,10 @@ def get_character_import_yaml(assetRoot: str) -> dict[str, Any]:
     rel_path = (assetRoot or "").strip().replace("\\", "/")
     if not rel_path:
         raise HTTPException(status_code=400, detail="assetRoot が必要です")
-    candidate = (PROJECT_ROOT / rel_path).resolve()
-    try:
-        candidate.relative_to(PROJECT_ROOT.resolve())
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="許可されていないパスです") from exc
+    candidate = resolve_root_rel(rel_path).resolve()
+    # PROJECT_ROOT だけでなく、登録済みの保管場所 (外付けディスク等) の内側も許可。
+    if not is_inside_allowed_roots(candidate):
+        raise HTTPException(status_code=400, detail="許可されていないパスです")
     if not candidate.exists() or not candidate.is_dir():
         raise HTTPException(status_code=404, detail="キャラクターディレクトリが見つかりません")
     from .psd import (
@@ -1640,11 +2011,10 @@ def get_character_layers(assetRoot: str) -> dict[str, Any]:
     rel_path = (assetRoot or "").strip().replace("\\", "/")
     if not rel_path:
         raise HTTPException(status_code=400, detail="assetRoot が必要です")
-    candidate = (PROJECT_ROOT / rel_path).resolve()
-    try:
-        candidate.relative_to(PROJECT_ROOT.resolve())
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="許可されていないパスです") from exc
+    candidate = resolve_root_rel(rel_path).resolve()
+    # PROJECT_ROOT だけでなく、登録済みの保管場所 (外付けディスク等) の内側も許可。
+    if not is_inside_allowed_roots(candidate):
+        raise HTTPException(status_code=400, detail="許可されていないパスです")
     if not candidate.exists() or not candidate.is_dir():
         raise HTTPException(status_code=404, detail="キャラクターディレクトリが見つかりません")
     manifest_path = candidate / "character_manifest.json"
@@ -1675,7 +2045,7 @@ def _drop_layer_entry_with_file(
 ) -> None:
     path_str = victim.get("path") or ""
     if path_str:
-        abs_path = (PROJECT_ROOT / path_str).resolve()
+        abs_path = resolve_root_rel(path_str).resolve()
         if abs_path.exists() and abs_path.is_file():
             try:
                 abs_path.unlink()
@@ -1690,7 +2060,7 @@ def _rename_layer_entry_in_place(
     old_path_str = target_entry.get("path") or ""
     new_path_str = old_path_str
     if old_path_str:
-        old_abs = (PROJECT_ROOT / old_path_str).resolve()
+        old_abs = resolve_root_rel(old_path_str).resolve()
         if old_abs.exists() and old_abs.is_file():
             new_filename = f"{new_id}.png"
             new_abs = old_abs.with_name(new_filename)
@@ -1736,11 +2106,10 @@ def post_character_layers_save(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(raw_updates, list):
         raise HTTPException(status_code=400, detail="updates が配列ではありません")
 
-    target_root = (PROJECT_ROOT / asset_root).resolve()
-    try:
-        target_root.relative_to(PROJECT_ROOT.resolve())
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="許可されていないパスです") from exc
+    target_root = resolve_root_rel(asset_root).resolve()
+    # PROJECT_ROOT だけでなく、登録済みの保管場所 (外付けディスク等) の内側も許可。
+    if not is_inside_allowed_roots(target_root):
+        raise HTTPException(status_code=400, detail="許可されていないパスです")
     if not target_root.exists() or not target_root.is_dir():
         raise HTTPException(status_code=404, detail="キャラクターディレクトリが見つかりません")
 
@@ -1995,11 +2364,10 @@ def post_character_layer_update(payload: dict[str, Any]) -> dict[str, Any]:
     if not new_id:
         raise HTTPException(status_code=400, detail="newIdが空です")
 
-    target_root = (PROJECT_ROOT / asset_root).resolve()
-    try:
-        target_root.relative_to(PROJECT_ROOT.resolve())
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="許可されていないパスです") from exc
+    target_root = resolve_root_rel(asset_root).resolve()
+    # PROJECT_ROOT だけでなく、登録済みの保管場所 (外付けディスク等) の内側も許可。
+    if not is_inside_allowed_roots(target_root):
+        raise HTTPException(status_code=400, detail="許可されていないパスです")
     if not target_root.exists() or not target_root.is_dir():
         raise HTTPException(status_code=404, detail="キャラクターディレクトリが見つかりません")
 
@@ -2026,7 +2394,7 @@ def post_character_layer_update(payload: dict[str, Any]) -> dict[str, Any]:
     new_path_str = target_entry.get("path") or ""
     old_path_str = new_path_str
     if old_path_str:
-        old_abs = (PROJECT_ROOT / old_path_str).resolve()
+        old_abs = resolve_root_rel(old_path_str).resolve()
         if old_abs.exists() and old_abs.is_file():
             new_filename = f"{new_id}.png"
             new_abs = old_abs.with_name(new_filename)
@@ -2087,11 +2455,10 @@ async def post_character_thumbnail(
     rel_path = (asset_root or "").strip().replace("\\", "/")
     if not rel_path:
         raise HTTPException(status_code=400, detail="asset_root が必要です")
-    candidate = (PROJECT_ROOT / rel_path).resolve()
-    try:
-        candidate.relative_to(PROJECT_ROOT.resolve())
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="許可されていないパスです") from exc
+    candidate = resolve_root_rel(rel_path).resolve()
+    # PROJECT_ROOT だけでなく、登録済みの保管場所 (外付けディスク等) の内側も許可。
+    if not is_inside_allowed_roots(candidate):
+        raise HTTPException(status_code=400, detail="許可されていないパスです")
     if not candidate.exists() or not candidate.is_dir():
         raise HTTPException(status_code=404, detail="キャラクターディレクトリが見つかりません")
 
@@ -2111,11 +2478,10 @@ def delete_character_thumbnail(payload: dict[str, Any]) -> dict[str, Any]:
     rel_path = str(payload.get("assetRoot") or "").strip().replace("\\", "/")
     if not rel_path:
         raise HTTPException(status_code=400, detail="assetRoot が必要です")
-    candidate = (PROJECT_ROOT / rel_path).resolve()
-    try:
-        candidate.relative_to(PROJECT_ROOT.resolve())
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="許可されていないパスです") from exc
+    candidate = resolve_root_rel(rel_path).resolve()
+    # PROJECT_ROOT だけでなく、登録済みの保管場所 (外付けディスク等) の内側も許可。
+    if not is_inside_allowed_roots(candidate):
+        raise HTTPException(status_code=400, detail="許可されていないパスです")
     target_path = candidate / "thumb.png"
     if target_path.exists():
         target_path.unlink()
@@ -2540,7 +2906,7 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
         if not rel:
             return None
         try:
-            return (PROJECT_ROOT / str(rel)).stat().st_mtime_ns
+            return resolve_root_rel(str(rel)).stat().st_mtime_ns
         except OSError:
             return None
     char_layers_for_token: list[dict[str, Any]] = []
@@ -3301,8 +3667,8 @@ async def video_reencode_fix_endpoint(request: Request) -> StreamingResponse:
                 target_fps=target_fps,
             )
             try:
-                rel = fixed_path.resolve().relative_to(PROJECT_ROOT.resolve())
-                fixed_rel = str(rel).replace("\\", "/")
+                # 保管場所が PROJECT_ROOT の外でも projects/<id>/... を返す。
+                fixed_rel = relative_to_root(fixed_path.resolve())
             except ValueError:
                 fixed_rel = ""
             return {
@@ -3524,7 +3890,7 @@ def list_project_outputs(ctx: ProjectContext) -> list[dict[str, Any]]:
                     if not entry.is_dir()
                     else None
                 ),
-                "relativePath": str(entry.relative_to(PROJECT_ROOT)).replace("\\", "/"),
+                "relativePath": relative_to_root(entry),
             }
         )
     return items
@@ -3578,7 +3944,7 @@ def get_outputs_list(scope: str = "project") -> dict[str, Any]:
     return {
         "scope": "project",
         "projectId": ctx.id,
-        "outputDir": str(ctx.output_dir.relative_to(PROJECT_ROOT)).replace("\\", "/"),
+        "outputDir": relative_to_root(ctx.output_dir),
         "outputs": list_project_outputs(ctx),
     }
 
@@ -3666,7 +4032,7 @@ def collect_cache_stats() -> dict[str, Any]:
     """
     total = 0
     projects: list[dict[str, Any]] = []
-    for project_file in sorted(current_projects_dir().glob("*/project.json")):
+    for project_file in sorted(iter_project_files(), key=lambda p: p.parent.name):
         try:
             ctx = project_context(project_file.parent.name)
         except Exception:
@@ -3762,7 +4128,7 @@ def prune_old_cache_files(older_than_hours: int) -> dict[str, int]:
         return removed
 
     counts = {"preview": 0, "lipsync": 0, "cleanPcm": 0}
-    for project_file in sorted(current_projects_dir().glob("*/project.json")):
+    for project_file in sorted(iter_project_files(), key=lambda p: p.parent.name):
         try:
             ctx = project_context(project_file.parent.name)
         except Exception:
@@ -3795,7 +4161,7 @@ def post_cache_empty(payload: dict[str, Any] | None = None) -> dict[str, Any]:
     if scope in ("project", "all"):
         targets: list[ProjectContext] = []
         if scope == "all":
-            for project_file in sorted(current_projects_dir().glob("*/project.json")):
+            for project_file in sorted(iter_project_files(), key=lambda p: p.parent.name):
                 try:
                     targets.append(project_context(project_file.parent.name))
                 except Exception:
@@ -4230,7 +4596,7 @@ def synthesize_tts(payload: dict[str, Any]) -> dict[str, Any]:
     except (ValueError, RuntimeError, OSError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    rel_path = result.audio_path.relative_to(PROJECT_ROOT).as_posix()
+    rel_path = relative_to_root(result.audio_path)
     duration = audio_duration_seconds(result.audio_path)
 
     response: dict[str, Any] = {
@@ -4420,7 +4786,7 @@ async def title_editor_export_png(request: Request) -> dict[str, Any]:
             active_id = ""
         if not active_id:
             raise HTTPException(status_code=400, detail="現行プロジェクトが未指定です (本体側で 1 つ開いてから書き出してください)")
-        project_root = current_projects_dir() / active_id
+        project_root = project_context(active_id).root
         if not project_root.exists():
             raise HTTPException(status_code=400, detail=f"プロジェクト '{active_id}' が見つかりません")
         base_dir = project_root / "assets" / "foregrounds"
@@ -4461,11 +4827,13 @@ def title_editor_manifest() -> dict[str, Any]:
     except Exception:
         active_id = ""
     if active_id:
-        candidate = current_projects_dir() / active_id / "config.json"
+        candidate = project_context(active_id).root / "config.json"
         if candidate.exists():
             target_path = candidate
     if target_path is None:
-        for p in sorted(current_projects_dir().glob("*/config.json")):
+        for p in sorted(
+            (f.parent / "config.json") for f in iter_project_files()
+        ):
             target_path = p
             break
     cfg: dict[str, Any] = {}
@@ -4769,7 +5137,6 @@ app.mount("/static", NoStoreStaticFiles(directory=STATIC_DIR), name="static")
 # まで LAN 公開時に取得できてしまう。実 URL は `assets/<...>` と
 # `projects/<id>/assets/<...>` の 2 パターンしか必要ないので、明示的に
 # allowlist してそれ以外を 404 にする。
-_ASSET_ROUTE_BASE = PROJECT_ROOT.resolve()
 
 
 def _is_allowed_asset_rel(rel: str) -> bool:
@@ -4791,11 +5158,12 @@ def get_asset_file(rel: str) -> FileResponse:
     rel_norm = rel.replace("\\", "/").lstrip("/")
     if not _is_allowed_asset_rel(rel_norm):
         raise HTTPException(status_code=404, detail="Not found")
-    candidate = (PROJECT_ROOT / rel_norm).resolve()
-    try:
-        candidate.relative_to(_ASSET_ROUTE_BASE)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Not found") from exc
+    # projects/<id>/... は保管場所を横断して実体へ解決する (プロジェクトが外付け
+    # ディスク上にあっても素材 URL は従来どおり /assets/projects/<id>/... のまま)。
+    candidate = resolve_root_rel(rel_norm).resolve()
+    # traversal ガード: PROJECT_ROOT か登録済み保管場所の内側だけを配信する。
+    if not is_inside_allowed_roots(candidate):
+        raise HTTPException(status_code=404, detail="Not found")
     if not candidate.is_file():
         raise HTTPException(status_code=404, detail="Not found")
     return FileResponse(candidate)

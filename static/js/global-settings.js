@@ -7,6 +7,7 @@
 import { state } from "./state.js";
 import { elements } from "./elements.js";
 import { showToast } from "./toast.js";
+import { loadProjectLocations, renderProjectLocationSettings } from "./project-locations.js";
 import { applyExportOptionsPresetUI, updateEncoderEngineHintFromPreset } from "./export-ui.js";
 import { fetchTtsState, refreshTtsCatalog } from "./tts.js";
 import {
@@ -975,6 +976,9 @@ export async function openGlobalSettings() {
     console.warn("tts state 取得失敗", error);
   }
   renderGlobalSettings();
+  // 保管場所は外付けディスクの抜き差しで可用性が変わるので、開くたびに取り直す。
+  renderProjectLocationSettings();
+  loadProjectLocations();
   refreshVendorStatus();
   refreshFontStatus();
   refreshFontScan();

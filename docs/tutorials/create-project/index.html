@@ -478,15 +478,54 @@
   <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
-        プロジェクトフォルダの保存先
+        保管場所 (複数のフォルダにプロジェクトを分ける)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="保管場所 (複数のフォルダにプロジェクトを分ける)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        保管場所を登録する
       
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プロジェクトを移動する
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        外付けディスクを外しているとき
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#_8" class="md-nav__link">
+  <a href="#_11" class="md-nav__link">
     <span class="md-ellipsis">
       
         削除
@@ -497,7 +536,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_9" class="md-nav__link">
+  <a href="#_12" class="md-nav__link">
     <span class="md-ellipsis">
       
         自動保存
@@ -1177,15 +1216,54 @@
   <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
-        プロジェクトフォルダの保存先
+        保管場所 (複数のフォルダにプロジェクトを分ける)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="保管場所 (複数のフォルダにプロジェクトを分ける)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        保管場所を登録する
       
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プロジェクトを移動する
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        外付けディスクを外しているとき
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#_8" class="md-nav__link">
+  <a href="#_11" class="md-nav__link">
     <span class="md-ellipsis">
       
         削除
@@ -1196,7 +1274,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_9" class="md-nav__link">
+  <a href="#_12" class="md-nav__link">
     <span class="md-ellipsis">
       
         自動保存
@@ -1299,6 +1377,10 @@
 <td>指定日に作成・更新されたプロジェクトを抽出</td>
 </tr>
 <tr>
+<td>保管場所</td>
+<td>保管場所で絞り込み (保管場所を 2 つ以上登録しているときだけ表示)</td>
+</tr>
+<tr>
 <td>並び順</td>
 <td>最近開いた順 / 更新日時順 / 名称順 / 作成日時順</td>
 </tr>
@@ -1308,7 +1390,7 @@
 </tr>
 </tbody>
 </table>
-<p>各カードからは <code>開く</code> / <code>名称変更</code> / <code>複製</code> / <code>アーカイブ</code> / <code>削除</code> を実行できます。
+<p>各カードからは <code>開く</code> / <code>名称変更</code> / <code>複製</code> / <code>移動</code> / <code>アーカイブ</code> / <code>削除</code> を実行できます (<code>移動</code> は保管場所を 2 つ以上登録しているときだけ出ます)。
 ダッシュボード上部のツールバーには <code>新規プロジェクト</code> / <code>読み込み</code> (ZIP 取り込み) もあります。</p>
 <h2 id="_4">プロジェクトを切り替える<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <p>ヘッダーのプロジェクト選択メニュー、または一覧画面からの <code>開く</code> で切り替わります。
@@ -1318,9 +1400,41 @@
 ディスク上のフォルダ名 (プロジェクト ID) も新しい名前に追従して変更されます。
 他プロジェクトと ID が衝突する場合は末尾に <code>_2</code>, <code>_3</code>, ... の連番が付きます。</p>
 <h2 id="_6">複製<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
-<p>プロジェクトカードの <code>複製</code> で、現在のシナリオ・設定・固有素材を含む完全なコピーを作成します。新しい ID は自動で採番されます。</p>
+<p>プロジェクトカードの <code>複製</code> で、<strong>プロジェクトフォルダをまるごとコピー</strong>します。新しい ID は自動で採番されます。
+保管場所を複数登録している場合は、ダイアログで複製先の保管場所も選べます。</p>
+<p>コピーされるもの / されないものは次のとおりです。</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>複製先</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>シナリオ・設定・プリセット・プロジェクト固有素材</td>
+<td>✅ コピーされる</td>
+</tr>
+<tr>
+<td><code>outputs/</code> (書き出した動画 / PNG / 字幕、手で置いたサムネや過去バージョン)</td>
+<td>✅ 既定でコピーされる（ダイアログのチェックを外すと省けます）</td>
+</tr>
+<tr>
+<td>フォルダ内に Finder / エクスプローラーで手作業で置いたファイル・フォルダ</td>
+<td>✅ コピーされる</td>
+</tr>
+<tr>
+<td><code>cache/</code> (プレビューキャッシュ)</td>
+<td>❌ コピーされない</td>
+</tr>
+</tbody>
+</table>
+<p><code>cache/</code> だけはコピーしません。プレビューキャッシュはプロジェクト ID を含むキーで引くので、ID が変わる複製先では 1 枚も再利用できず、容量を食うだけになるためです（必要な分は次の再生時に作り直されます）。</p>
+<p>除外の対象は<strong>プロジェクト直下の <code>cache/</code> / <code>outputs/</code> だけ</strong>です。<code>参考資料/cache/</code> のように自分で作ったフォルダの中に同じ名前があっても、それは巻き添えになりません。</p>
+<p>複製ダイアログには、そのプロジェクトの合計容量と <code>outputs/</code> の容量が表示されます。</p>
 <h2 id="zip">アーカイブ (ZIP 書き出し)<a class="headerlink" href="#zip" title="Permanent link">&para;</a></h2>
-<p>プロジェクトカードの <code>アーカイブ</code> を押すと、プロジェクトディレクトリ全体を <code>&lt;タイトル&gt;.splite.zip</code> としてダウンロードできます。</p>
+<p>プロジェクトカードの <code>アーカイブ</code> を押すと、プロジェクトディレクトリ全体を <code>&lt;タイトル&gt;.splite.zip</code> としてダウンロードできます。
+ファイル名にはプロジェクト名がそのまま入ります (日本語だけの名前でもそのまま残ります)。</p>
 <ul>
 <li>中身: <code>project.json</code> / <code>config.json</code> / <code>expression_presets.json</code> / <code>scenarios/</code> / <code>assets/</code> (= プロジェクト固有素材)</li>
 <li>除外: <code>cache/</code> / <code>outputs/</code> / <code>exports/</code> / <code>generated/</code> (派生物・揮発キャッシュ)</li>
@@ -1333,12 +1447,53 @@
 <li>スキーマバージョンが古い場合は取り込み時に自動的に最新へ更新します (<code>app/project_import.py</code> の <code>MIGRATIONS</code> を順次適用)。</li>
 <li>取り込み後はトーストに <code>v3 → v4</code> のような表記が出ます。</li>
 </ul>
-<h2 id="_7">プロジェクトフォルダの保存先<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
-<p>既定では <code>projects/</code> (リポジトリルート) が使われますが、ヘッダーの <code>設定</code> → <code>全体設定</code> から <code>プロジェクトフォルダ</code> を絶対パスで指定し、外部 SSD やクラウド同期フォルダに移すこともできます。
-パスを変更したらサーバを再起動してください。</p>
-<h2 id="_8">削除<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<h2 id="_7">保管場所 (複数のフォルダにプロジェクトを分ける)<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<p>プロジェクトの置き場所は複数登録できます。完成した作品を外付けディスクへ寄せても、プロジェクト一覧からはこれまでどおり開けます。</p>
+<h3 id="_8">保管場所を登録する<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<p><code>全体設定</code> → <code>環境</code> → <strong>プロジェクトの保管場所</strong> で、表示名とフォルダの絶対パスを入力して <code>保管場所を追加</code> を押します。
+<code>フォルダが無ければ作成する</code> にチェックを入れておくと、親フォルダが存在する場合にかぎりフォルダを作ります (未接続の外付けディスクのパスに対して、起動ディスク側へ空フォルダを作ってしまわないための制限です)。</p>
+<p>各保管場所の行からは次の操作ができます。</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>新規の保存先にする</td>
+<td>以降の <code>新規プロジェクト</code> と ZIP 取り込みがこの保管場所に作られます</td>
+</tr>
+<tr>
+<td>名称変更</td>
+<td>一覧やダイアログでの表示名を変えます</td>
+</tr>
+<tr>
+<td>登録解除</td>
+<td><strong>一覧に出さなくするだけ</strong>で、ディスク上のファイルは一切削除しません。再登録すればそのまま戻ります</td>
+</tr>
+</tbody>
+</table>
+<p>一番上の「アプリ内 (既定)」は組み込みの保管場所で、削除できません。そのパスは下の <strong>組み込み保管場所のパス</strong> (旧「プロジェクトフォルダの場所」) で変更できます。既定は <code>projects/</code> (リポジトリルート) です。</p>
+<h3 id="_9">プロジェクトを移動する<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<p>プロジェクトカードの <code>移動</code> で、別の保管場所へ移します。<strong>フォルダをそのまま動かすので、中身は一切間引きません。</strong></p>
+<ul>
+<li>書き出した動画・字幕、Finder / エクスプローラーで手作業で置いたサムネやメモ、プレビューキャッシュまで、フォルダの中身は全部そのまま移動先へ移ります（移動は元フォルダを消すので、落とすものがあってはいけないためです）。</li>
+<li>シナリオ・素材の参照もそのまま引き継がれるので、移動後もそのまま編集できます。</li>
+<li>同じディスク内の移動は一瞬です。別のディスクへ移すときは中身のコピーになるため、容量に応じて時間がかかります。</li>
+<li>移動先に同じフォルダ名のプロジェクトがある場合は、末尾に <code>_2</code>, <code>_3</code>, ... の連番を付けて退避します。</li>
+<li>編集中のプロジェクトを移動しても、そのまま開いたままになります。</li>
+</ul>
+<h3 id="_10">外付けディスクを外しているとき<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h3>
+<p>未接続の保管場所は設定画面で <code>未接続</code> と表示され、そこにあるプロジェクトは一覧に出ません。
+プロジェクト一覧の先頭にも「未接続の保管場所があります」と理由が出るので、ディスクを繋ぎ直せばそのまま戻ります (設定を消す必要はありません)。</p>
+<blockquote>
+<p><strong>フォルダ名は全保管場所で重複させないでください。</strong> プロジェクト ID (= フォルダ名) は素材パスの参照キーでもあるため、同じ名前のフォルダが複数の保管場所にあると先に見つかった方だけが使われます。その場合は一覧の先頭と設定画面に警告が出るので、どちらかのフォルダ名を変更してください (アプリ内の <code>移動</code> / <code>複製</code> / <code>読み込み</code> は自動で重複を避けます)。</p>
+</blockquote>
+<h2 id="_11">削除<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
 <p>プロジェクトカードの <code>削除</code> を押すと確認ダイアログが開きます。確認欄にプロジェクト名または ID を入力し、<code>削除</code> を押すと、プロジェクト配下の素材・シナリオ・出力・キャッシュもまとめて削除されます。共通素材 (<code>assets/</code>) は削除されません。</p>
-<h2 id="_9">自動保存<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<h2 id="_12">自動保存<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
 <p>カット・テロップ・キャラクター配置などの編集はすべて自動保存されます。
 ライブプレビューの再生ヘッド位置 (<code>lastPlayheadFrame</code>) もプロジェクトに保存され、次回起動時に復元されます。
 編集中にネットワークが切れた場合や保存が失敗した場合は、画面右下にトーストで通知されます。</p>

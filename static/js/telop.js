@@ -19,7 +19,7 @@ import {
   telopDurationFrame,
 } from "./scenario.js";
 import { migrateInDialogToasts, showToast } from "./toast.js";
-import { recordHistory } from "./history.js";
+import { recordHistory, beginCoalescedHistory, flushCoalescedHistory } from "./history.js";
 import {
   FONT_WEIGHT_CSS,
   fontDisplayName,
@@ -618,6 +618,14 @@ export function renderTelopEditor() {
   const editTelop = (fn) => {
     const t = currentTelop();
     if (!t) return null;
+    // 履歴フック: テロップ編集はすべてこの closure を通る。**書き換えの直前**に
+    // 「このテロップ単位の履歴コミット」を予約しておくことで、
+    //   - 打鍵は打鍵が止まるまで 1 エントリに丸まる
+    //   - 別テロップへ移った瞬間に前のテロップぶんが確定する
+    // が同時に成り立つ。個別ハンドラに recordHistory を撒く方式だと漏れが出て、
+    // 漏れた編集は「次に履歴を積む操作」のエントリに吸収され、undo 1 回で複数
+    // テロップの文字修正がまとめて巻き戻る (2026-09-11 の報告症状)。
+    beginCoalescedHistory(`telop:${telopId}`);
     fn(t);
     return t;
   };
@@ -849,6 +857,9 @@ export function renderTelopEditor() {
     deps.renderPreview();
     renderTelopTrack();
   });
+  // フォーカスが外れたら即確定。これで「打鍵 → 別の操作」が 1 エントリに
+  // 混ざらず、undo が打鍵ぶんだけを戻す。
+  textArea.addEventListener("blur", () => { flushCoalescedHistory(); });
   body.append(textArea);
 
   const row1 = document.createElement("div");
@@ -934,6 +945,7 @@ export function renderTelopEditor() {
         t.x = xInput.value === "" ? null : Number(xInput.value) || 0;
       });
       deps.scheduleScenarioSave();
+      recordHistory();
       deps.renderPreview();
     });
     rowXY.append(xLabel);
@@ -949,6 +961,7 @@ export function renderTelopEditor() {
         t.y = yInput.value === "" ? null : Number(yInput.value) || 0;
       });
       deps.scheduleScenarioSave();
+      recordHistory();
       deps.renderPreview();
     });
     rowXY.append(yLabel);

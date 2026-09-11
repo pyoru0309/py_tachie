@@ -176,9 +176,11 @@ def existing_font_path(candidate: str) -> Path | None:
         # 相対パス (assets/... / projects/...) は PROJECT_ROOT 基準。CWD 基準に
         # すると、リポジトリルート以外から起動したとき候補が全滅して OS フォント
         # へ黙ってフォールバックし、canvas 描画とレイアウト計算がずれる。
-        from .paths import PROJECT_ROOT
+        # projects/<id>/... は保管場所を横断して解決する (外付けディスク上の
+        # プロジェクトでもフォントが見つかるように)。
+        from .utils import resolve_root_rel
 
-        path = PROJECT_ROOT / path
+        path = resolve_root_rel(path)
     return path if path.exists() else None
 
 

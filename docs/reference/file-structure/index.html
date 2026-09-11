@@ -1546,7 +1546,7 @@
 </table>
 <p><code>cache/</code> は安全にまるごと削除できます。次回再生 / 書き出し時に必要分だけ再生成されます。アプリ内では <strong>アセット管理 → キャッシュ タブ</strong> から個別 / 共有 / 全体を削除できます (詳細は <a href=".././assets/#キャッシュタブ">素材管理 — キャッシュタブ</a>)。起動時の mtime ベース自動間引きも <code>全体設定 → キャッシュ</code> で ON/OFF できます (既定 6 時間)。</p>
 <h2 id="app_stateglobal_configjson"><code>app_state/global_config.json</code><a class="headerlink" href="#app_stateglobal_configjson" title="Permanent link">&para;</a></h2>
-<p>全体設定 (動画プリセット / ffmpeg のパス / プロジェクトフォルダ / Undo 履歴サイズ / quietMode / <code>vendor.useCdn</code> / <code>fontWeightOverrides</code> / <code>tts.voicevoxAppPath</code> / <code>tts.voicevoxBaseUrl</code> / <code>tts.voicepeakBinPath</code> / <code>backup.autoIntervalMinutes</code> / <code>backup.autoRetentionCount</code> / <code>cache.autoPruneOnStartup</code> / <code>cache.autoPruneOlderThanDays</code> 等) を保存します。
+<p>全体設定 (動画プリセット / ffmpeg のパス / プロジェクトの保管場所 (<code>projectsPath</code> / <code>projectLocations</code> / <code>defaultProjectLocationId</code>) / Undo 履歴サイズ / quietMode / <code>vendor.useCdn</code> / <code>fontWeightOverrides</code> / <code>tts.voicevoxAppPath</code> / <code>tts.voicevoxBaseUrl</code> / <code>tts.voicepeakBinPath</code> / <code>backup.autoIntervalMinutes</code> / <code>backup.autoRetentionCount</code> / <code>cache.autoPruneOnStartup</code> / <code>cache.autoPruneOlderThanDays</code> 等) を保存します。
 複数のリポジトリで使い回したい場合は、このファイルを共有 / バージョン管理から外すなどで運用してください。</p>
 <h2 id="app_statevoice_catalogjson"><code>app_state/voice_catalog.json</code><a class="headerlink" href="#app_statevoice_catalogjson" title="Permanent link">&para;</a></h2>
 <p>VOICEVOX / VOICEPEAK の話者・スタイル・感情の最新カタログ (全体設定 → 音声読み上げ → 「ボイスを登録」で取得) を保存します。話者の追加 / アップデート時に再取得して書き換わります。</p>
@@ -1554,7 +1554,8 @@
 <p>three.js / mp4box.js のローカル取得状況を記録します。サーバが HTML を返すときの <code>&lt;script type="importmap"&gt;</code> 解決はこのファイルを読みます (<code>{"three": "0.165.0", "mp4box": "0.5.2"}</code> のような形)。</p>
 <p>各ライブラリは <code>static/vendor/&lt;lib&gt;/&lt;version&gt;/</code> 配下に展開され、<code>active.json</code> で「現行 version」を切替えます。古い version は残置でき、ロールバックも可能です。</p>
 <h2 id="zip">プロジェクト ZIP アーカイブの構造<a class="headerlink" href="#zip" title="Permanent link">&para;</a></h2>
-<p>ダッシュボードの <code>アーカイブ</code> で書き出される zip は、トップに <code>&lt;project_id&gt;/</code> を 1 段持ちます。</p>
+<p>ダッシュボードの <code>アーカイブ</code> で書き出される zip は、トップに <code>&lt;project_id&gt;/</code> を 1 段持ちます。
+ファイル名 / zip 内のエントリ名は常に <strong>NFC</strong> に正規化されます (macOS が濁音を NFD で保持していても、Windows で解凍したときに文字化けや参照切れが起きないようにするため)。</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>&lt;project_id&gt;.splite.zip
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>└── &lt;project_id&gt;/
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    ├── project.json

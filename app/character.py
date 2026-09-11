@@ -22,13 +22,14 @@ from .utils import (
     relative_to_root,
     slugify_project_id,
     write_project_file,
+    resolve_root_rel,
 )
 
 
 def safe_character_root(rel_path: str | None, ctx: ProjectContext | None = None) -> Path:
     if not rel_path:
         raise ValueError("assetRoot is required")
-    path = (PROJECT_ROOT / rel_path).resolve()
+    path = resolve_root_rel(rel_path).resolve()
     allowed_roots = [(ASSETS_DIR / "characters").resolve()]
     if ctx:
         allowed_roots.append((ctx.root / "assets" / "characters").resolve())

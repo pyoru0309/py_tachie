@@ -12,8 +12,8 @@ import yaml
 from PIL import Image
 
 from .log_setup import app_logger
-from .paths import CACHE_DIR, PROJECT_ROOT
-from .utils import relative_to_root, slugify_project_id
+from .paths import CACHE_DIR
+from .utils import relative_to_root, slugify_project_id, resolve_root_rel
 
 _log = app_logger("psd-importer")
 
@@ -986,7 +986,7 @@ def convert_psd_importer_session(
     def _drop_entry(category: str, manifest_key: str, victim: dict[str, Any]) -> None:
         path_str = victim.get("path") or ""
         if path_str:
-            old_path = (PROJECT_ROOT / path_str).resolve()
+            old_path = resolve_root_rel(path_str).resolve()
             if old_path.exists() and old_path.is_file():
                 try:
                     old_path.unlink()

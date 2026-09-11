@@ -5,7 +5,7 @@
 import { state } from "./state.js";
 import { elements } from "./elements.js";
 import { showToast, migrateInDialogToasts } from "./toast.js";
-import { recordHistory } from "./history.js";
+import { recordHistory, flushCoalescedHistory } from "./history.js";
 import {
   option,
   basenameOnly,
@@ -2405,6 +2405,9 @@ export async function applyScenarioSnapshot(snap) {
 }
 
 export async function undoEdit() {
+  // 打鍵の途中 (連続入力コミット待ち) で undo すると、確定していない打鍵が
+  // 履歴に無いまま巻き戻されて redo でも戻せなくなる。まず確定させる。
+  flushCoalescedHistory();
   if (state.history.index <= 0) {
     showToast("これ以上戻せません");
     return;
@@ -2420,6 +2423,7 @@ export async function undoEdit() {
 }
 
 export async function redoEdit() {
+  flushCoalescedHistory();
   if (state.history.index >= state.history.stack.length - 1) {
     showToast("これ以上やり直せません");
     return;

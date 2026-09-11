@@ -15,7 +15,13 @@ from PIL import Image, UnidentifiedImageError
 
 from .log_setup import app_logger
 from .paths import ASSETS_DIR, PROJECT_ROOT
-from .utils import ProjectContext, relative_to_root, slugify_project_id
+from .utils import (
+    ProjectContext,
+    is_inside_allowed_roots,
+    relative_to_root,
+    resolve_root_rel,
+    slugify_project_id,
+)
 
 _log = app_logger("assets")
 
@@ -56,7 +62,7 @@ def valid_manifest_items(items: Any) -> list[dict[str, str]]:
         if not rel_path:
             continue
         try:
-            path = (PROJECT_ROOT / rel_path).resolve()
+            path = resolve_root_rel(rel_path).resolve()
             if path.exists() and is_valid_image_file(path):
                 valid_items.append(item)
         except ValueError:
@@ -69,7 +75,7 @@ def valid_image_asset_path(path_value: Any) -> bool:
     if not rel_path:
         return False
     try:
-        path = (PROJECT_ROOT / rel_path).resolve()
+        path = resolve_root_rel(rel_path).resolve()
     except ValueError:
         return False
     return path.exists() and is_valid_image_file(path)
@@ -128,7 +134,7 @@ def uploaded_category_path(filename: str) -> tuple[str, str] | None:
 
 
 def image_items(directory: str, prefix: str) -> list[dict[str, str]]:
-    target = PROJECT_ROOT / directory
+    target = resolve_root_rel(directory)
     if not target.exists():
         return []
     items = []
@@ -457,7 +463,7 @@ def asset_url(rel_path: str | None) -> str | None:
     # 返し続け、「画像を差し替えたのに反映されない」状態になる。stat 失敗時は
     # クエリ無しで返す (asset_url は不在パスでも URL を生成する用途がある)。
     try:
-        mtime_ns = (PROJECT_ROOT / rel_path).stat().st_mtime_ns
+        mtime_ns = resolve_root_rel(rel_path).stat().st_mtime_ns
     except OSError:
         return url
     return f"{url}?v={mtime_ns}"
@@ -786,12 +792,11 @@ def find_missing_asset_references(ctx: ProjectContext) -> list[dict[str, Any]]:
                 checks.append(("textStyle.boxOverlayImage", overlay))
             # v4 ではキャラ素材は ID 参照なのでパス存在チェックは不要
             for field, ref in checks:
-                target = (PROJECT_ROOT / ref).resolve()
-                try:
-                    target.relative_to(PROJECT_ROOT)
-                    inside = True
-                except ValueError:
-                    inside = False
+                target = resolve_root_rel(ref).resolve()
+                # 「PROJECT_ROOT の外を指していないか」の安全確認。保管場所を
+                # 複数持てるようになったので、プロジェクトの実体ディレクトリも
+                # 許可範囲に含める。
+                inside = is_inside_allowed_roots(target)
                 if inside and target.exists():
                     continue
                 key = (scenario_path.stem, cut_id, field, ref)

@@ -1,12 +1,20 @@
 import { state } from "./state.js";
 import { elements } from "./elements.js";
-import { option, formatProjectDate } from "./utils.js";
+import { option, formatProjectDate, formatSize } from "./utils.js";
 import { showToast } from "./toast.js";
 import { recordHistory, clearHistory } from "./history.js";
 import { stopPreviewPlayback } from "./playback.js";
 import { captureAndUploadThumbnail } from "./thumbnail.js";
 import { flushAutoBackupOnLeave } from "./backup.js";
 import { cancelPendingScenarioSave } from "./scenario-actions.js";
+import {
+  applyLocationsPayload,
+  fillLocationSelect,
+  hasMultipleLocations,
+  locationLabel,
+  openProjectMoveDialog,
+  projectLocations,
+} from "./project-locations.js";
 
 // 編集画面を離れる直前 (= ダッシュボード遷移 / 別プロジェクトへ切替 / 新規プロジェクト
 // 作成 / プロジェクト削除) に、現在の v2 GL canvas をサムネとして保存する。
@@ -99,15 +107,74 @@ export function sortedProjects(sortMode = elements.projectSort?.value || "recent
 export function filteredProjects() {
   const nameQuery = (elements.projectNameFilter.value || "").trim().toLowerCase();
   const dateQuery = elements.projectDateFilter.value || "";
+  const locationQuery = elements.projectLocationFilter?.value || "";
   return sortedProjects().filter((project) => {
     const name = `${project.title || ""} ${project.id || ""}`.toLowerCase();
     const dates = [project.updatedAt, project.createdAt, project.lastOpenedAt].filter(Boolean).join(" ");
-    return (!nameQuery || name.includes(nameQuery)) && (!dateQuery || dates.includes(dateQuery));
+    return (!nameQuery || name.includes(nameQuery))
+      && (!dateQuery || dates.includes(dateQuery))
+      && (!locationQuery || project.locationId === locationQuery);
   });
+}
+
+// 保管場所フィルタの選択肢を state から作り直す。保管場所が 1 つだけのときは
+// 選ばせる意味が無いので丸ごと隠す (従来の見た目のまま)。
+function refreshLocationFilterOptions() {
+  const select = elements.projectLocationFilter;
+  if (!select) return;
+  const label = select.closest("label");
+  const multiple = hasMultipleLocations();
+  if (label) label.hidden = !multiple;
+  if (!multiple) {
+    select.value = "";
+    return;
+  }
+  const previous = select.value;
+  select.innerHTML = "";
+  const all = document.createElement("option");
+  all.value = "";
+  all.textContent = "すべて";
+  select.append(all);
+  for (const loc of projectLocations()) {
+    const option = document.createElement("option");
+    option.value = loc.id;
+    option.textContent = loc.available ? loc.name : `${loc.name}（未接続）`;
+    option.title = loc.path;
+    select.append(option);
+  }
+  select.value = projectLocations().some((loc) => loc.id === previous) ? previous : "";
+}
+
+function dashboardNotices() {
+  const notices = [];
+  const offline = projectLocations().filter((loc) => !loc.available);
+  if (offline.length > 0) {
+    notices.push(
+      `⚠ 未接続の保管場所があります: ${offline.map((l) => `${l.name}（${l.path}）`).join(" / ")}。`
+      + "そこにあるプロジェクトは接続するまで一覧に出ません。",
+    );
+  }
+  for (const conflict of state.projectIdConflicts || []) {
+    const names = (conflict.locations || []).map((l) => l.name).join(" / ");
+    notices.push(
+      `⚠ 同じフォルダ名「${conflict.id}」が複数の保管場所にあります（${names}）。`
+      + `「${locationLabel(conflict.usedLocationId)}」の方だけを表示しています。`,
+    );
+  }
+  return notices;
 }
 
 export function renderProjectDashboard() {
   elements.projectGrid.innerHTML = "";
+  refreshLocationFilterOptions();
+  // 未接続の保管場所 / フォルダ名重複は「プロジェクトが消えた」と誤解されやすい。
+  // 一覧の先頭で必ず理由を示す。
+  for (const notice of dashboardNotices()) {
+    const box = document.createElement("div");
+    box.className = "dashboard-notice";
+    box.textContent = notice;
+    elements.projectGrid.append(box);
+  }
   const projects = filteredProjects();
   if (projects.length === 0) {
     const empty = document.createElement("div");
@@ -144,6 +211,18 @@ export function renderProjectDashboard() {
     const meta = document.createElement("div");
     meta.className = "project-card-meta";
     meta.textContent = `更新 ${formatProjectDate(project.updatedAt || project.createdAt)}`;
+
+    // 保管場所が複数あるときだけ「どこにあるか」を出す (1 つなら情報量ゼロ)。
+    let locationLine = null;
+    if (hasMultipleLocations() && project.locationId) {
+      locationLine = document.createElement("div");
+      locationLine.className = "project-card-location";
+      locationLine.innerHTML = '<span class="msym" aria-hidden="true">folder</span>';
+      const text = document.createElement("span");
+      text.textContent = locationLabel(project.locationId);
+      locationLine.title = locationLabel(project.locationId);
+      locationLine.append(text);
+    }
 
     const actions = document.createElement("div");
     actions.className = "project-card-actions";
@@ -183,9 +262,24 @@ export function renderProjectDashboard() {
       downloadProjectArchive(project);
     });
 
-    actions.append(renameButton, duplicateButton, archiveButton, deleteButton);
+    const moveButton = document.createElement("button");
+    moveButton.type = "button";
+    moveButton.className = "project-rename-button";
+    moveButton.textContent = "移動";
+    moveButton.title = "別の保管場所へフォルダごと移動します";
+    moveButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openProjectMoveDialog(project);
+    });
 
-    card.append(thumb, title, meta, actions);
+    actions.append(renameButton, duplicateButton);
+    // 移動先が無いのにボタンだけ出しても押せないだけなので、複数あるときのみ。
+    if (hasMultipleLocations()) actions.append(moveButton);
+    actions.append(archiveButton, deleteButton);
+
+    card.append(thumb, title, meta);
+    if (locationLine) card.append(locationLine);
+    card.append(actions);
     const openProject = () => {
       activateProject(project.id, { hideDashboard: true }).catch((error) => {
         console.error(error);
@@ -320,6 +414,9 @@ export async function loadProjects() {
   const result = await response.json();
   state.activeProjectId = result.activeProjectId || "";
   state.projects = result.projects || [];
+  // /api/projects は保管場所の一覧 / 既定 / ID 重複も返す。ここで取り込んでおけば
+  // ダッシュボードは追加の fetch なしで保管場所バッジと注意書きを描ける。
+  applyLocationsPayload(result);
   fillProjectSelect();
   renderProjectDashboard();
   return result;
@@ -417,6 +514,14 @@ export function openProjectDuplicateDialog(project) {
   elements.projectDuplicateDescription.textContent =
     `「${project.title || project.id}」を複製します。新しいプロジェクト名を入力してください（既存名は使用不可）`;
   elements.projectDuplicateTitleInput.value = `${project.title || project.id} のコピー`;
+  // 複製先の保管場所。1 つしか無いなら選ばせない (既定へ複製)。
+  if (elements.projectDuplicateLocationLabel) {
+    elements.projectDuplicateLocationLabel.hidden = !hasMultipleLocations();
+  }
+  fillLocationSelect(elements.projectDuplicateLocationSelect, { selectedId: project.locationId });
+  // outputs/ は数百 MB になりうるので、既定は「含める」だが容量を見せて選べるようにする。
+  if (elements.projectDuplicateIncludeOutputs) elements.projectDuplicateIncludeOutputs.checked = true;
+  refreshDuplicateSizeHint(project);
   elements.projectDuplicateError.hidden = true;
   elements.projectDuplicateError.textContent = "";
   elements.projectDuplicateDialog.showModal();
@@ -424,6 +529,31 @@ export function openProjectDuplicateDialog(project) {
     elements.projectDuplicateTitleInput.focus();
     elements.projectDuplicateTitleInput.select();
   });
+}
+
+const DUPLICATE_HINT_BASE =
+  "素材・シナリオ・設定と、フォルダ内に手で置いたファイルはすべて複製されます。"
+  + "再生成できるプレビューキャッシュ (cache/) だけは複製しません。";
+
+async function refreshDuplicateSizeHint(project) {
+  const hint = elements.projectDuplicateOutputsHint;
+  if (!hint) return;
+  hint.textContent = DUPLICATE_HINT_BASE;
+  try {
+    const response = await fetch(`/api/projects/${encodeURIComponent(project.id)}/storage`);
+    if (!response.ok) return;
+    const data = await response.json();
+    // ダイアログを閉じた / 別プロジェクトに切り替わったあとの遅延レスポンスは捨てる。
+    if (state.projectDuplicateSource?.id !== project.id) return;
+    const outputs = data.outputs || {};
+    const total = data.total || {};
+    hint.textContent =
+      `${DUPLICATE_HINT_BASE}`
+      + `（このプロジェクトは合計 ${formatSize(total.bytes || 0)}、`
+      + `うち outputs/ が ${formatSize(outputs.bytes || 0)} / ${outputs.count || 0} 件）`;
+  } catch (error) {
+    console.warn("[project] 容量の取得に失敗しました", error);
+  }
 }
 
 export function closeProjectDuplicateDialog() {
@@ -448,10 +578,16 @@ export async function submitProjectDuplicate() {
     elements.projectDuplicateError.textContent = `プロジェクト名「${newTitle}」は既に使われています`;
     return;
   }
+  const locationId = hasMultipleLocations()
+    ? (elements.projectDuplicateLocationSelect?.value || "")
+    : "";
+  const includeOutputs = elements.projectDuplicateIncludeOutputs
+    ? elements.projectDuplicateIncludeOutputs.checked
+    : true;
   const response = await fetch(`/api/projects/${encodeURIComponent(project.id)}/duplicate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: newTitle }),
+    body: JSON.stringify({ title: newTitle, locationId, includeOutputs }),
   });
   if (!response.ok) {
     const errText = await response.text();
@@ -459,10 +595,17 @@ export async function submitProjectDuplicate() {
     elements.projectDuplicateError.textContent = errText || "複製に失敗しました";
     return;
   }
+  const created = await response.json().catch(() => ({}));
   closeProjectDuplicateDialog();
   await loadProjects();
   renderProjectDashboard();
-  showToast(`プロジェクトを複製しました: ${newTitle}`);
+  const notes = [];
+  if (created?.locationName && hasMultipleLocations()) notes.push(created.locationName);
+  if (created && created.includedOutputs === false) notes.push("outputs/ は複製せず");
+  showToast(
+    `プロジェクトを複製しました: ${newTitle}`
+    + (notes.length ? `（${notes.join(" / ")}）` : ""),
+  );
 }
 
 // ===========================================================================

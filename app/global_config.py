@@ -5,8 +5,10 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -195,7 +197,14 @@ def default_global_config() -> dict[str, Any]:
         },
         "editorHistorySize": 50,
         "ffmpegPath": "",
+        # 組み込み保管場所のパス。空ならアプリ同梱の projects/。
+        # (複数保管場所を足しても、この値は「組み込み保管場所」として生き続ける)
         "projectsPath": "",
+        # 追加の保管場所 [{id, name, path}]。外付けディスクへアーカイブしたプロジェクトを
+        # 一覧から見えるようにするためのもの。詳細は app/project_locations.py。
+        "projectLocations": [],
+        # 新規プロジェクト / ZIP 取り込みの保存先 (保管場所 id)。空 = 組み込み。
+        "defaultProjectLocationId": "",
         # 新規インストール時のデフォルトは ON (= 抑制)。詳細ログは「開発者モード」
         # 位置付けで、ユーザは全体設定で OFF にしたとき初めて INFO が流れる。
         # quietMode=True で uvicorn 系 + splite_anime logger を WARNING 化 (詳細は
@@ -284,6 +293,52 @@ def default_global_config() -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------------------
+# 保管場所 (projectLocations)
+# ---------------------------------------------------------------------------
+# 実体の解決 / 走査は app/project_locations.py。ここでは「ディスクに落とす形」の
+# 正規化だけを行う (global_config は app.paths 以外に依存しない方針のため、
+# project_locations を import しない)。
+def _location_slug(value: str) -> str:
+    normalized = unicodedata.normalize("NFC", (value or "").strip())
+    slug = re.sub(r"[^\w-]+", "_", normalized, flags=re.UNICODE).strip("_").lower()
+    return slug[:48]
+
+
+def _normalize_project_locations(raw: Any) -> list[dict[str, str]]:
+    """``projectLocations`` を ``[{id, name, path}]`` へ正規化する。
+
+    - path は絶対パス必須 (相対はディスクを跨げないので落とす)。
+    - **存在チェックはしない**。外付けディスクは外れるので、外れている間だけ設定から
+      消えるのは最悪の挙動になる。可用性は読み出し側 (Location.available) が見る。
+    - id は重複したら連番で住み分け。空なら末尾ディレクトリ名から生成。
+    """
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, str]] = []
+    seen_ids: set[str] = {"builtin"}
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        raw_path = str(entry.get("path") or "").strip()
+        if not raw_path:
+            continue
+        candidate = Path(raw_path).expanduser()
+        if not candidate.is_absolute():
+            continue
+        path = str(candidate)
+        loc_id = _location_slug(str(entry.get("id") or "")) or _location_slug(candidate.name) or "location"
+        base = loc_id
+        suffix = 2
+        while loc_id in seen_ids:
+            loc_id = f"{base}_{suffix}"
+            suffix += 1
+        seen_ids.add(loc_id)
+        name = unicodedata.normalize("NFC", str(entry.get("name") or "").strip()) or candidate.name
+        out.append({"id": loc_id, "name": name[:80], "path": path})
+    return out
+
+
 def _clamp_history_size(value: Any, fallback: int = 50) -> int:
     try:
         size = int(value)
@@ -330,6 +385,10 @@ def load_global_config() -> dict[str, Any]:
         config["ffmpegPath"] = data["ffmpegPath"].strip()
     if isinstance(data.get("projectsPath"), str):
         config["projectsPath"] = data["projectsPath"].strip()
+    if isinstance(data.get("projectLocations"), list):
+        config["projectLocations"] = _normalize_project_locations(data["projectLocations"])
+    if isinstance(data.get("defaultProjectLocationId"), str):
+        config["defaultProjectLocationId"] = data["defaultProjectLocationId"].strip()
     logging_in = data.get("logging") if isinstance(data.get("logging"), dict) else {}
     if "quietMode" in logging_in:
         config["logging"]["quietMode"] = bool(logging_in["quietMode"])
@@ -449,6 +508,18 @@ def save_global_config(payload: dict[str, Any]) -> dict[str, Any]:
                         raise ValueError(f"ffmpeg のパスが見つかりません: {normalized}")
                     normalized = str(candidate)
                 config["ffmpegPath"] = normalized
+        if "projectLocations" in payload:
+            config["projectLocations"] = _normalize_project_locations(payload.get("projectLocations"))
+        if "defaultProjectLocationId" in payload:
+            raw_default = payload.get("defaultProjectLocationId")
+            if isinstance(raw_default, str):
+                wanted = raw_default.strip()
+                known = {"builtin", ""} | {
+                    str(loc.get("id")) for loc in config.get("projectLocations", []) if isinstance(loc, dict)
+                }
+                if wanted not in known:
+                    raise ValueError(f"保管場所が見つかりません: {wanted}")
+                config["defaultProjectLocationId"] = wanted
         if "projectsPath" in payload:
             raw_path = payload.get("projectsPath")
             if isinstance(raw_path, str):

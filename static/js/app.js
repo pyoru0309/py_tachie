@@ -148,6 +148,11 @@ import {
   submitProjectForm,
 } from "./project.js";
 import {
+  bindProjectLocations,
+  loadProjectLocations,
+  renderProjectLocationSettings,
+} from "./project-locations.js";
+import {
   bindAssets,
   refreshAssetManager,
   ensureCommonInventoryLoaded,
@@ -175,6 +180,7 @@ import {
 } from "./dialog.js";
 import {
   bindScenarioActions,
+  cancelPendingScenarioSave,
   ensureSelectValue,
   setAudioPath,
   activeScene,
@@ -1062,6 +1068,23 @@ function bindControls() {
     reloadProjectData,
     clearProjectData,
   });
+  bindProjectLocations({
+    // 保管場所の増減 / プロジェクト移動のあとは一覧を取り直す。
+    reloadProjects: async () => {
+      await loadProjects();
+      renderProjectDashboard();
+    },
+    // 移動の直前に「プロジェクトを離れる」処理を済ませる。debounce 中の自動保存が
+    // 旧パスへ書き戻されるのを防ぐ (プロジェクト切替と同じ理由)。
+    prepareForMove: async (project) => {
+      if (project?.id !== state.activeProjectId) return;
+      await cancelPendingScenarioSave({ flush: true });
+      await flushAutoBackupOnLeave(state.activeProjectId);
+    },
+    reloadActiveProject: async (projectId) => {
+      await reloadProjectData({ projectId });
+    },
+  });
   bindAssets({
     openCharacterManager,
     reloadProjectData,
@@ -1564,7 +1587,13 @@ function bindControls() {
     elements.confirmProjectDeleteButton.disabled = confirmation !== expectedName && confirmation !== expectedId;
   });
   elements.cancelProjectDeleteButton.addEventListener("click", closeProjectDeleteDialog);
-  for (const element of [elements.projectNameFilter, elements.projectDateFilter, elements.projectSort]) {
+  for (const element of [
+    elements.projectNameFilter,
+    elements.projectDateFilter,
+    elements.projectSort,
+    elements.projectLocationFilter,
+  ]) {
+    if (!element) continue;
     element.addEventListener("input", renderProjectDashboard);
     element.addEventListener("change", renderProjectDashboard);
   }

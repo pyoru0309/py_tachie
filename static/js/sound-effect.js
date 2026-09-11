@@ -22,7 +22,7 @@ import {
   soundEffectDurationFrame,
 } from "./scenario.js";
 import { showToast } from "./toast.js";
-import { recordHistory } from "./history.js";
+import { recordHistory, beginCoalescedHistory } from "./history.js";
 import { renderTelopTrack } from "./timeline.js";
 
 let deps = {
@@ -240,6 +240,15 @@ export function renderSoundEffectEditor() {
   // saveScenario が state.scenario を置き換えうるため、handler 側では
   // 毎回 seId で活きたオブジェクトを引き直す (telop.js と同じパターン)。
   const live = () => findSoundEffectById(seId);
+  // 履歴フック: この編集パネルの変更はすべて saveWithHistory() を通す。
+  // 個別ハンドラに recordHistory を撒くと必ず漏れが出て、漏れた編集は
+  // 「次に履歴を積む操作」のエントリに吸収され、undo 1 回で複数項目が
+  // まとめて巻き戻る (テロップ本文で実際に起きた症状と同根)。
+  // 対象 (= seId) をキーにするので、別項目へ移った瞬間に前の項目が確定する。
+  const saveWithHistory = () => {
+    beginCoalescedHistory(`se:${seId}`);
+    deps.scheduleScenarioSave();
+  };
 
   // 効果音アセット選択
   const srcLabel = document.createElement("label");
@@ -256,7 +265,7 @@ export function renderSoundEffectEditor() {
     const cur = live();
     if (!cur) return;
     cur.src = srcSelect.value || "";
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     renderTelopTrack();
     deps.renderPreview();
   });
@@ -286,7 +295,7 @@ export function renderSoundEffectEditor() {
       const cur = live();
       if (!cur) return;
       cur.startFrame = Math.max(0, frames | 0);
-      deps.scheduleScenarioSave();
+      saveWithHistory();
       renderTelopTrack();
       deps.renderPreview();
     },
@@ -313,7 +322,7 @@ export function renderSoundEffectEditor() {
       // 終了 <= 開始 はガード (最低 1 フレーム)
       const newEnd = Math.max(s + 1, frames | 0);
       cur.durationFrame = newEnd - s;
-      deps.scheduleScenarioSave();
+      saveWithHistory();
       renderTelopTrack();
       deps.renderPreview();
     },
@@ -345,7 +354,7 @@ export function renderSoundEffectEditor() {
     const cur = live();
     if (!cur) return;
     cur.loop = loopInput.checked;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
     deps.renderPreview();
   });
   const loopText = document.createElement("span");
@@ -366,7 +375,7 @@ export function renderSoundEffectEditor() {
     if (!cur) return;
     const v = Number(volInput.value);
     cur.volume = Number.isFinite(v) ? Math.max(0, Math.min(2, v)) : 1.0;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
   });
   volLabel.append(volInput);
   row2.append(volLabel);
@@ -388,7 +397,7 @@ export function renderSoundEffectEditor() {
     if (!cur) return;
     const v = Number(fadeInInput.value);
     cur.fadeInSec = Number.isFinite(v) && v >= 0 ? v : 0;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
   });
   fadeInLabel.append(fadeInInput);
   row3.append(fadeInLabel);
@@ -405,7 +414,7 @@ export function renderSoundEffectEditor() {
     if (!cur) return;
     const v = Number(fadeOutInput.value);
     cur.fadeOutSec = Number.isFinite(v) && v >= 0 ? v : 0;
-    deps.scheduleScenarioSave();
+    saveWithHistory();
   });
   fadeOutLabel.append(fadeOutInput);
   row3.append(fadeOutLabel);

@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from .manifest import resolve_hairstyle_preset
-from .paths import PROJECT_ROOT
 from .scenario import _character_def_for
+from .utils import is_inside_allowed_roots, resolve_root_rel
 
 
 def safe_output_name(name: str | None) -> str:
@@ -28,9 +28,9 @@ def safe_asset_path(rel_path: str | None) -> Path | None:
     # NFD のまま URL を送ってくるケースがあり、ディスク上が NFC だと Windows で
     # 開けなくなる。両端 NFC に正規化することで normalization 由来の事故を防ぐ。
     rel_path = unicodedata.normalize("NFC", rel_path)
-    path = (PROJECT_ROOT / rel_path).resolve()
-    root = PROJECT_ROOT.resolve()
-    if root not in path.parents and path != root:
+    path = resolve_root_rel(rel_path).resolve()
+    # PROJECT_ROOT だけでなく、登録済みの保管場所 (外付けディスク等) の内側も許可。
+    if not is_inside_allowed_roots(path):
         raise ValueError("Asset path is outside of project root")
     return path
 

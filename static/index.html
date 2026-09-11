@@ -102,6 +102,12 @@
             <input id="projectDateFilterInput" type="date" />
           </label>
           <label>
+            保管場所
+            <select id="projectLocationFilterSelect">
+              <option value="">すべて</option>
+            </select>
+          </label>
+          <label>
             並び順
             <select id="projectSortSelect">
               <option value="recent">最近開いた順</option>
@@ -2506,6 +2512,18 @@
           複製先プロジェクト名
           <input id="projectDuplicateTitleInput" type="text" autocomplete="off" />
         </label>
+        <label id="projectDuplicateLocationLabel">
+          複製先の保管場所
+          <select id="projectDuplicateLocationSelect"></select>
+        </label>
+        <label class="checkbox-row">
+          <input id="projectDuplicateIncludeOutputs" type="checkbox" checked />
+          <span>書き出しフォルダ (<code>outputs/</code>) も複製する</span>
+        </label>
+        <p id="projectDuplicateOutputsHint" class="asset-hint">
+          素材・シナリオ・設定と、フォルダ内に手で置いたファイルはすべて複製されます。
+          再生成できるプレビューキャッシュ (<code>cache/</code>) だけは複製しません。
+        </p>
         <p id="projectDuplicateError" class="asset-warning" role="alert" hidden></p>
         <div class="dialog-actions">
           <button id="confirmProjectDuplicateButton" class="primary-button" type="submit">
@@ -2513,6 +2531,37 @@
             <span>複製する</span>
           </button>
           <button id="cancelProjectDuplicateButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>閉じる</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="projectMoveDialog" class="project-form-dialog">
+      <form id="projectMoveForm" method="dialog" class="project-form-panel">
+        <div class="dialog-header project-form-header">
+          <div>
+            <h2>プロジェクトを移動</h2>
+            <p id="projectMoveDescription">移動先の保管場所を選んでください</p>
+          </div>
+        </div>
+        <label>
+          移動先の保管場所
+          <select id="projectMoveLocationSelect"></select>
+        </label>
+        <p class="asset-hint">
+          <strong>フォルダをそのまま移動します。</strong>書き出した動画・サムネ・キャッシュ・
+          Finder やエクスプローラーで手作業に置いたファイルまで、中身は一切間引かずに運びます。
+          素材の参照もそのまま引き継がれるので、移動後もそのまま編集できます。
+          編集中の内容は移動前に保存されます。
+        </p>
+        <p id="projectMoveError" class="asset-warning" role="alert" hidden></p>
+        <div class="dialog-actions">
+          <button id="confirmProjectMoveButton" class="primary-button" type="submit">
+            <span class="msym button-icon" aria-hidden="true">drive_file_move</span>
+            <span>移動する</span>
+          </button>
+          <button id="cancelProjectMoveButton" type="button">
             <span class="msym button-icon" aria-hidden="true">close</span>
             <span>閉じる</span>
           </button>
@@ -2664,8 +2713,36 @@
                 </label>
               </div>
               <p id="globalFfmpegResolved" class="asset-hint"></p>
-              <h3>プロジェクトフォルダの場所</h3>
-              <p class="asset-hint">空欄にするとアプリ同梱の <code>projects/</code> を使います。外部ディスクなどへ移したい場合は絶対パスを入力してください（既存プロジェクトの自動移行は行いません）。</p>
+              <h3>プロジェクトの保管場所</h3>
+              <p class="asset-hint">
+                プロジェクトを複数の場所に分けて保管できます。外付けディスクを登録しておけば、
+                完成した作品をそちらへ<strong>移動</strong>しても、プロジェクト一覧からはこれまでどおり開けます。
+                未接続の保管場所は「未接続」と表示され、一覧には出ません（接続すれば戻ります）。
+                移動・複製はプロジェクト一覧の各カードから実行します。
+              </p>
+              <div id="projectLocationList" class="location-list"></div>
+              <div class="location-add-row">
+                <label>
+                  表示名
+                  <input id="projectLocationNameInput" type="text" placeholder="外付けアーカイブ" autocomplete="off" />
+                </label>
+                <label>
+                  フォルダのパス（絶対パス）
+                  <input id="projectLocationPathInput" type="text" placeholder="/Volumes/Archive/splite_projects" autocomplete="off" />
+                </label>
+                <button id="projectLocationAddButton" type="button">
+                  <span class="msym button-icon" aria-hidden="true">add</span>
+                  <span>保管場所を追加</span>
+                </button>
+              </div>
+              <label class="checkbox-row">
+                <input id="projectLocationCreateInput" type="checkbox" checked />
+                フォルダが無ければ作成する（親フォルダが存在する場合のみ）
+              </label>
+              <p id="projectLocationError" class="asset-hint form-error" hidden></p>
+
+              <h4>組み込み保管場所のパス</h4>
+              <p class="asset-hint">空欄にするとアプリ同梱の <code>projects/</code> を使います。ここを変えても既存プロジェクトの自動移行は行いません（移行したい場合は各プロジェクトの「移動」を使ってください）。</p>
               <div class="settings-grid">
                 <label class="settings-label-wide">
                   projects ディレクトリ

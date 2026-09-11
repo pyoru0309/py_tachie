@@ -28,6 +28,7 @@ import io
 import json
 import shutil
 import tempfile
+import unicodedata
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -100,15 +101,25 @@ def _extract_zip_to_tmp(zip_bytes: bytes) -> tuple[Path, str]:
         zf.close()
         raise ProjectImportError("ZIP が空です")
 
-    # トップ階層の dir を集計。"<top>/..." 形式以外は弾く。
+    # ★ エントリ名は必ず NFC へ正規化してから扱う。macOS で作られた zip は
+    #   濁音・半濁音が NFD (基底文字 + 結合濁点) で入っていることがあり、
+    #     - トップが NFD と NFC で混在すると「単一ディレクトリ」判定が 2 個と誤検出
+    #     - Windows へ展開すると NFD のままのファイル名になり、NFC で引く側から
+    #       見つからない (フォント / 背景 / 音声の 404)
+    #   という事故になる (dev_docs: NFC 正規化 3 層)。展開も extractall ではなく
+    #   NFC 名を明示して 1 件ずつ書き出す。
     tops: set[str] = set()
+    entries: list[tuple[str, str]] = []  # (zip 内の元名, NFC 正規化した相対パス)
     for name in members:
-        if not _safe_zip_member(name.rstrip("/")):
+        stripped = name.rstrip("/")
+        if not stripped:
+            continue
+        if not _safe_zip_member(stripped):
             zf.close()
             raise ProjectImportError(f"安全でない ZIP エントリです: {name}")
-        first = name.split("/", 1)[0]
-        if first:
-            tops.add(first)
+        norm = unicodedata.normalize("NFC", stripped)
+        tops.add(norm.split("/", 1)[0])
+        entries.append((name, norm))
     if len(tops) != 1:
         zf.close()
         raise ProjectImportError(
@@ -118,8 +129,19 @@ def _extract_zip_to_tmp(zip_bytes: bytes) -> tuple[Path, str]:
 
     tmp_root = Path(tempfile.mkdtemp(prefix="splite_import_"))
     try:
-        zf.extractall(tmp_root)
-    finally:
+        for original, norm in entries:
+            target = tmp_root.joinpath(*norm.split("/"))
+            if original.endswith("/"):
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with zf.open(original) as src, target.open("wb") as dst:
+                shutil.copyfileobj(src, dst)
+    except Exception as exc:  # noqa: BLE001
+        zf.close()
+        shutil.rmtree(tmp_root, ignore_errors=True)
+        raise ProjectImportError(f"ZIP を展開できません: {exc}") from exc
+    else:
         zf.close()
 
     project_root = tmp_root / top_dir
@@ -214,16 +236,25 @@ def run_migrations(ctx: ImportContext, from_version: int, to_version: int) -> No
 # ---------------------------------------------------------------------------
 
 
-def _allocate_project_id(preferred: str, projects_dir: Path) -> str:
-    """projects_dir 配下で衝突しない project_id を確保する。
+def _allocate_project_id(
+    preferred: str,
+    projects_dir: Path,
+    id_taken: Callable[[str], bool] | None = None,
+) -> str:
+    """衝突しない project_id を確保する。
 
-    ``unique_project_id`` は内部で ``current_projects_dir()`` を見るが、テスト等で
-    違うディレクトリに展開したいケースがあるので、ここでは独自に走査する。
+    ``unique_project_id`` は内部で保管場所を横断走査するが、テスト等で違うディレクトリに
+    展開したいケースがあるので、ここでは ``projects_dir`` 直下を必ず見たうえで、
+    ``id_taken`` が渡されていれば「他の保管場所でも使われていないか」も併せて確認する。
+    project_id は URL / シナリオ内アセットパスのキーなので、**全保管場所で一意**である
+    必要がある。
     """
     base = slugify_project_id(preferred)
     candidate = base
     suffix = 2
-    while (projects_dir / candidate / "project.json").exists():
+    while (projects_dir / candidate / "project.json").exists() or (
+        id_taken is not None and id_taken(candidate)
+    ):
         candidate = f"{base}_{suffix}"
         suffix += 1
     return candidate
@@ -248,6 +279,7 @@ def import_project_zip(
     *,
     original_filename: str = "",
     target_id: str | None = None,
+    id_taken: Callable[[str], bool] | None = None,
 ) -> dict[str, Any]:
     """ZIP からプロジェクトを取り込み、最終的な project_id 等を返す。
 
@@ -278,7 +310,7 @@ def import_project_zip(
             or Path(original_filename).stem
             or "imported_project"
         )
-        new_id = _allocate_project_id(preferred, projects_dir)
+        new_id = _allocate_project_id(preferred, projects_dir, id_taken)
 
         _write_project_metadata(project_root, project_data, new_id)
 

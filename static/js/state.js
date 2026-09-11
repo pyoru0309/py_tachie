@@ -79,6 +79,13 @@ export const state = {
   isLoadingCut: false,
   projects: [],
   activeProjectId: "",
+  // プロジェクトの保管場所 (app/project_locations.py)。/api/projects と
+  // /api/project-locations の両方から更新される。
+  projectLocations: [],
+  defaultProjectLocationId: "builtin",
+  // 同じフォルダ名が複数の保管場所にあるときの報告 (先勝ちで 1 つしか使えない)。
+  projectIdConflicts: [],
+  projectMoveSource: null,
   // state.scenario / state.manifest がどのプロジェクトから読み込まれたか。
   // activeProjectId はサーバーの current_project や UI 操作で変わり得るため、
   // 保存時は loadedProjectId と保存先 projectId の一致を必ず確認する。

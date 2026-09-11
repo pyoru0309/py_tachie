@@ -65,6 +65,13 @@ textarea {
   color: inherit;
 }
 
+/* `hidden` 属性は必ず効かせる。base の `label { display: grid }` のように
+   要素セレクタで display を指定していると、[hidden] のユーザーエージェント
+   スタイル (display: none) が特異性で負けて「隠したつもりが出たまま」になる。 */
+label[hidden] {
+  display: none;
+}
+
 label {
   display: grid;
   gap: 6px;
