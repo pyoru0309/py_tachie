@@ -53,9 +53,10 @@ from .export_video import (
     source_to_stream_time,
     video_metadata,
 )
-from .global_config import current_projects_dir, ffmpeg_executable, resolve_video_preset
+from .global_config import ffmpeg_executable, resolve_video_preset
 from .log_setup import app_logger
 from .paths import OUTPUT_DIR
+from .project_locations import find_project_location, load_locations
 from .render import safe_asset_path
 from .timecode import PROJECT_FPS
 from .utils import current_project
@@ -163,6 +164,29 @@ def _is_inside(path: Path, root: Path) -> bool:
     return True
 
 
+def _allowed_output_roots() -> list[Path]:
+    """書き出しの入出力に使ってよいディレクトリ (resolve 済み)。
+
+    全保管場所 (組み込み + 外付け等) の直下と top-level `outputs/`。PROJECT_ROOT
+    全体までは広げない (`app/` や `static/` に書かせない)。未接続の保管場所は
+    外す: 外付けが外れた状態で mkdir すると起動ディスク側に `/Volumes/<名前>/...`
+    を作ってしまうため。
+    """
+    roots = [OUTPUT_DIR.resolve()]
+    for location in load_locations():
+        if not location.available:
+            continue
+        try:
+            roots.append(location.path.resolve())
+        except OSError:
+            continue
+    return roots
+
+
+def _is_allowed_output_path(path: Path) -> bool:
+    return any(_is_inside(path, root) for root in _allowed_output_roots())
+
+
 def _resolve_output_path(
     project_id: str,
     cut_id: str,
@@ -200,11 +224,8 @@ def _resolve_output_path(
         is_transparent = encoder in TRANSPARENT_ENCODERS
         extension = ".mov" if is_transparent else ".mp4"
 
-    # 許可ルート: `projects/<id>/` 配下と `outputs/` (top-level) 配下のみ。
+    # 許可ルート: 各保管場所の配下と `outputs/` (top-level) 配下のみ。
     # シンボリックリンクや `..` を含むパスは resolve で絶対化してから判定する。
-    projects_root = current_projects_dir().resolve()
-    outputs_root = OUTPUT_DIR.resolve()
-
     if explicit:
         try:
             cand = Path(explicit).expanduser()
@@ -218,12 +239,9 @@ def _resolve_output_path(
                 f"outputPath の拡張子は {extension} を期待 (got {cand_resolved.suffix or 'なし'})"
             )
 
-        if not (
-            _is_inside(cand_resolved, projects_root)
-            or _is_inside(cand_resolved, outputs_root)
-        ):
+        if not _is_allowed_output_path(cand_resolved):
             return None, (
-                "outputPath は projects/ または outputs/ の配下のみ許可されます: "
+                "outputPath はプロジェクトの保管場所または outputs/ の配下のみ許可されます: "
                 f"{cand_resolved}"
             )
 
@@ -237,11 +255,13 @@ def _resolve_output_path(
         basename = f"v2_{safe_cut}_{ts}{extension}"
     if project_id:
         try:
-            root = current_projects_dir() / project_id
-            if root.exists():
+            # プロジェクトは外付け等の別保管場所にありうるので、組み込みの
+            # projects/ に決め打ちせず実際の置き場所を引く。
+            found = find_project_location(project_id)
+            if found is not None:
                 # v1 互換: 動画 / PNG (mov) は projects/{id}/outputs/ に置く。
                 # シナリオ・テロップの export/ とは分離する。
-                out_dir = root / "outputs"
+                out_dir = found[1] / "outputs"
                 out_dir.mkdir(parents=True, exist_ok=True)
                 return out_dir / basename, None
         except Exception:
@@ -848,14 +868,12 @@ class ExportMuxRequest(BaseModel):
 
 
 def _validate_input_video_path(p: str) -> Path:
-    """videoPath を絶対化、projects/ または outputs/ 配下のみ許可。"""
+    """videoPath を絶対化、プロジェクトの保管場所または outputs/ 配下のみ許可。"""
     cand = Path(p).expanduser()
     cand_resolved = cand.resolve() if cand.is_absolute() else (Path.cwd() / cand).resolve()
-    projects_root = current_projects_dir().resolve()
-    outputs_root = OUTPUT_DIR.resolve()
-    if not (_is_inside(cand_resolved, projects_root) or _is_inside(cand_resolved, outputs_root)):
+    if not _is_allowed_output_path(cand_resolved):
         raise ValueError(
-            f"videoPath は projects/ または outputs/ 配下のみ許可されます: {cand_resolved}"
+            f"videoPath はプロジェクトの保管場所または outputs/ 配下のみ許可されます: {cand_resolved}"
         )
     if not cand_resolved.exists():
         raise ValueError(f"videoPath が存在しません: {cand_resolved}")

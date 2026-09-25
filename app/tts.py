@@ -29,7 +29,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .paths import ASSETS_DIR, DEFAULT_PROJECTS_DIR, STATE_DIR
+from .paths import ASSETS_DIR, STATE_DIR
+from .project_locations import iter_project_dirs
 
 
 VOICE_CATALOG_PATH = STATE_DIR / "voice_catalog.json"
@@ -723,16 +724,16 @@ def _iter_character_manifest_paths() -> list[Path]:
                 p = child / "character_manifest.json"
                 if p.exists():
                     candidates.append(p)
-    if DEFAULT_PROJECTS_DIR.exists():
-        for project_dir in DEFAULT_PROJECTS_DIR.iterdir():
-            chars_root = project_dir / "assets" / "characters"
-            if not chars_root.exists():
-                continue
-            for child in chars_root.iterdir():
-                if child.is_dir():
-                    p = child / "character_manifest.json"
-                    if p.exists():
-                        candidates.append(p)
+    # プロジェクトは外付け等の別保管場所にもありうるので全保管場所を走査する。
+    for _location, project_dir in iter_project_dirs():
+        chars_root = project_dir / "assets" / "characters"
+        if not chars_root.exists():
+            continue
+        for child in chars_root.iterdir():
+            if child.is_dir():
+                p = child / "character_manifest.json"
+                if p.exists():
+                    candidates.append(p)
     return candidates
 
 

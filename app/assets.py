@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
+import threading
 import unicodedata
 import uuid
 from datetime import datetime, timezone
@@ -174,6 +176,17 @@ def asset_items(paths: list[Path], prefix: str) -> list[dict[str, str]]:
     return items
 
 
+_NFC_TMP_PREFIX = ".__nfc_migrate__"
+# scan_project_assets はリクエストスレッドから並行に呼ばれる。2 本同時に走ると、
+# 片方が一時名へ逃がしたファイルをもう片方の rglob が拾って rename し合い、
+# ENOENT で失敗したり一時名 (ドットファイル) のまま取り残されて素材が消えたりする。
+_NFC_MIGRATE_LOCK = threading.Lock()
+# NFC へのリネームが定着しない (書き込み時に NFD へ戻す) ボリュームの st_dev。
+# 例: Paragon の NTFS ドライバ (ufsd_NTFS) はファイル名を常に NFD で保存する。
+# こうしたボリュームでは移行が原理的に成功しないので、以降は触らない。
+_NFC_UNSUPPORTED_DEVS: set[int] = set()
+
+
 def migrate_nfc_filenames(root: Path) -> int:
     # root 配下を recursive walk して、NFD 文字を含むファイル/ディレクトリ名を NFC に
     # リネームする。Windows (NTFS) との互換のため。UI のアセット管理経由だけでなく
@@ -186,6 +199,16 @@ def migrate_nfc_filenames(root: Path) -> int:
     # 真に別ファイル (= 別 inode) で衝突している場合のみ WARN+スキップ。
     if not root.exists():
         return 0
+    with _NFC_MIGRATE_LOCK:
+        return _migrate_nfc_filenames_locked(root)
+
+
+def _migrate_nfc_filenames_locked(root: Path) -> int:
+    try:
+        if root.stat().st_dev in _NFC_UNSUPPORTED_DEVS:
+            return 0
+    except OSError:
+        return 0
     renamed = 0
     # bottom-up で walk しないと、親ディレクトリを先にリネームすると下層の path が壊れる
     entries: list[Path] = []
@@ -195,6 +218,13 @@ def migrate_nfc_filenames(root: Path) -> int:
     for path in entries:
         try:
             name = path.name
+            if name.startswith(_NFC_TMP_PREFIX):
+                # 過去の 2-step rename が途中で落ちて取り残された一時名。元の名前へ戻す。
+                original = path.with_name(unicodedata.normalize("NFC", name[len(_NFC_TMP_PREFIX):]))
+                if original.name and not original.exists():
+                    path.rename(original)
+                    _log.warning("NFC migration: 取り残された一時名を復旧しました: %s", original)
+                continue
             nfc_name = unicodedata.normalize("NFC", name)
             if name == nfc_name:
                 continue
@@ -213,12 +243,22 @@ def migrate_nfc_filenames(root: Path) -> int:
                     continue
                 # 同一 inode = APFS の normalization-insensitive matching。
                 # 一時名経由でリネームしてディスク上の表記を NFC に書き換える。
-                tmp_name = f".__nfc_migrate__{nfc_name}"
-                tmp_path = path.with_name(tmp_name)
+                tmp_path = path.with_name(f"{_NFC_TMP_PREFIX}{nfc_name}")
                 if tmp_path.exists():
-                    tmp_path = path.with_name(f".__nfc_migrate__{uuid.uuid4().hex}__{nfc_name}")
+                    tmp_path = path.with_name(f"{_NFC_TMP_PREFIX}{uuid.uuid4().hex}__{nfc_name}")
                 path.rename(tmp_path)
                 tmp_path.rename(new_path)
+                if nfc_name not in os.listdir(new_path.parent):
+                    # リネームしてもディスク上は NFD のまま = このボリュームは NFD を強制する。
+                    # 毎回の空振り rename を避けるため、以降このボリュームは対象外にする。
+                    dev = new_path.stat().st_dev
+                    _NFC_UNSUPPORTED_DEVS.add(dev)
+                    _log.info(
+                        "NFC migration: %s のボリュームはファイル名を NFD で保存するため、"
+                        "以降の NFC 移行をスキップします",
+                        root,
+                    )
+                    return renamed
             else:
                 path.rename(new_path)
             renamed += 1

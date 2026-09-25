@@ -2515,7 +2515,10 @@ def _save_scenario_to_ctx(ctx, payload: dict[str, Any]) -> dict[str, Any]:
     payload_project_id = payload.get("projectId")
     if payload_project_id:
         payload_project_id = slugify_project_id(str(payload_project_id))
-        if payload_project_id != ctx.id:
+        # ctx.id はディスク上の実フォルダ名 (NTFS / APFS では NFD のことがある) で、
+        # slugify_project_id は NFC を返す。素の文字列比較だと濁点を含む ID
+        # (例: 「愛をとりもどせ」) で必ず不一致になり、自動保存が 409 で全滅する。
+        if payload_project_id != slugify_project_id(ctx.id):
             raise HTTPException(
                 status_code=409,
                 detail=(
