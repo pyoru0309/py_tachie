@@ -39,6 +39,11 @@ import { recordHistory } from "./history.js";
 import { resolveShortcutAction } from "./shortcuts.js";
 import { characterColorById } from "./character.js";
 import { showToast } from "./toast.js";
+import {
+  findTelopLaneOverlaps,
+  overlappingTelopIds,
+  resolveTelopLaneOverlaps,
+} from "./telop-overlap.js";
 
 let deps = {
   selectTelop: () => {},
@@ -319,6 +324,7 @@ export function drawTimeline() {
     accentRing: (css.getPropertyValue("--accent-ring") || "#93c5fd").trim() || "#93c5fd",
     accentFg: (css.getPropertyValue("--accent-fg") || "#fff").trim() || "#fff",
     warn: (css.getPropertyValue("--warn") || "#f59e0b").trim() || "#f59e0b",
+    danger: (css.getPropertyValue("--danger") || "#b42318").trim() || "#b42318",
   };
   const view = { cssW: contentW, viewportW, scrollLeft, cssH, viewportH, scrollTopV, pxPerSec, totalSec, layout, palette };
   ctx.save();
@@ -346,6 +352,60 @@ export function drawTimeline() {
   ctx.restore();
   updateTimelineZoomLabel();
   updateTimelinePlayheadInfo();
+  updateTelopOverlapButton(view.telopOverlaps);
+}
+
+// ---- 同一レーン内のテロップ重なり (警告 + 解消) ----
+
+function updateTelopOverlapButton(overlaps) {
+  const button = elements.telopOverlapButton;
+  if (!button) return;
+  const count = Array.isArray(overlaps) ? overlaps.length : 0;
+  if (button.hidden !== (count === 0)) button.hidden = count === 0;
+  const text = `重なり ${count} 件を解消`;
+  if (elements.telopOverlapLabel && elements.telopOverlapLabel.textContent !== text) {
+    elements.telopOverlapLabel.textContent = text;
+  }
+}
+
+// 全テロップの同一レーン重なりを解消する (ツールバーの警告ボタン)。
+export function resolveAllTelopOverlaps() {
+  const scene = state.scenario;
+  const telops = Array.isArray(scene?.telops) ? scene.telops : [];
+  if (findTelopLaneOverlaps(telops).length === 0) {
+    showToast("同じレーンで重なっているテロップはありません");
+    drawTimeline();
+    return;
+  }
+  const laneCount = sceneLaneCount(scene, "telop");
+  const result = resolveTelopLaneOverlaps(telops, laneCount);
+  if (result.laneCount > laneCount) {
+    if (!scene.laneCounts || typeof scene.laneCounts !== "object") {
+      scene.laneCounts = { telop: 1, soundEffect: 1, videoLayer: 1 };
+    }
+    scene.laneCounts.telop = result.laneCount;
+  }
+  telops.sort((a, b) => telopStartFrame(a) - telopStartFrame(b));
+  deps.scheduleScenarioSave();
+  recordHistory();
+  drawTimeline();
+  if (state.editorTarget === "telop") deps.renderTelopEditor();
+  deps.renderPreview();
+  const parts = [];
+  if (result.trimmed > 0) parts.push(`${result.trimmed} 件の終わりを詰めました`);
+  if (result.moved > 0) parts.push(`${result.moved} 件を別レーンへ移しました`);
+  showToast(`テロップの重なりを解消: ${parts.join(" / ")}`);
+}
+
+// ドラッグ / キー操作で動かしたテロップが同じレーンの別テロップに重なったら知らせる。
+function warnIfTelopsOverlap(movedIds) {
+  const ids = movedIds instanceof Set ? movedIds : new Set(movedIds || []);
+  if (ids.size === 0) return;
+  const overlaps = findTelopLaneOverlaps(state.scenario?.telops || [])
+    .filter((o) => ids.has(o.a.id) || ids.has(o.b.id));
+  if (overlaps.length === 0) return;
+  const frames = Math.max(...overlaps.map((o) => o.endFrame - o.startFrame));
+  showToast(`同じレーンのテロップと ${frames} フレーム重なっています（「重なり」ボタンで解消できます）`, "error");
 }
 
 function drawTimelineBackground(ctx, view) {
@@ -577,6 +637,9 @@ function drawTimelineTelops(ctx, view) {
   ctx.font = "11px sans-serif";
   ctx.textBaseline = "middle";
   const sorted = telops.slice().sort((a, b) => telopStartFrame(a) - telopStartFrame(b));
+  const overlaps = findTelopLaneOverlaps(telops);
+  view.telopOverlaps = overlaps;
+  const overlapIds = overlappingTelopIds(overlaps);
   // テロップを編集していないとき (= editorTarget !== "telop") は強調しない。
   // SE 編集中にテロップが同時にアクセントで光る排他バグの対策で editorTarget で
   // ハイライトを排他していたが、cross-type 選択 (Cmd+click で複数種別を同時選択)
@@ -621,24 +684,72 @@ function drawTimelineTelops(ctx, view) {
     }
     // カットリンク表示: 左端に 3px 幅のリンク先カット speaker color の帯を載せる。
     _drawLinkedCutMarker(ctx, telop, r);
+    if (overlapIds.has(telop.id)) {
+      ctx.strokeStyle = palette.danger;
+      ctx.lineWidth = 1.5;
+      roundRect(ctx, r.x + 0.75, r.y + 0.75, r.w - 1.5, r.h - 1.5, 4);
+      ctx.stroke();
+    }
   }
+  drawTelopOverlapMarks(ctx, view, overlaps);
   // マーキー（範囲選択）の矩形を最後に描画
   const drag = state.timeline.drag;
   if (drag && drag.type === "marquee" && drag.curX != null) {
     const x0 = Math.min(drag.startX, drag.curX);
     const x1 = Math.max(drag.startX, drag.curX);
-    const bandH = layout.telopLanes * layout.laneHeight;
+    // 選択対象のレーン範囲 (開始レーン〜現在レーン) だけを塗る。
+    const laneLo = Math.min(drag.startLane ?? 0, drag.curLane ?? 0);
+    const laneHi = Math.max(drag.startLane ?? 0, drag.curLane ?? 0);
+    const bandTop = laneTopFor(layout, "telop", laneLo);
+    const bandH = (laneHi - laneLo + 1) * layout.laneHeight;
     ctx.save();
     ctx.fillStyle = palette.accent;
     ctx.globalAlpha = 0.18;
-    ctx.fillRect(x0, layout.telopTop, x1 - x0, bandH);
+    ctx.fillRect(x0, bandTop, x1 - x0, bandH);
     ctx.globalAlpha = 0.7;
     ctx.strokeStyle = palette.accent;
     ctx.lineWidth = 1;
-    ctx.strokeRect(x0 + 0.5, layout.telopTop + 0.5, x1 - x0 - 1, bandH - 1);
+    ctx.strokeRect(x0 + 0.5, bandTop + 0.5, x1 - x0 - 1, bandH - 1);
     ctx.restore();
   }
   ctx.restore();
+}
+
+// 重なり区間に赤い斜線 + 上下の帯を描く。数フレームの重なりでも見落とさないよう
+// 最低幅を持たせる。
+function drawTelopOverlapMarks(ctx, view, overlaps) {
+  if (!overlaps || overlaps.length === 0) return;
+  const { layout, palette, pxPerSec } = view;
+  const MIN_MARK_PX = 6;
+  for (const o of overlaps) {
+    const x0 = (o.startFrame / TIMELINE_FRAME_FPS) * pxPerSec;
+    const x1 = (o.endFrame / TIMELINE_FRAME_FPS) * pxPerSec;
+    const w = Math.max(MIN_MARK_PX, x1 - x0);
+    const x = (x0 + x1) / 2 - w / 2;
+    const y = laneTopFor(layout, "telop", o.lane) + 2;
+    const h = layout.telopHeight - 4;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.fillStyle = palette.danger;
+    ctx.globalAlpha = 0.28;
+    ctx.fillRect(x, y, w, h);
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = palette.danger;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let hx = x - h; hx < x + w; hx += 5) {
+      ctx.moveTo(hx, y + h);
+      ctx.lineTo(hx + h, y);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = palette.danger;
+    ctx.fillRect(x, y, w, 2);
+    ctx.fillRect(x, y + h - 2, w, 2);
+    ctx.restore();
+  }
 }
 
 function soundEffectDurationSec(se) {
@@ -2150,6 +2261,7 @@ export function setupTimelineCanvas() {
   const canvas = elements.telopTrackCanvas;
   const scrollEl = elements.timelineScroll;
   if (!canvas || !scrollEl) return;
+  elements.telopOverlapButton?.addEventListener("click", () => resolveAllTelopOverlaps());
 
   const onPointerMove = (event) => {
     const drag = state.timeline.drag;
@@ -2215,7 +2327,9 @@ export function setupTimelineCanvas() {
       _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "marquee") {
-      drag.curX = timelineLocalCoords(canvas, event).x;
+      const local = timelineLocalCoords(canvas, event);
+      drag.curX = local.x;
+      drag.curLane = laneFromPointerY(computeTimelineLayout(), "telop", local.y);
       drawTimeline();
     } else if (drag.type === "resizeTelopStart") {
       const telop = findTelopById(drag.telopId);
@@ -2480,8 +2594,12 @@ export function setupTimelineCanvas() {
       // 範囲に重なるテロップを選択
       const telops = state.scenario?.telops || [];
       const pxPerSec = state.timeline.pxPerSec;
+      const laneLo = Math.min(drag.startLane ?? 0, drag.curLane ?? 0);
+      const laneHi = Math.max(drag.startLane ?? 0, drag.curLane ?? 0);
       const hits = [];
       for (const t of telops) {
+        const lane = itemLane(t);
+        if (lane < laneLo || lane > laneHi) continue;
         const ts = telopStartSec(t) * pxPerSec;
         const te = ts + Math.max(2, telopDurationSec(t) * pxPerSec);
         if (te < x0 || ts > x1) continue;
@@ -2550,6 +2668,9 @@ export function setupTimelineCanvas() {
       // テロップ編集パネルの数値表示も更新
       if (state.editorTarget === "telop" && state.selectedTelopId === drag.telopId) {
         deps.renderTelopEditor();
+      }
+      if (drag.dirty) {
+        warnIfTelopsOverlap(new Set([drag.telopId, ...(drag.groupStartMap instanceof Map ? drag.groupStartMap.keys() : [])]));
       }
     }
     if (drag.type === "seek") {
@@ -2633,11 +2754,20 @@ export function setupTimelineCanvas() {
         event.preventDefault();
         return;
       }
-      // Shift クリック: プライマリ〜クリック対象までを範囲選択（連続）
+      // Shift クリック: プライマリ〜クリック対象までを範囲選択（連続）。
+      // 対象はプライマリとクリック対象のレーンにはさまれたレーンだけ (同じレーン同士なら
+      // そのレーンのみ)。全レーンを時間順に並べると上下レーンのテロップまで巻き込むため。
       if (event.shiftKey) {
         const telops = state.scenario?.telops || [];
-        const sorted = telops.slice().sort((a, b) => telopStartFrame(a) - telopStartFrame(b));
         const primaryId = state.selectedTelopId;
+        const primaryTelop = primaryId ? findTelopById(primaryId) : null;
+        const laneA = itemLane(telop);
+        const laneB = primaryTelop ? itemLane(primaryTelop) : laneA;
+        const laneLo = Math.min(laneA, laneB);
+        const laneHi = Math.max(laneA, laneB);
+        const sorted = telops
+          .filter((t) => t && itemLane(t) >= laneLo && itemLane(t) <= laneHi)
+          .sort((a, b) => telopStartFrame(a) - telopStartFrame(b));
         const targetIdx = sorted.findIndex((t) => t.id === telop.id);
         const primaryIdx = primaryId ? sorted.findIndex((t) => t.id === primaryId) : -1;
         const ids = new Set(state.selectedTelopIds || []);
@@ -2960,6 +3090,9 @@ export function setupTimelineCanvas() {
         startClientX: event.clientX,
         startX: localX,
         curX: localX,
+        // 矩形選択: ドラッグ開始レーン〜現在レーンの範囲だけを対象にする。
+        startLane: hit.lane || 0,
+        curLane: hit.lane || 0,
         additive: !!event.shiftKey,
         dirty: false,
       };

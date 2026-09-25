@@ -532,6 +532,21 @@
   color: var(--fg-muted);
 }
 
+/* 同一レーンのテロップ重なり警告 (重なりがあるときだけ表示) */
+.telop-overlap-button {
+  margin-left: 8px;
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--border));
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  white-space: nowrap;
+}
+.telop-overlap-button:hover {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+}
+.telop-overlap-button[hidden] {
+  display: none;
+}
+
 .timeline-zoom-label {
   min-width: 64px;
   text-align: center;

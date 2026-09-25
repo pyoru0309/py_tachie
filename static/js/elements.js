@@ -316,6 +316,8 @@ export const elements = {
   timelineZoomInButton: document.querySelector("#timelineZoomInButton"),
   timelineZoomOutButton: document.querySelector("#timelineZoomOutButton"),
   timelineZoomLabel: document.querySelector("#timelineZoomLabel"),
+  telopOverlapButton: document.querySelector("#telopOverlapButton"),
+  telopOverlapLabel: document.querySelector("#telopOverlapLabel"),
   timelinePlayheadInfo: document.querySelector("#timelinePlayheadInfo"),
   prerenderButton: document.querySelector("#prerenderButton"),
   prerenderButtonLabel: document.querySelector("#prerenderButtonLabel"),
