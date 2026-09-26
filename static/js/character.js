@@ -6,6 +6,7 @@ import { recordHistory } from "./history.js";
 import { secToFrames } from "./timecode.js";
 import { synthesizeBatchItem } from "./scenario-actions.js";
 import { promptBulkApply } from "./dialog.js";
+import { activeSceneResolved } from "./scenario.js";
 
 let deps = {
   handleEditorChanged: () => {},
@@ -173,6 +174,11 @@ const MOUTH_FLAG_SUFFIXES = [
   ["lipClosed", "（閉じ）"],
   ["lipMid", "（中間）"],
   ["lipOpen", "（開き）"],
+  ["lipA", "（あ）"],
+  ["lipI", "（い）"],
+  ["lipU", "（う）"],
+  ["lipE", "（え）"],
+  ["lipO", "（お）"],
 ];
 
 function decorateAnimationItems(items, flagOrder) {
@@ -414,10 +420,12 @@ function _validateMotionFromServer(raw) {
 
 function _validateBobFromServer(raw) {
   if (!raw || typeof raw !== "object") return null;
-  const bpm = Number(raw.bpm);
+  const bpm = Number(raw.bpm) || 0;
   const amplitudePx = Number(raw.amplitudePx);
-  if (!(bpm > 0) || !(amplitudePx > 0)) return null;
-  return { bpm, amplitudePx };
+  if (!(amplitudePx > 0) || (!(bpm > 0) && raw.bpmSource !== "midi")) return null;
+  // 揺れ方パラメータ (style / hold / rate / bpmSource / onlyWhileSinging) はそのまま通す
+  // (正規化はサーバの scenario._normalize_character_bob)。
+  return { ...raw, bpm, amplitudePx };
 }
 
 // crop オブジェクトを { x, y, width, height } のみに限定して受け入れる。
@@ -484,8 +492,45 @@ function _collectMotionForCharacterFromControls() {
 function _collectBobForCharacterFromControls() {
   const bpm = Number(elements.characterBobBpm?.value) || 0;
   const amplitudePx = Number(elements.characterBobAmplitude?.value) || 0;
-  if (!(bpm > 0) || !(amplitudePx > 0)) return null;
-  return { bpm, amplitudePx };
+  const bpmSource = elements.characterBobBpmSource?.value === "midi" ? "midi" : "manual";
+  // BPM は手入力なら必須、MIDI 自動検出なら不要 (MIDI が外れたときの予備として残す)。
+  if (!(amplitudePx > 0) || (!(bpm > 0) && bpmSource !== "midi")) return null;
+  return {
+    bpm,
+    amplitudePx,
+    bpmSource,
+    style: elements.characterBobStyle?.value || "wave",
+    hold: Math.max(0, Math.min(95, Number(elements.characterBobHold?.value) || 0)) / 100,
+    rate: Number(elements.characterBobRate?.value) || 1,
+    onlyWhileSinging: !!elements.characterBobOnlyWhileSinging?.checked,
+  };
+}
+
+// 「MIDI から自動検出」は、今のシーンの BGM に歌唱判定 MIDI があるときだけ選べる。
+// 既に選ばれている場合は外さず残す (MIDI を戻せば効く / 無い間は手入力の BPM を使う)。
+export function syncBobMidiAvailability(select, hasMidi) {
+  const opt = select?.querySelector('option[value="midi"]');
+  if (!opt) return;
+  opt.disabled = !hasMidi && select.value !== "midi";
+  opt.textContent = hasMidi ? "MIDI から自動検出" : "MIDI から自動検出（MIDI 未設定）";
+}
+
+function _sceneHasLipSyncMidi() {
+  return (activeSceneResolved()?.bgmTracks || []).some((t) => t?.lipSyncMidi?.src);
+}
+
+function _applyBobToControls(bob) {
+  if (elements.characterBobBpm) elements.characterBobBpm.value = String(Number(bob?.bpm) || 0);
+  if (elements.characterBobAmplitude) elements.characterBobAmplitude.value = String(Number(bob?.amplitudePx) || 0);
+  if (elements.characterBobBpmSource) elements.characterBobBpmSource.value = bob?.bpmSource === "midi" ? "midi" : "manual";
+  if (elements.characterBobStyle) elements.characterBobStyle.value = bob?.style || "wave";
+  if (elements.characterBobHold) {
+    const hold = bob?.hold == null ? 0.7 : Number(bob.hold);
+    elements.characterBobHold.value = String(Math.round(hold * 100));
+  }
+  if (elements.characterBobRate) elements.characterBobRate.value = String(Number(bob?.rate) || 1);
+  if (elements.characterBobOnlyWhileSinging) elements.characterBobOnlyWhileSinging.checked = !!bob?.onlyWhileSinging;
+  syncBobMidiAvailability(elements.characterBobBpmSource, _sceneHasLipSyncMidi());
 }
 
 export function loadCharacterIntoControls(character) {
@@ -531,8 +576,7 @@ export function loadCharacterIntoControls(character) {
     if (elements.motionType) elements.motionType.value = "none";
     deps.applyCutMotionSettingsToControls(null);
     deps.syncMotionParamsVisibility();
-    if (elements.characterBobBpm) elements.characterBobBpm.value = "0";
-    if (elements.characterBobAmplitude) elements.characterBobAmplitude.value = "0";
+    _applyBobToControls(null);
     fillCharacterDefinitionAddSelect();
     deps.fillExpressionPresets("");
     deps.fillPlacementPresets("");
@@ -573,12 +617,7 @@ export function loadCharacterIntoControls(character) {
   deps.applyCutMotionSettingsToControls(character.motion?.settings);
   deps.syncMotionParamsVisibility();
   // BPM 上下ゆれ。未設定キャラは 0 (= 無効) 表示。
-  if (elements.characterBobBpm) {
-    elements.characterBobBpm.value = String(Number(character.bob?.bpm) || 0);
-  }
-  if (elements.characterBobAmplitude) {
-    elements.characterBobAmplitude.value = String(Number(character.bob?.amplitudePx) || 0);
-  }
+  _applyBobToControls(character.bob);
   // 表情プリセットセレクタを (character.characterId に紐付く) 最新候補で再構築する。
   // これをやらないと、loadCut 経路で character は表示されているのに preset セレクタが
   // 「なし」のまま残るバグが出る (project 初期化時の fillAssetControls は state.

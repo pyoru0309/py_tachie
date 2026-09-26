@@ -39,6 +39,8 @@ import { registerProjectFonts } from "/static/js/font.js";
 import { createReadback } from "./pbo-readback.js";
 import { createH264FrameEncoder, computeBitrate, selectH264Config } from "./webcodecs-encoder.js";
 import { FrameSender } from "./frame-sender.js";
+import { computeMouthKeyByChar, shapeIndexForTime } from "/static/js/lipsync.js";
+import { computeBobDyByChar } from "/static/js/body-bob.js";
 
 const FONT_READY_TIMEOUT_MS = 5000;
 const PROJECT_FPS = 24;
@@ -110,15 +112,8 @@ function computeIdleMotionOffset(idleMotion, timelineSec) {
       dy += amp * Math.sin((2 * Math.PI * t) / period);
     }
   }
-  const bpm = Number(idleMotion?.bpm) || 0;
-  const bob = idleMotion?.bpmBob;
-  if (bpm > 0 && bob) {
-    const amp = Math.max(0, Number(bob.amplitudePx) || 0);
-    if (amp > 0) {
-      const period = 60.0 / bpm;
-      dy += amp * Math.sin((2 * Math.PI * t) / period);
-    }
-  }
+  // BPM ボブ (bpmBob) はキャラごとに計算する (口パク連動・MIDI 自動 BPM があるため)。
+  // → body-bob.js computeBobDyByChar / _computeExportSceneState の bobDyByChar。
   return { dx: 0, dy };
 }
 
@@ -441,6 +436,23 @@ function _computeExportSceneState(rd, f, { withLipSync = true } = {}) {
   if (withLipSync && rd.speakerId && rd.lipSyncEnabled && rd.levels && f >= 0 && f < rd.levels.length) {
     mouthKey = mouthKeyFromVolume(rd.levels[f], rd.lipSyncCfg);
   }
+  // キャラ単位の口パク (デュエットのボーカル割り当て / 歌唱判定 MIDI)。
+  // MIDI は preview と同じく characterAnimationFps で量子化して 24fps の口形列を引く。
+  // withLipSync=false (partner 延長) では null のまま = 全員カット選択の口。
+  let mouthKeyByChar = null;
+  if (withLipSync && rd.lipSyncEnabled && rd.lipSyncByChar) {
+    mouthKeyByChar = computeMouthKeyByChar(
+      rd.lipSyncByChar,
+      shapeIndexForTime(localElapsedSec, rd.animationFps),
+      {
+        levelForEntry: (charId) => {
+          const arr = rd.levelsByChar?.[charId];
+          return arr && f >= 0 && f < arr.length ? arr[f] : null;
+        },
+        volumeToKey: (volume) => mouthKeyFromVolume(volume, rd.lipSyncCfg),
+      },
+    );
+  }
   let eyeKeyByChar = null;
   if (rd.blinkEnabled) {
     eyeKeyByChar = {};
@@ -454,15 +466,40 @@ function _computeExportSceneState(rd, f, { withLipSync = true } = {}) {
   const shake = computeShakeOffset(rd.motionType, rd.motionSettings, localElapsedSec);
   const motionOffsetByChar = _computePerCharacterMotionOffsetsForExport(rd.layerData.characters, localElapsedSec);
   const idle = rd.idleMotion ? computeIdleMotionOffset(rd.idleMotion, sceneSec) : { dx: 0, dy: 0 };
+  // 体の揺れ (シーンの BPM ボブ + キャラの bob)。「口パクのときだけ」は、その時刻に
+  // 声が出ていたか (MIDI 口形 / キャラ別ボーカル / 話者音声の levels) で判定する。
+  const silence = Number(rd.lipSyncCfg?.silenceThreshold ?? 0.08);
+  const bobDyByChar = computeBobDyByChar({
+    characters: rd.layerData.characters,
+    sceneBob: rd.idleMotion?.bpmBob,
+    sceneBpm: rd.idleMotion?.bpm,
+    beatMaps: rd.layerData.beatMaps,
+    localSec: localElapsedSec,
+    sceneSec,
+    voicedAtLocal: (charId, t) => {
+      const entry = rd.lipSyncByChar?.[charId];
+      if (entry?.kind === "midi") {
+        const ch = entry.shapes?.[Math.floor(t * 24 + 1e-6)];
+        return !!ch && ch !== "-";
+      }
+      const arr = entry?.kind === "level"
+        ? rd.levelsByChar?.[charId]
+        : (charId === rd.speakerId ? rd.levels : null);
+      const v = arr ? arr[Math.floor(t * rd.fps + 1e-6)] : null;
+      return v != null && v >= silence;
+    },
+  });
   return {
     eyeKey: "open",
     eyeKeyByChar,
     mouthKey,
+    mouthKeyByChar,
     speakerId: rd.speakerId,
     shakeDx: shake.dx,
     shakeDy: shake.dy,
     idleDx: idle.dx,
     idleDy: idle.dy,
+    bobDyByChar,
     motionOffsetByChar,
     elapsedSec: localElapsedSec,
     animationFps: 12,
@@ -490,7 +527,7 @@ async function _prepareExportASideTex(nextCut, projectId, fps) {
 }
 
 // per-cut の render data をまとめる (state 計算 + partner 延長で共有)。
-function _buildExportRenderData(layerData, fps, cutStartSec, total, levels) {
+function _buildExportRenderData(layerData, fps, cutStartSec, total, levels, levelsByChar = null) {
   const blinkStartsSecByChar = {};
   const rawBlinkByChar = layerData.blinkFramesByChar;
   if (rawBlinkByChar && typeof rawBlinkByChar === "object") {
@@ -510,6 +547,8 @@ function _buildExportRenderData(layerData, fps, cutStartSec, total, levels) {
     lipSyncEnabled: layerData.lipSyncEnabled !== false,
     levels,
     lipSyncCfg: layerData.lipSync || {},
+    lipSyncByChar: layerData.lipSyncByChar || null,
+    levelsByChar,
     blinkEnabled: layerData.blinkEnabled !== false,
     blinkStartsSecByChar,
     blinkStartsSecFallback,
@@ -869,11 +908,29 @@ async function renderCutFrames({
     }
   }
 
+  // キャラ専用ボーカル音源 (lipSyncByChar[*].kind="level") の per-frame levels。
+  // 同じ URL (= 同じ音源・同じ範囲) は 1 回だけ取る。
+  let levelsByChar = null;
+  if (lipSyncEnabled && layerData.lipSyncByChar) {
+    const byUrl = new Map();
+    for (const [charId, entry] of Object.entries(layerData.lipSyncByChar)) {
+      const url = entry?.kind === "level" ? entry.levels?.url : null;
+      if (!url) continue;
+      try {
+        if (!byUrl.has(url)) byUrl.set(url, await fetchLipSyncLevels(entry.levels));
+        levelsByChar = levelsByChar || {};
+        levelsByChar[charId] = byUrl.get(url);
+      } catch (err) {
+        onLog(`lipSyncByChar levels fetch failed (${charId}): ${err?.message || err}`, "warn");
+      }
+    }
+  }
+
   const total = Math.max(1, Number(cut.durationFrame) || 0);
 
   // ---- 境界またぎトランジション (フルライブ dual-RT 合成) のセットアップ ----
   // rd: このカットの render data (active + partner 延長で共有)。
-  const rd = _buildExportRenderData(layerData, fps, cutStartSec, total, levels);
+  const rd = _buildExportRenderData(layerData, fps, cutStartSec, total, levels, levelsByChar);
   // B-side: 直前カット A が retain されていてこのカット B 用なら、B の頭 D_B/2 で合成。
   const trB = (cut && typeof cut.transition === "object") ? cut.transition : null;
   const trBType = trB && trB.type ? String(trB.type) : "none";

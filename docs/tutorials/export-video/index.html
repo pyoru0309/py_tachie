@@ -13,7 +13,7 @@
       
       
       
-        <link rel="prev" href="../voice-synthesis/">
+        <link rel="prev" href="../singing-lipsync/">
       
       
         <link rel="next" href="../../reference/editor/">
@@ -257,6 +257,8 @@
       
         
       
+        
+      
     
     
     
@@ -401,6 +403,34 @@
     
   
     音声合成 (VOICEVOX / VOICEPEAK) を使う
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../singing-lipsync/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    歌・デュエットの口パク
   
 
     
@@ -1270,6 +1300,12 @@
 <li><strong>エンコーダ</strong>: HW エンコーダ (NVENC / VideoToolbox) が利用可能な環境では alternate として選択肢に並びます。利用不可なものは disabled で表示されます。</li>
 <li><strong>FPS</strong>: <code>8</code> / <code>12</code> / <code>24</code> のいずれか。プロジェクト fps は 24 固定で、書き出し fps はそれと独立に選べます。</li>
 <li><strong>音声を含める</strong>: 既定 ON。OFF にすると映像のみのファイル (mux 工程を skip) で出力します。透過素材をカット単位で書き出して動画編集ソフトに取り込むときに、音声トラック無しの方が便利な場合に使います。ダイアログを経由しない (= 全体設定の「動画書き出しにフォーマットを指定」が OFF の) クイック書き出し経路では常に音声が含まれます。</li>
+<li><strong>音声形式 / ビットレート / サンプリング周波数</strong>: 既定はプリセットの設定です。<ul>
+<li>MP4 (H.264 / H.265) の音声は <strong>AAC のみ</strong> です (128 / 192 / 256 / 320 kbps)。</li>
+<li>ProRes / PNG の mov は <strong>リニア PCM 16bit / 24bit</strong> も選べます (既定は 16bit)。AAC にもできます。</li>
+<li>サンプリング周波数は 48kHz / 44.1kHz。音声は BGM・効果音・セリフを 48kHz で合成してから書き出すので、44.1kHz を選ぶと最後に 1 回だけ変換します。24bit / 48kHz の素材をそのまま残したいときは「リニア PCM 24bit・48kHz」を選んでください。</li>
+</ul>
+</li>
 <li><strong>モノラル → ステレオ</strong>: 全体設定で既定値を変更可能。</li>
 <li><strong>書き出し前確認</strong>: ON にすると毎回ダイアログを開きます。</li>
 </ul>
@@ -1342,6 +1378,7 @@
 <ul>
 <li>カットの音声 (<code>audio</code>) は話者ごとのセリフに紐付き、口パク解析の入力になります。</li>
 <li>シーンの BGM (<code>bgmTracks</code>) はカット境界をまたいで流れ続けます。1 トラックだけ <code>useForLipSync</code> を ON にすると、その BGM が口パク用の音声として扱われます (例: 歌唱配信用の伴奏 + 歌の音声を分けたい場合)。</li>
+<li>複数シーンのプロジェクトは、書き出し範囲を <strong>プロジェクト全体（全シーン）</strong> にすると全シーンが 1 本の動画になります。BGM が「シーンごと」ならシーンが変わると切り替わり、「プロジェクト通し」なら途切れずに続きから鳴ります。セリフ音声・効果音・動画レイヤーの音はプレビューと同じくシーンの境目で切れません (シーン 1 に置いた長い曲の効果音はシーン 2 まで鳴ります)。BGM も効果音も無いシーンは無音になります。</li>
 <li>動画背景 (<code>videoTrack</code>) は <code>cover</code> / <code>contain</code> / <code>fit</code> などの fit を選べます。<code>muted</code> を OFF にすると動画の音声トラックも合成されます。</li>
 </ul>
 <h2 id="_4">書き出しに失敗した場合<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
@@ -1426,7 +1463,7 @@
       <nav class="md-footer__inner md-grid" aria-label="フッター" >
         
           
-          <a href="../voice-synthesis/" class="md-footer__link md-footer__link--prev" aria-label="前: 音声合成 (VOICEVOX &#x2f; VOICEPEAK) を使う">
+          <a href="../singing-lipsync/" class="md-footer__link md-footer__link--prev" aria-label="前: 歌・デュエットの口パク">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
@@ -1436,7 +1473,7 @@
                 前
               </span>
               <div class="md-ellipsis">
-                音声合成 (VOICEVOX / VOICEPEAK) を使う
+                歌・デュエットの口パク
               </div>
             </div>
           </a>

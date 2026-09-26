@@ -51,6 +51,7 @@ ID は日本語でも構いません。UI の表示名としてそのまま使�
 | mouth | `lipClosed` | 閉じ口 (シーン全体で 1 枚) |
 | mouth | `lipMid` | 半開き口 (同) |
 | mouth | `lipOpen` | 開き口 (同) |
+| mouth | `lipA` / `lipI` / `lipU` / `lipE` / `lipO` | 母音口形 (歌唱判定 MIDI の口パク用)。各母音シーン全体で 1 枚だが、1 枚に複数立ててよい (「あ/え」共用の口に `[lipA, lipE]`)。無い母音は `lipOpen` / `lipMid` で代用 |
 
 フラグの設定はインポート後に **編集画面のキャラ管理 → レイヤー編集** からチェックボックスで行うのが基本です (詳細は [キャラクターモデル](character-model.md) 参照)。
 インポート時にあらかじめフラグを宣言しておきたい場合は、`import_manifest.yml` の `flags:` ブロックを使います。

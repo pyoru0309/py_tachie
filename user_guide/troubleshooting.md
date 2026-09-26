@@ -72,6 +72,7 @@ PowerShell -ExecutionPolicy Bypass
 - カットに話者 (`speakerCharacterId`) が設定されている
 - 話者キャラのレイヤー編集で、口素材に `閉じ` / `中間` / `開き` (= `lipClosed` / `lipMid` / `lipOpen`) のフラグが立っている (最低 `開き` 1 つ)
 - 音声ファイルが存在しているか、シーンの BGM で `useForLipSync` が ON になっている
+- 話者以外のキャラ (デュエット) を動かすなら、シーン設定 → BGM で「口パクさせるキャラ」または「歌唱判定 MIDI」のトラックにそのキャラが割り当てられている ([歌・デュエットの口パク](tutorials/singing-lipsync.md))
 - `ffmpeg` / `ffprobe` が利用できる
 
 無音区間ではカット選択の口がそのまま表示される仕様です (`lipMid` 未設定なら mid 帯域もカット選択にフォールバック)。

@@ -48,6 +48,7 @@ import {
 } from "./telop.js";
 import { mapVideoLayerSec } from "./video-layer-time.js";
 import { computeVideoFit } from "./effects/video-fit.js";
+import { MOUTH_VOWEL_KEYS, resolveMouthTexture } from "/static/js/lipsync.js";
 import { ensureVerticalGlyphsForTelops } from "./text-vertical.js";
 
 // silhouette / blur のための padding。Pillow の GaussianBlur 同等の広がりを
@@ -1068,6 +1069,7 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
     mouthClosedTex,
     mouthMidTex,
     mouthOpenTex,
+    ...mouthVowelTexList
   ] = await Promise.all([
     collect(char.underUrl),
     collect(char.overUrl),
@@ -1078,6 +1080,8 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
     collect(char.mouthUrls?.closed),
     collect(char.mouthUrls?.mid),
     collect(char.mouthUrls?.open),
+    // 母音口形 (lipA〜lipO、MIDI 口パク用)。フラグの無いキャラは null。
+    ...MOUTH_VOWEL_KEYS.map((key) => collect(char.mouthUrls?.[key])),
   ]);
 
   const eyeTextures = { open: eyeOpenTex, half: eyeHalfTex, closed: eyeClosedTex };
@@ -1089,6 +1093,9 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
     mid: mouthMidTex,
     open: mouthOpenTex,
   };
+  MOUTH_VOWEL_KEYS.forEach((key, i) => {
+    if (mouthVowelTexList[i]) mouthTextures[key] = mouthVowelTexList[i];
+  });
 
   // キャラごとに Group を作り、内側 mesh は (0,0) に置く。Group の position
   // を per-frame で動かすことで shake / idle motion を表現 (Phase B-1)。
@@ -1226,6 +1233,7 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
 }
 
 // BPM 上下ゆれパラメータの検証。bpm / amplitudePx がともに正のときだけ有効。
+// bobDyByChar を渡さない古い呼び出し元 (v2-export-bench 等) 向けの従来計算用。
 function _normalizeBob(raw) {
   if (!raw || typeof raw !== "object") return null;
   const bpm = Number(raw.bpm);
@@ -1405,11 +1413,19 @@ export async function buildScene(
     // 該当 id が無いキャラは eyeKey にフォールバック。
     eyeKeyByChar = null,
     mouthKey = "closed",
+    // mouthKeyByChar: { [charId]: mouthKey }。キャラ単位の口パク (デュエットの
+    // ボーカル割り当て / 歌唱判定 MIDI) で使う。載っているキャラは話者かどうかに
+    // 関係なくこの値で口を動かす。載っていないキャラは従来どおり「話者だけ mouthKey」。
+    mouthKeyByChar = null,
     speakerId = null,
     shakeDx = 0,
     shakeDy = 0,
     idleDx = 0,
     idleDy = 0,
+    // bobDyByChar: { [charId]: dy }。シーンの BPM ボブ + キャラの bob を呼び出し側
+    // (static/js/body-bob.js) で計算済みの値。指定があれば下の従来計算 (キャラ bob の
+    // 常時サイン波) は使わない。
+    bobDyByChar = null,
     // M-2: per-character motion offset { [charId]: { dx, dy, scale? } }。
     // 指定があれば shake / move / zoom はこちらを優先。指定なしのキャラは
     // 旧 scene global の shakeDx/Dy (= speaker のみ) を fallback。
@@ -1544,12 +1560,13 @@ export async function buildScene(
       }
       // 口パク: speaker のみ mouthKey を反映。それ以外 / 口パク終了 / OFF は
       // "default" (= カット選択の口) を出す。default が無ければ closed → null の順。
-      const localMouthKey = charInstance.id === speakerId ? mouthKey : "default";
-      const nextMouthTex =
-        charInstance.mouthTextures[localMouthKey]
-        || charInstance.mouthTextures.default
-        || charInstance.mouthTextures.closed
-        || null;
+      // キャラ単位の口パク (mouthKeyByChar) が来ていればそちらを優先する。
+      // 母音キー (a/i/u/e/o) は絵に無ければ lipOpen / lipMid へ寄せる (lipsync.js)。
+      const perCharMouthKey = mouthKeyByChar ? mouthKeyByChar[charInstance.id] : undefined;
+      const localMouthKey = perCharMouthKey != null
+        ? perCharMouthKey
+        : (charInstance.id === speakerId ? mouthKey : "default");
+      const nextMouthTex = resolveMouthTexture(charInstance.mouthTextures, localMouthKey);
       if (charInstance.mouthMesh.material.uniforms.uMap.value !== nextMouthTex) {
         charInstance.mouthMesh.material.uniforms.uMap.value = nextMouthTex;
         charInstance.mouthMesh.visible = !!nextMouthTex;
@@ -1575,7 +1592,9 @@ export async function buildScene(
       // できる)。位相はシーン内通算秒 (cutStartSec + elapsedSec) で計算するので、
       // カットを跨いでも波が連続する (= scene-level bpmBob と同じ時間基準)。
       const bob = charInstance.bob;
-      if (bob) {
+      if (bobDyByChar) {
+        dy += Number(bobDyByChar[charInstance.id]) || 0;
+      } else if (bob) {
         const bobSceneSec = cutStartSec + (Number(elapsedSec) || 0);
         const period = 60 / bob.bpm;
         if (period > 0) {

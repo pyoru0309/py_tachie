@@ -86,6 +86,7 @@ assets/characters/<character_id>/
 | mouth | `lipClosed` | 閉じ口 (口パク用) | ○ |
 | mouth | `lipMid` | 半開き口 | ○ |
 | mouth | `lipOpen` | 開き口 | ○ |
+| mouth | `lipA` / `lipI` / `lipU` / `lipE` / `lipO` | 母音口形 (歌唱判定 MIDI の口パク用)。1 枚に複数可 | ○ (母音ごと) |
 
 ### 目パチの動作ルール
 
@@ -128,6 +129,7 @@ assets/characters/<character_id>/
     - 音量 < silence 閾値 / 音声なし / 全体設定で口パク OFF → **カット選択の口** をそのまま表示
 - `lipMid` フラグ未設定なら mid 帯域も `lipOpen` ではなく **カット選択の口** にフォールバックします。
 - 「話している間だけ口パクが乗り、無音区間や口パク OFF ではカット指定の表情がそのまま見える」挙動です。例えば「ジト目で `:|` のような口」を意図的に選んだカットは、無音区間でその口が維持されます。
+- シーン BGM で **キャラ専用の口パク入力** (`lipSyncCharacterIds`) や **歌唱判定 MIDI** (`lipSyncMidi`) に割り当てたキャラは、話者でなくても口パクします (デュエット)。MIDI の口パクは歌詞から あ/い/う/え/お/ん の口形を選び、`lipA`〜`lipO` の無いキャラは `lipOpen` (あ・え) / `lipMid` (い・う・お) に寄せます。詳細は [歌・デュエットの口パク](../tutorials/singing-lipsync.md)。
 
 ### フラグの設定方法
 

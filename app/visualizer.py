@@ -1231,7 +1231,10 @@ def resolve_track_audio_path(
     else:
         path = project_root / "assets" / src
     if not path.exists():
-        path = project_root / src
+        # ``projects/<id>/...`` は保管場所 (外付けディスク等) を横断して解決する。
+        from .utils import resolve_root_rel
+
+        path = resolve_root_rel(src)
         if not path.exists():
             return None
     return path

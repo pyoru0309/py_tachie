@@ -255,6 +255,8 @@
       
         
       
+        
+      
     
     
     
@@ -399,6 +401,34 @@
     
   
     音声合成 (VOICEVOX / VOICEPEAK) を使う
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/singing-lipsync/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    歌・デュエットの口パク
   
 
     
@@ -1430,6 +1460,11 @@ Clip Studio Paint や Photoshop からの PSD 保存を想定しています。<
 <td>mouth</td>
 <td><code>lipOpen</code></td>
 <td>開き口 (同)</td>
+</tr>
+<tr>
+<td>mouth</td>
+<td><code>lipA</code> / <code>lipI</code> / <code>lipU</code> / <code>lipE</code> / <code>lipO</code></td>
+<td>母音口形 (歌唱判定 MIDI の口パク用)。各母音シーン全体で 1 枚だが、1 枚に複数立ててよい (「あ/え」共用の口に <code>[lipA, lipE]</code>)。無い母音は <code>lipOpen</code> / <code>lipMid</code> で代用</td>
 </tr>
 </tbody>
 </table>

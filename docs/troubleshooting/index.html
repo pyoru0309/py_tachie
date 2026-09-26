@@ -253,6 +253,8 @@
       
         
       
+        
+      
     
     
     
@@ -397,6 +399,34 @@
     
   
     音声合成 (VOICEVOX / VOICEPEAK) を使う
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/singing-lipsync/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    歌・デュエットの口パク
   
 
     
@@ -1561,6 +1591,7 @@
 <li>カットに話者 (<code>speakerCharacterId</code>) が設定されている</li>
 <li>話者キャラのレイヤー編集で、口素材に <code>閉じ</code> / <code>中間</code> / <code>開き</code> (= <code>lipClosed</code> / <code>lipMid</code> / <code>lipOpen</code>) のフラグが立っている (最低 <code>開き</code> 1 つ)</li>
 <li>音声ファイルが存在しているか、シーンの BGM で <code>useForLipSync</code> が ON になっている</li>
+<li>話者以外のキャラ (デュエット) を動かすなら、シーン設定 → BGM で「口パクさせるキャラ」または「歌唱判定 MIDI」のトラックにそのキャラが割り当てられている (<a href="../tutorials/singing-lipsync/">歌・デュエットの口パク</a>)</li>
 <li><code>ffmpeg</code> / <code>ffprobe</code> が利用できる</li>
 </ul>
 <p>無音区間ではカット選択の口がそのまま表示される仕様です (<code>lipMid</code> 未設定なら mid 帯域もカット選択にフォールバック)。</p>

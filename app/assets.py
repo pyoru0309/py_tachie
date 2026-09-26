@@ -413,6 +413,8 @@ ASSET_CATEGORY_KINDS: dict[str, dict[str, Any]] = {
     "audio": {"kind": "file", "extensions": [".wav", ".mp3", ".m4a", ".aac", ".ogg"]},
     "sound_effects": {"kind": "file", "extensions": [".wav", ".mp3", ".m4a", ".aac", ".ogg"]},
     "videos": {"kind": "file", "extensions": [".mp4", ".mov", ".webm", ".mkv"]},
+    # 歌唱判定用 MIDI (口パク用)。BGM トラックの「MIDI で口パク」から参照する。
+    "midi": {"kind": "file", "extensions": [".mid", ".midi"]},
 }
 
 

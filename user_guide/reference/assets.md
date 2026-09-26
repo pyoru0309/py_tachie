@@ -12,6 +12,7 @@ assets/
   videos/
   audio/
   sound_effects/
+  midi/
   fonts/
   overlays/
 ```
@@ -26,6 +27,7 @@ projects/<project_id>/
     videos/
     audio/
     sound_effects/
+    midi/
     fonts/
     overlays/
 ```
@@ -36,6 +38,10 @@ projects/<project_id>/
 
 背景は `backgrounds/` に置きます。対応拡張子は `.png` / `.jpg` / `.jpeg` / `.webp` / `.avif` です。
 出力時は 1920×1080 にカバー配置されます。
+
+## 歌唱判定 MIDI
+
+`midi/` には口パク用の歌唱判定 MIDI (`.mid` / `.midi`) を置きます。シーン設定 → BGM の「歌唱判定 MIDI で口パク」から選ぶ・アップロードするのが基本です (アップロード先はプロジェクトの `assets/midi/`)。使い方は [歌・デュエットの口パク](../tutorials/singing-lipsync.md) を参照してください。
 
 ## 動画背景
 
@@ -169,7 +175,7 @@ PSD インポート時に `thumb` / `thumbnail` / `サムネイル` / `サムネ
 
 - **表示名 (`name`)**: セレクタやリストで使われる人間向けラベル。インポート直後の機械生成名 (例: `制服_デフォルト`) を読みやすい名前に直したい場面に。レイヤー ID は不変なので、シナリオの参照は壊れません。
 - **目パチフラグ (eye)**: `開き` (= `blinkOpen`) / `中間` (= `blinkHalf`) / `閉じ` (= `blinkClosed`)
-- **口パクフラグ (mouth)**: `閉じ` (= `lipClosed`) / `中間` (= `lipMid`) / `開き` (= `lipOpen`)
+- **口パクフラグ (mouth)**: `閉じ` (= `lipClosed`) / `中間` (= `lipMid`) / `開き` (= `lipOpen`)。2 行目の `あ`〜`お` (= `lipA`〜`lipO`) は歌唱判定 MIDI の口パク用の母音口形で、1 枚に複数立てられます ([歌・デュエットの口パク](../tutorials/singing-lipsync.md))
 
 `blinkOpen` 以外は manifest 全体で **1 枚だけ** 立てられる排他フラグで、別レイヤーで ON にすると自動で外れます。フラグの動作詳細は [キャラクターモデル](../technical/character-model.md#blink-lipsync-flags) を参照してください。
 

@@ -30,7 +30,7 @@ const LAYER_MANIFEST_KEY = {
 const LAYER_CATEGORY_ORDER = ["back_hair", "base", "cheek", "eye", "mouth", "bangs", "front"];
 
 // 目パチ・口パクのフラグ。各カテゴリで UI に出すチェックボックスの並び。
-// blinkHalf/blinkClosed/lipClosed/lipMid/lipOpen は manifest 全体で 1 枚のみ
+// blinkHalf/blinkClosed/lipClosed/lipMid/lipOpen/lipA〜lipO は manifest 全体で 1 枚のみ
 // (排他)。blinkOpen は per-character 複数立てて OK。サーバ側 layers/save が
 // 排他制約を強制適用する (UI もそれに追従)。
 const FLAG_DEFS_BY_CATEGORY = {
@@ -42,7 +42,15 @@ const FLAG_DEFS_BY_CATEGORY = {
   mouth: [
     { key: "lipOpen", label: "開き", suffix: "（開き）", exclusive: true },
     { key: "lipMid", label: "中間", suffix: "（中間）", exclusive: true },
-    { key: "lipClosed", label: "閉じ", suffix: "（閉じ）", exclusive: true },
+    { key: "lipClosed", label: "閉じ", suffix: "（閉じ）", exclusive: true, title: "音量の口パクの無音時、MIDI 口パクの「ん」・ま行の閉じにも使います" },
+    // 母音口形 (MIDI 口パク用)。各母音 1 枚だが、1 枚に複数立ててよい
+    // (「あ/え」共用の口に あ + え)。無い母音は 開き / 中間 に寄せて描く
+    // (static/js/lipsync.js: MOUTH_FALLBACKS)。
+    { key: "lipA", label: "あ", suffix: "（あ）", exclusive: true, lineBreakBefore: true, title: "MIDI 口パクの「あ」。無ければ「開き」を使います" },
+    { key: "lipI", label: "い", suffix: "（い）", exclusive: true, title: "MIDI 口パクの「い」。無ければ「中間」→「開き」を使います" },
+    { key: "lipU", label: "う", suffix: "（う）", exclusive: true, title: "MIDI 口パクの「う」「っ」。無ければ「お」→「中間」→「開き」を使います" },
+    { key: "lipE", label: "え", suffix: "（え）", exclusive: true, title: "MIDI 口パクの「え」。無ければ「あ」→「開き」を使います" },
+    { key: "lipO", label: "お", suffix: "（お）", exclusive: true, title: "MIDI 口パクの「お」。無ければ「う」→「中間」→「開き」を使います" },
   ],
 };
 
@@ -173,7 +181,8 @@ function renderCharacterLayerEditor() {
       const note = document.createElement("span");
       note.className = "asset-hint";
       note.textContent =
-        " — 開き／中間／閉じはそれぞれ 1 枚を指定。指定無し時は口パクが劣化します。";
+        " — 開き／中間／閉じはそれぞれ 1 枚を指定。指定無し時は口パクが劣化します。"
+        + "あ〜お は歌唱判定 MIDI の口パク用 (1 枚に複数可。無い母音は 開き／中間 で代用)。";
       header.append(note);
     }
     section.append(header);
@@ -274,8 +283,15 @@ function createLayerEditorRow(category, entry) {
     flagBox.className = "layer-editor-flags";
     const currentFlags = effectiveFlags(category, entry);
     for (const def of flagDefs) {
+      if (def.lineBreakBefore) {
+        // 母音フラグ (あ〜お) は 2 行目にまとめる。
+        const br = document.createElement("span");
+        br.className = "layer-editor-flag-break";
+        flagBox.append(br);
+      }
       const wrap = document.createElement("label");
       wrap.className = "checkbox-row layer-editor-flag";
+      if (def.title) wrap.title = def.title;
       const cb = document.createElement("input");
       cb.type = "checkbox";
       cb.checked = !!currentFlags[def.key];

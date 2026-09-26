@@ -35,7 +35,7 @@ export function bindAssets(injectedDeps) {
   deps = { ...deps, ...injectedDeps };
 }
 
-export const ASSET_CATEGORY_KEYS = ["characters", "backgrounds", "foregrounds", "overlays", "fonts", "audio", "sound_effects", "videos"];
+export const ASSET_CATEGORY_KEYS = ["characters", "backgrounds", "foregrounds", "overlays", "fonts", "audio", "sound_effects", "videos", "midi"];
 export const ASSET_CATEGORY_LABELS = {
   characters: "キャラクター",
   backgrounds: "背景",
@@ -45,6 +45,7 @@ export const ASSET_CATEGORY_LABELS = {
   audio: "音声",
   sound_effects: "効果音",
   videos: "動画",
+  midi: "MIDI（口パク）",
 };
 export const ASSET_CATEGORY_ICONS = {
   characters: "groups",
@@ -55,6 +56,7 @@ export const ASSET_CATEGORY_ICONS = {
   audio: "music_note",
   sound_effects: "graphic_eq",
   videos: "movie",
+  midi: "piano",
 };
 export const ASSET_CATEGORY_ACCEPT = {
   backgrounds: ".png,.jpg,.jpeg,.webp,.avif",
@@ -64,6 +66,7 @@ export const ASSET_CATEGORY_ACCEPT = {
   audio: ".wav,.mp3,.m4a,.aac,.ogg",
   sound_effects: ".wav,.mp3,.m4a,.aac,.ogg",
   videos: ".mp4,.mov,.webm,.mkv",
+  midi: ".mid,.midi",
   characters: ".psd,.zip,.png,.webp,.avif",
 };
 

@@ -98,6 +98,17 @@ def resolve_character_paths(state: dict[str, Any], manifest: dict[str, Any]) -> 
     return out
 
 
+# 母音口形のフラグ。キー (a/i/u/e/o) は scene-bundle の mouthUrls のキーにもなる。
+# 「ん」は従来の lipClosed を使う。
+MOUTH_VOWEL_FLAGS: dict[str, str] = {
+    "a": "lipA",
+    "i": "lipI",
+    "u": "lipU",
+    "e": "lipE",
+    "o": "lipO",
+}
+
+
 def _find_layer_by_flag(items: list[dict[str, Any]], flag: str) -> str | None:
     """manifest 上で `flags[flag]=True` が立った最初のレイヤーの path を返す。"""
     for item in items:
@@ -131,6 +142,9 @@ def animation_layers(manifest: dict[str, Any], state: dict[str, Any]) -> dict[st
                 OFF 時に使う。
       mouth_closed / mouth_mid / mouth_open: 同 `flags.lipClosed` / `lipMid` /
                 `lipOpen`。
+      mouth_a / mouth_i / mouth_u / mouth_e / mouth_o: 母音口形 (`flags.lipA` 〜
+                `lipO`)。MIDI 口パク用。1 枚に複数の母音フラグを立ててよい (「あ/え」
+                共用の口など)。無い母音はクライアントが lipOpen / lipMid へ寄せる。
     """
     eyes = animation_asset_items(manifest, state, "eyes")
     mouths = animation_asset_items(manifest, state, "mouths")
@@ -144,6 +158,10 @@ def animation_layers(manifest: dict[str, Any], state: dict[str, Any]) -> dict[st
         "mouth_closed": _find_layer_by_flag(mouths, "lipClosed"),
         "mouth_mid": _find_layer_by_flag(mouths, "lipMid"),
         "mouth_open": _find_layer_by_flag(mouths, "lipOpen"),
+        **{
+            f"mouth_{vowel}": _find_layer_by_flag(mouths, flag)
+            for vowel, flag in MOUTH_VOWEL_FLAGS.items()
+        },
     }
 
 

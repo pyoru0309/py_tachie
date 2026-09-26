@@ -780,11 +780,24 @@ def compute_dialogue_layout(
 
 
 def asset_path(project_root: Path, rel_path: str | None) -> Path | None:
+    """論理相対パス (``assets/...`` / ``projects/<id>/...``) を実ファイルパスへ解決する。
+
+    ``project_root / rel`` で組むと、外付けディスク等 PROJECT_ROOT の外の保管場所に
+    あるプロジェクトの素材が見つからず、キャラレイヤーが黙って空 PNG に焼かれる
+    (= キャラが表示されない)。``projects/<id>/`` は保管場所を横断して解決する。
+    ``project_root`` は互換のため残しているが、traversal ガードは登録済み保管場所を含む
+    ``is_inside_allowed_roots`` で行う。
+    """
     if not rel_path:
         return None
-    path = (project_root / rel_path).resolve()
-    root = project_root.resolve()
-    if root not in path.parents and path != root:
+    from .utils import is_inside_allowed_roots, resolve_root_rel
+
+    rel = str(rel_path)
+    if Path(rel).is_absolute():
+        path = Path(rel).resolve()
+    else:
+        path = resolve_root_rel(rel).resolve()
+    if not is_inside_allowed_roots(path):
         raise ValueError("Asset path is outside of project root")
     return path
 
@@ -871,13 +884,22 @@ def bake_preview_layers(
     for layer in front_layers:
         over.alpha_composite(layer, (0, 0))
 
+    # 同じ PNG が複数キーに割り当たる (「口開け」が open と あ を兼ねる等) ことが多いので
+    # パス単位で 1 回だけ読む。dim_character は新しい Image を返すので共有しても安全。
+    loaded: dict[str, Image.Image | None] = {}
+
+    def load_variant(rel: str | None) -> Image.Image | None:
+        if not rel:
+            return None
+        if rel not in loaded:
+            loaded[rel] = _load_preview_layer(project_root, rel, rw, layer_size)
+        return loaded[rel]
+
     eye_layers: dict[str, Image.Image | None] = {
-        key: _load_preview_layer(project_root, rel, rw, layer_size)
-        for key, rel in eye_variant_paths.items()
+        key: load_variant(rel) for key, rel in eye_variant_paths.items()
     }
     mouth_layers: dict[str, Image.Image | None] = {
-        key: _load_preview_layer(project_root, rel, rw, layer_size)
-        for key, rel in mouth_variant_paths.items()
+        key: load_variant(rel) for key, rel in mouth_variant_paths.items()
     }
 
     if not is_speaker:
@@ -885,12 +907,14 @@ def bake_preview_layers(
         if opacity < 1.0:
             under = dim_character(under, opacity)
             over = dim_character(over, opacity)
+            # dim_character は引数をその場で書き換える。load_variant で同じ Image を
+            # 複数キーが共有しているので、コピーしてから暗くする (二重適用防止)。
             for key, layer in eye_layers.items():
                 if layer is not None:
-                    eye_layers[key] = dim_character(layer, opacity)
+                    eye_layers[key] = dim_character(layer.copy(), opacity)
             for key, layer in mouth_layers.items():
                 if layer is not None:
-                    mouth_layers[key] = dim_character(layer, opacity)
+                    mouth_layers[key] = dim_character(layer.copy(), opacity)
 
     return {
         "layerSize": layer_size,
@@ -962,13 +986,11 @@ def character_request_from_payload(payload: dict[str, Any], fallback: dict[str, 
     raw_bob = payload.get("bob") if isinstance(payload.get("bob"), dict) else None
     bob_cfg = None
     if raw_bob:
-        try:
-            bob_bpm = float(raw_bob.get("bpm") or 0)
-            bob_amp = float(raw_bob.get("amplitudePx") or 0)
-        except (TypeError, ValueError):
-            bob_bpm = bob_amp = 0.0
-        if bob_bpm > 0 and bob_amp > 0:
-            bob_cfg = {"bpm": bob_bpm, "amplitudePx": bob_amp}
+        # 揺れ方 (style / hold / rate / bpmSource / onlyWhileSinging) ごと正規化して
+        # scene-bundle に渡す。計算はブラウザ (static/js/body-bob.js)。
+        from .scenario import _normalize_character_bob
+
+        bob_cfg = _normalize_character_bob(raw_bob)
     return CharacterRequest(
         id=str(payload.get("id") or fallback.get("id") or ""),
         name=str(payload.get("name") or fallback.get("name") or ""),

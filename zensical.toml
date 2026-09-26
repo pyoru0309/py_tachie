@@ -13,6 +13,7 @@ nav = [
     "tutorials/create-project.md",
     "tutorials/import-character.md",
     "tutorials/voice-synthesis.md",
+    "tutorials/singing-lipsync.md",
     "tutorials/export-video.md"
   ]},
   {"リファレンス" = [

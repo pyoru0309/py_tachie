@@ -10,6 +10,7 @@ import { showToast, withBusy } from "./toast.js";
 import {
   fillExportOptionsDialog,
   applyExportOptionsPresetUI,
+  syncAudioFormatControls,
   readExportFormValues,
   setExportProgress,
   clearExportProgress,
@@ -355,6 +356,9 @@ async function runV2Export(formValues) {
       scope: formValues.target === "project" ? "project" : "cut",
       monoToStereo: !!formValues.monoToStereo,
       leadInSec: 0,
+      audioCodec: formValues.audioCodec || "aac",
+      audioBitrate: formValues.audioBitrate || "192k",
+      audioSampleRate: formValues.audioSampleRate || 48000,
     };
     if (formValues.target === "cut") muxBody.cutId = formValues.selectedCutId;
     exportPhase = "muxing";
@@ -372,6 +376,8 @@ async function runV2Export(formValues) {
     }
     appendExportLog(
       `mux done: rc=${muxResult.ffmpegRc} audio=${muxResult.audioRendered} `
+      + `codec=${muxResult.audioCodec || "aac"}${muxResult.audioBitrate ? `/${muxResult.audioBitrate}` : ""}`
+      + ` ${muxResult.audioSampleRate || 48000}Hz `
       + `output=${muxResult.outputPath}`,
     );
   }
@@ -548,6 +554,7 @@ function emitExportSummary({ formValues, baseExportConfig, result, done, muxResu
     lines.push(`## 音声 mux`);
     lines.push(`mux elapsed = ${muxResult.elapsedSec?.toFixed?.(2) ?? "n/a"} s`);
     lines.push(`audioRendered = ${muxResult.audioRendered} (false なら anullsrc 無音)`);
+    lines.push(`audio format = ${muxResult.audioCodec || "aac"}${muxResult.audioBitrate ? ` ${muxResult.audioBitrate}` : ""} / ${muxResult.audioSampleRate || 48000} Hz`);
     lines.push(`ffmpeg rc = ${muxResult.ffmpegRc}`);
     lines.push(`output (mux 後) = ${muxResult.outputPath}`);
   } else if (muxResult && muxResult.type === "error") {
@@ -672,6 +679,9 @@ export function bindExport() {
   elements.exportOptionsPresetSelect?.addEventListener("change", () => {
     applyExportOptionsPresetUI();
   });
+  // 音声形式: PCM ならビットレート欄を隠す / 「音声を含める」OFF なら音声欄を無効化。
+  elements.exportOptionsAudioCodecSelect?.addEventListener("change", syncAudioFormatControls);
+  elements.exportOptionsIncludeAudioInput?.addEventListener("change", syncAudioFormatControls);
   elements.exportOptionsEncoderEngineSelect?.addEventListener("change", () => {
     const preset = findPreset(elements.exportOptionsPresetSelect?.value);
     if (preset) updateEncoderEngineHintFromPreset(preset, elements.exportOptionsEncoderEngineSelect.value);

@@ -255,6 +255,8 @@
       
         
       
+        
+      
     
     
     
@@ -399,6 +401,34 @@
     
   
     音声合成 (VOICEVOX / VOICEPEAK) を使う
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/singing-lipsync/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    歌・デュエットの口パク
   
 
     
@@ -691,6 +721,17 @@
     <span class="md-ellipsis">
       
         背景
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#midi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        歌唱判定 MIDI
       
     </span>
   </a>
@@ -1241,6 +1282,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#midi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        歌唱判定 MIDI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1501,8 +1553,9 @@
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  videos/
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  audio/
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  sound_effects/
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  fonts/
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  overlays/
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  midi/
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  fonts/
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  overlays/
 </span></code></pre></div>
 <h2 id="_3">プロジェクト固有素材<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>projects/&lt;project_id&gt;/
@@ -1512,13 +1565,16 @@
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    videos/
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    audio/
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    sound_effects/
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    fonts/
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    overlays/
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    midi/
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    fonts/
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    overlays/
 </span></code></pre></div>
 <p><code>projects/</code> の保存先は全体設定で別ディレクトリへ切り替えられます。</p>
 <h2 id="_4">背景<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <p>背景は <code>backgrounds/</code> に置きます。対応拡張子は <code>.png</code> / <code>.jpg</code> / <code>.jpeg</code> / <code>.webp</code> / <code>.avif</code> です。
 出力時は 1920×1080 にカバー配置されます。</p>
+<h2 id="midi">歌唱判定 MIDI<a class="headerlink" href="#midi" title="Permanent link">&para;</a></h2>
+<p><code>midi/</code> には口パク用の歌唱判定 MIDI (<code>.mid</code> / <code>.midi</code>) を置きます。シーン設定 → BGM の「歌唱判定 MIDI で口パク」から選ぶ・アップロードするのが基本です (アップロード先はプロジェクトの <code>assets/midi/</code>)。使い方は <a href="../../tutorials/singing-lipsync/">歌・デュエットの口パク</a> を参照してください。</p>
 <h2 id="_5">動画背景<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p>シーンの <code>videoTrack</code> で使う動画は <code>videos/</code> に置きます。対応コンテナは <code>.mp4</code> / <code>.mov</code> / <code>.webm</code> など、ffmpeg / ブラウザ両方が読める形式を推奨します。<code>fit</code> (cover / contain / fit)、<code>muted</code>、<code>loop</code>、<code>trimStartSec</code> / <code>trimEndSec</code>、<code>speed</code> を指定できます。</p>
 <h2 id="_6">音声<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
@@ -1653,7 +1709,7 @@ PSD インポート時に <code>thumb</code> / <code>thumbnail</code> / <code>�
 <ul>
 <li><strong>表示名 (<code>name</code>)</strong>: セレクタやリストで使われる人間向けラベル。インポート直後の機械生成名 (例: <code>制服_デフォルト</code>) を読みやすい名前に直したい場面に。レイヤー ID は不変なので、シナリオの参照は壊れません。</li>
 <li><strong>目パチフラグ (eye)</strong>: <code>開き</code> (= <code>blinkOpen</code>) / <code>中間</code> (= <code>blinkHalf</code>) / <code>閉じ</code> (= <code>blinkClosed</code>)</li>
-<li><strong>口パクフラグ (mouth)</strong>: <code>閉じ</code> (= <code>lipClosed</code>) / <code>中間</code> (= <code>lipMid</code>) / <code>開き</code> (= <code>lipOpen</code>)</li>
+<li><strong>口パクフラグ (mouth)</strong>: <code>閉じ</code> (= <code>lipClosed</code>) / <code>中間</code> (= <code>lipMid</code>) / <code>開き</code> (= <code>lipOpen</code>)。2 行目の <code>あ</code>〜<code>お</code> (= <code>lipA</code>〜<code>lipO</code>) は歌唱判定 MIDI の口パク用の母音口形で、1 枚に複数立てられます (<a href="../../tutorials/singing-lipsync/">歌・デュエットの口パク</a>)</li>
 </ul>
 <p><code>blinkOpen</code> 以外は manifest 全体で <strong>1 枚だけ</strong> 立てられる排他フラグで、別レイヤーで ON にすると自動で外れます。フラグの動作詳細は <a href="../../technical/character-model/#blink-lipsync-flags">キャラクターモデル</a> を参照してください。</p>
 <p>設定した表示名 / フラグは <code>character_manifest.json</code> の各エントリに書き込まれ、<code>import_manifest.yml</code> の <code>flags:</code> ブロックや <code>expressionPresets</code> / <code>hairstylePresets</code> 内のレイヤー名参照も同期更新されます。</p>

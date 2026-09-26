@@ -11,6 +11,8 @@ import {
 import { captureAndUploadThumbnail } from "./thumbnail.js";
 import { createPreviewScheduler, PRIORITY } from "./preview-scheduler.js";
 import { setCutPrerenderStatus } from "./prerender.js";
+import { computeMouthKeyByChar, shapeIndexForTime } from "./lipsync.js";
+import { computeBobDyByChar, createStreamingVoiceGate, cycleIsVoiced } from "./body-bob.js";
 
 // =============================================================================
 // v2 (WebGL + three.js) renderer
@@ -181,6 +183,98 @@ function stopLivePreviewBgm() {
   state.playbackAnalyser = null;
   state.playbackAnalyserBuffer = null;
   state.playbackAnalyserOwner = null;
+  closeCharLipAnalysers();
+}
+
+// キャラ専用の口パク入力 (useForLipSync + lipSyncCharacterIds。デュエットで
+// キャラごとにボーカル素材を分けたもの) の analyser 群。
+// src → { analyser, buffer, smoothed }。話者用 (setupLipSyncAnalyser) と同じく
+// destination には繋がないので、出力ミックスには流れない。
+//
+// meter: 「音量メーターに反映する」トラック ({ audio, audible }) が話者用口パク入力
+// 以外のとき。キャラ専用入力ならその analyser を共有し、出力に流すトラック (audible)
+// なら analyser を destination にも繋いで音はそのまま聞こえるようにする。
+function setupCharLipAnalysers(entries, meter = null) {
+  closeCharLipAnalysers();
+  if (!entries.length && !meter) return;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const makeEntry = (audio, audible) => {
+      const source = ctx.createMediaElementSource(audio);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.4;
+      source.connect(analyser);
+      if (audible) analyser.connect(ctx.destination);
+      return { analyser, buffer: new Float32Array(analyser.fftSize), smoothed: null, db: null };
+    };
+    const bySrc = new Map();
+    const all = [];
+    let meterEntry = null;
+    for (const { src, audio } of entries) {
+      // 同じ音源を 2 本の口パク入力に置いても、要素ごとに analyser へ繋ぐ
+      // (繋がない要素は出力に漏れて聞こえてしまう)。キャラ参照は先勝ち。
+      const entry = makeEntry(audio, false);
+      all.push(entry);
+      if (!bySrc.has(src)) bySrc.set(src, entry);
+      if (meter && meter.audio === audio) meterEntry = entry;
+    }
+    if (meter && !meterEntry) {
+      meterEntry = makeEntry(meter.audio, meter.audible);
+      all.push(meterEntry);
+    }
+    state.playbackCharLipContext = ctx;
+    state.playbackCharLipAnalysers = bySrc;
+    state.playbackCharLipAll = all;
+    state.playbackMeterEntry = meterEntry;
+  } catch (error) {
+    console.warn("Per-character lip-sync analyser unavailable", error);
+  }
+}
+
+function closeCharLipAnalysers() {
+  if (state.playbackCharLipContext) {
+    try { state.playbackCharLipContext.close(); } catch (_) { /* ignore */ }
+  }
+  state.playbackCharLipContext = null;
+  state.playbackCharLipAnalysers = null;
+  state.playbackCharLipAll = null;
+  state.playbackMeterEntry = null;
+}
+
+// 1 描画フレームに 1 回、各キャラ専用音源の音量を取り直す (sampleAudioVolume と同式)。
+function sampleCharLipVolumes(lipSync) {
+  const all = state.playbackCharLipAll;
+  if (!all) return;
+  const smoothing = Math.max(0, Math.min(0.45, Number(lipSync?.smoothing ?? 0.2)));
+  for (const entry of all) {
+    const { analyser, buffer } = entry;
+    if (typeof analyser.getFloatTimeDomainData !== "function") continue;
+    analyser.getFloatTimeDomainData(buffer);
+    let sum = 0;
+    for (let i = 0; i < buffer.length; i += 1) sum += buffer[i] * buffer[i];
+    const rms = Math.sqrt(sum / buffer.length);
+    entry.db = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+    const normalized = rmsToNormalizedDb(rms, lipSync);
+    const previous = entry.smoothed ?? 0;
+    const center = 1.0 - smoothing * 2;
+    entry.smoothed = previous * smoothing + normalized * center + normalized * smoothing;
+  }
+}
+
+// 音量メーターの表示値。「音量メーターに反映する」トラックがあればその音量、
+// 無ければ (または話者用口パク入力を選んだときは) 従来どおり話者の口パク入力。
+function meterReading() {
+  const entry = state.playbackMeterEntry;
+  if (entry) return { volume: entry.smoothed ?? 0, db: entry.db };
+  return { volume: currentAudioVolume() || 0, db: state.playbackVolumeDb };
+}
+
+function charLipVolume(src) {
+  const entry = state.playbackCharLipAnalysers?.get(src);
+  return entry ? entry.smoothed : null;
 }
 
 // 効果音 (scene.soundEffects[]) 用の予約再生プレイヤー。
@@ -411,6 +505,8 @@ async function startLivePreviewBgm(scene, timelineOffsetSec) {
   if (!scene || !Array.isArray(scene.bgmTracks)) return;
   const audios = [];
   let lipAudio = null;
+  const charLipAudios = [];
+  let meter = null;
   for (const bgm of scene.bgmTracks) {
     if (!bgm || !bgm.src) continue;
     const src = bgm.src.startsWith("/") ? bgm.src : `/assets/${bgm.src}`;
@@ -425,14 +521,23 @@ async function startLivePreviewBgm(scene, timelineOffsetSec) {
     if (bgm.useForLipSync) {
       // 口パク用トラックは analyser 経由で波形を取り、destination には繋がない。
       // → 出力ミックスから外れ、波形だけ取得できる。
-      lipAudio = audio;
+      // キャラ割り当て付きはキャラ専用 (デュエット)、無しは話者用。
+      if (Array.isArray(bgm.lipSyncCharacterIds) && bgm.lipSyncCharacterIds.length > 0) {
+        charLipAudios.push({ src: bgm.src, audio });
+      } else {
+        lipAudio = audio;
+      }
     }
+    if (bgm.showInMeter && !meter) meter = { audio, audible: !bgm.useForLipSync };
     audios.push({ audio, isLipSync: !!bgm.useForLipSync });
   }
   state.playbackBgmAudios = audios.map(({ audio }) => audio);
   if (lipAudio) {
     setupLipSyncAnalyser(lipAudio);
   }
+  // 話者用口パク入力をメーターに選んだときは、その analyser (従来のメーター入力) を使う。
+  if (meter && meter.audio === lipAudio) meter = null;
+  setupCharLipAnalysers(charLipAudios, meter);
   // BGM が実際に鳴り始めるまで待ってから resolve する。
   // → 呼び出し側 (playPreviewPlayback) はこの直後に wallclock anchor を取れるので、
   //   Windows の初回 audio decode 遅延でテロップが先走る現象を防げる。
@@ -1830,13 +1935,13 @@ function formatDbForMeter(db) {
   return rounded < 0 ? `−${abs}` : (rounded > 0 ? `+${abs}` : "0");
 }
 
-function updateAudioMeterValue(volume) {
+function updateAudioMeterValue(volume, dbValue = state.playbackVolumeDb) {
   if (!elements.audioMeterFill) return;
   const v = Math.max(0, Math.min(1, Number(volume) || 0));
   elements.audioMeterFill.style.width = `${v * 100}%`;
   // 数値読み取り（dB と norm）の更新。analyser が無効なら無音表記に戻す。
   if (elements.audioMeterDb) {
-    const db = state.playbackVolumeDb;
+    const db = dbValue;
     if (db == null) {
       elements.audioMeterDb.textContent = "−∞";
     } else if (!Number.isFinite(db)) {
@@ -2007,16 +2112,33 @@ function computeIdleMotionOffset(idleMotion, timelineSec) {
       dy += amp * Math.sin((2 * Math.PI * t) / period);
     }
   }
-  const bpm = Number(idleMotion?.bpm) || 0;
-  const bob = idleMotion?.bpmBob;
-  if (bpm > 0 && bob) {
-    const amp = Math.max(0, Number(bob.amplitudePx) || 0);
-    if (amp > 0) {
-      const period = 60.0 / bpm;
-      dy += amp * Math.sin((2 * Math.PI * t) / period);
-    }
-  }
+  // BPM ボブ (bpmBob) はキャラごとに computePreviewBobDy で計算する
+  // (口パク連動・MIDI 自動 BPM があるため)。
   return { dx: 0, dy };
+}
+
+// MIDI 口形がある (= 未来まで分かる) キャラの「声が出ていたか」。書き出しと同じ判定。
+function midiVoicedAtLocal(layerData, charId, t) {
+  const entry = layerData?.lipSyncByChar?.[charId];
+  if (entry?.kind !== "midi") return false;
+  const ch = entry.shapes?.[Math.floor(t * 24 + 1e-6)];
+  return !!ch && ch !== "-";
+}
+
+// 体の揺れ (シーンの BPM ボブ + キャラの bob) の { [charId]: dy }。body-bob.js 参照。
+// isVoiced 未指定 (停止中・トランジション延長) は MIDI 口形だけで「口パクのときだけ」を
+// 判定する (音量は実時間でしか取れないため、停止中は揺らさない)。
+function computePreviewBobDy(layerData, idleMotion, localSec, sceneSec, isVoiced = null) {
+  return computeBobDyByChar({
+    characters: layerData?.characters,
+    sceneBob: idleMotion?.bpmBob,
+    sceneBpm: idleMotion?.bpm,
+    beatMaps: layerData?.beatMaps,
+    localSec,
+    sceneSec,
+    isVoiced,
+    voicedAtLocal: isVoiced ? undefined : (charId, t) => midiVoicedAtLocal(layerData, charId, t),
+  });
 }
 
 export async function playLiveCut(cut, options = {}) {
@@ -2154,6 +2276,11 @@ async function renderPreviewV2(cut, requestId) {
   const eyeKey = "open";
   const mouthKey = "default";
   const speakerId = layerData.speakerId || null;
+  // ただし歌唱判定 MIDI の口パクは再生位置の口形を出す (シークしながらオフセットを
+  // 合わせられるように)。音量駆動 (キャラ専用ボーカル) は音が無いので default。
+  const mouthKeyByChar = layerData.lipSyncEnabled !== false
+    ? computeMouthKeyByChar(layerData.lipSyncByChar, shapeIndexForTime(previewSec, animationFps))
+    : null;
 
   // モーション (再生中と同じ式)。停止中も「現在 frame における shake/idle 量」を
   // そのまま反映するので、シーク中の見た目が再生中と一致する。
@@ -2180,16 +2307,20 @@ async function renderPreviewV2(cut, requestId) {
   const idleOffset = idleMotion
     ? computeIdleMotionOffset(idleMotion, cutStart + quantized)
     : { dx: 0, dy: 0 };
+  // 体の揺れはキャラアニメ fps でコマ打ちしない (跳ねる区間が短いと 1 コマで終わるため)。
+  const bobDyByChar = computePreviewBobDy(layerData, idleMotion, previewSec, cutStart + previewSec);
 
   const motionOffsetByChar = computePerCharacterMotionOffsets(layerData.characters, quantized);
   const sceneState = {
     eyeKey,
     mouthKey,
+    mouthKeyByChar,
     speakerId,
     shakeDx,
     shakeDy,
     idleDx: idleOffset.dx,
     idleDy: idleOffset.dy,
+    bobDyByChar,
     motionOffsetByChar,
     elapsedSec: quantized,
     // テロップ可視判定用: 量子化前の cut-local 秒。selectTelop で playhead を
@@ -2260,6 +2391,13 @@ async function fetchSceneBundleV2(cut, options = {}) {
     if (!owner) return null;
     return sceneToDisk(owner.sceneId);
   })();
+  // プロジェクト通し BGM / 口パク MIDI の時間軸でのシーン先頭。サーバはこれを足して
+  // 「BGM の何秒目がこのカットか」を出す (保存 debounce 中でも live state で正しく)。
+  const liveSceneStartFrame = (() => {
+    const owner = (state.scenario?.cuts || []).find((c) => c && c.id === cut.id);
+    if (!owner) return 0;
+    return sceneSpans(state.scenario).find((sp) => sp.id === owner.sceneId)?.startFrame || 0;
+  })();
   // 音源単位 viz 解析キャッシュの「同期生成」を許すかどうか。先読み (NEXT/LOOKAHEAD)
   // のときだけ true にして裏で音源全長キャッシュを温め、現カット (CURRENT) や対話
   // fetch (priority 未指定) では false にして「3 分 BGM の最初の 1 カットで音源全長
@@ -2298,6 +2436,7 @@ async function fetchSceneBundleV2(cut, options = {}) {
             // disk 読み込み遅延を介さず即座に visualizer / cut_start_sec に
             // 反映されるようにする。
             cuts: Array.isArray(liveScene.cuts) ? liveScene.cuts : [],
+            sceneStartFrame: liveSceneStartFrame,
           },
         }
       : {}),
@@ -2803,6 +2942,9 @@ function _computeCutSceneState(ctx, cutLocalSec, { mouthVolume = null } = {}) {
   const idleOffset = ctx.idleMotion
     ? computeIdleMotionOffset(ctx.idleMotion, ctx.timelineOffsetSec + quantized)
     : { dx: 0, dy: 0 };
+  const bobDyByChar = computePreviewBobDy(
+    ctx.layerData, ctx.idleMotion, cutLocalSec, ctx.timelineOffsetSec + cutLocalSec,
+  );
   const motionOffsetByChar = computePerCharacterMotionOffsets(ctx.layerData.characters, quantized);
   return {
     eyeKey: "open",
@@ -2813,6 +2955,7 @@ function _computeCutSceneState(ctx, cutLocalSec, { mouthVolume = null } = {}) {
     shakeDy,
     idleDx: idleOffset.dx,
     idleDy: idleOffset.dy,
+    bobDyByChar,
     motionOffsetByChar,
     elapsedSec: quantized,
     rawElapsedSec: cutLocalSec,
@@ -3174,6 +3317,8 @@ export async function playLiveCutV2(cut, _options = {}) {
   // 2D ctx へ毎フレーム塗り直す経路は撤去。
 
   let firstFrameLogged = false;
+  // 「口パクのときだけ揺らす」の実時間判定 (カット単位)。body-bob.js。
+  const bobVoiceGate = createStreamingVoiceGate();
   return new Promise((resolve) => {
     let lastDrawnFrame = -1;
     const tick = () => {
@@ -3188,7 +3333,9 @@ export async function playLiveCutV2(cut, _options = {}) {
         lastDrawnFrame = frameIdx;
         const quantized = frameIdx / animationFps;
         sampleAudioVolume(lipSync);
-        updateAudioMeterValue(currentAudioVolume() || 0);
+        sampleCharLipVolumes(lipSync);
+        const meterNow = meterReading();
+        updateAudioMeterValue(meterNow.volume, meterNow.db);
         // 均等方式は per-char で「中目あり / なし」によりパターン長が変わるため、
         // キャラ単位で eyeKey を計算して eyeKeyByChar として scene-builder に渡す。
         // アニメ方式でも 中目なしキャラは pattern 上 "half" → 描画時に closed
@@ -3212,6 +3359,14 @@ export async function playLiveCutV2(cut, _options = {}) {
         const mouthKey = lipSyncEnabled
           ? mouthKeyFromVolume(currentAudioVolume(), lipSync)
           : "default";
+        // キャラ単位の口パク (デュエットのボーカル割り当て / 歌唱判定 MIDI)。
+        // MIDI の口形列はカット内秒を anim fps で量子化して引く (書き出しと同式)。
+        const mouthKeyByChar = lipSyncEnabled
+          ? computeMouthKeyByChar(layerData.lipSyncByChar, shapeIndexForTime(clamped, animationFps), {
+            levelForEntry: (_charId, entry) => charLipVolume(entry.trackSrc),
+            volumeToKey: (volume) => mouthKeyFromVolume(volume, lipSync),
+          })
+          : null;
 
         // モーション (v1 と同じ式)。shake はカット内 elapsed、idle はタイムライン t。
         let shakeDx = 0;
@@ -3234,6 +3389,28 @@ export async function playLiveCutV2(cut, _options = {}) {
         const idleOffset = idleMotion
           ? computeIdleMotionOffset(idleMotion, timelineOffsetSec + quantized)
           : { dx: 0, dy: 0 };
+        // 体の揺れ。「口パクのときだけ」は MIDI なら口形、音量ならキャラ別ボーカル /
+        // 話者音声の今の音量を見て、周期ごとに判定を固定する (bobVoiceGate)。
+        const silenceLevel = Number(lipSync?.silenceThreshold ?? 0.08);
+        // 体の揺れはコマ打ちしない実時間 (clamped) で計算する (書き出しと同じ)。
+        const bobDyByChar = computePreviewBobDy(
+          layerData, idleMotion, clamped, timelineOffsetSec + clamped,
+          (charId, cycle, cycleAt, layer) => {
+            const entry = layerData.lipSyncByChar?.[charId];
+            if (entry?.kind === "midi") {
+              return cycleIsVoiced({
+                cycle, localSec: clamped, cycleAt,
+                voicedAtLocal: (t) => midiVoicedAtLocal(layerData, charId, t),
+              });
+            }
+            let volume = null;
+            if (entry?.kind === "level") volume = charLipVolume(entry.trackSrc);
+            else if (charId === speakerId) volume = currentAudioVolume();
+            const key = `${charId}|${layer}`;
+            bobVoiceGate.observe(key, cycle, volume != null && volume >= silenceLevel);
+            return bobVoiceGate.isActive(key, cycle);
+          },
+        );
 
         // 動画レイヤー: per-layer HTMLVideoElement の play/pause/seek を毎フレーム同期。
         // mesh.visible は scene-builder の update() 側で mapVideoLayerSec を再計算
@@ -3247,11 +3424,13 @@ export async function playLiveCutV2(cut, _options = {}) {
           eyeKey: "open",
           eyeKeyByChar,
           mouthKey,
+          mouthKeyByChar,
           speakerId,
           shakeDx,
           shakeDy,
           idleDx: idleOffset.dx,
           idleDy: idleOffset.dy,
+          bobDyByChar,
           motionOffsetByChar,
           elapsedSec: quantized,
           // 再生中も telop の出入りは量子化していない実時間で判定する。

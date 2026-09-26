@@ -1561,8 +1561,40 @@ def _normalize_character_motion(raw: Any) -> dict[str, Any] | None:
     return {"type": motion_type, "settings": dict(raw_settings)}
 
 
+_BOB_STYLES = ("wave", "bounce", "hop", "kick", "nod")
+_BOB_RATES = (2.0, 1.0, 0.5, 0.25)
+
+
+def _normalize_bob_pattern(raw: dict[str, Any]) -> dict[str, Any]:
+    """シーン / キャラ共通の揺れ方パラメータ (static/js/body-bob.js と対応)。
+
+    - style: wave (従来の常時サイン波) / bounce / hop / kick / nod (溜め → 拍で跳ねる)
+    - hold: 溜め (1 周期のうち静止している割合、0〜0.95)
+    - rate: 揺らすリズム = BPM × rate (2 / 1 / 0.5 / 0.25)
+    - bpmSource: manual (キャラ = bob.bpm、シーン = scene.bpm) / midi (BGM の歌唱判定
+      MIDI のテンポマップから自動)
+    - onlyWhileSinging: 口パク (音声 / MIDI) で声が出ている周期だけ揺らす
+    """
+    style = str(raw.get("style") or "wave")
+    try:
+        rate = float(raw.get("rate") or 1)
+    except (TypeError, ValueError):
+        rate = 1.0
+    try:
+        hold = float(raw.get("hold")) if raw.get("hold") is not None else 0.7
+    except (TypeError, ValueError):
+        hold = 0.7
+    return {
+        "style": style if style in _BOB_STYLES else "wave",
+        "hold": round(max(0.0, min(0.95, hold)), 3),
+        "rate": rate if rate in _BOB_RATES else 1.0,
+        "bpmSource": "midi" if raw.get("bpmSource") == "midi" else "manual",
+        "onlyWhileSinging": bool(raw.get("onlyWhileSinging") or False),
+    }
+
+
 def _normalize_character_bob(raw: Any) -> dict[str, Any] | None:
-    """BPM 上下ゆれ (bob)。bpm / amplitudePx がともに正のときだけ有効。"""
+    """BPM 上下ゆれ (bob)。振幅が正で、BPM が取れる (手入力 > 0 か MIDI 自動) ときだけ有効。"""
     if not isinstance(raw, dict):
         return None
     try:
@@ -1570,9 +1602,10 @@ def _normalize_character_bob(raw: Any) -> dict[str, Any] | None:
         amplitude_px = float(raw.get("amplitudePx") or 0)
     except (TypeError, ValueError):
         return None
-    if bpm <= 0 or amplitude_px <= 0:
+    pattern = _normalize_bob_pattern(raw)
+    if amplitude_px <= 0 or (bpm <= 0 and pattern["bpmSource"] != "midi"):
         return None
-    return {"bpm": round(bpm, 3), "amplitudePx": round(amplitude_px, 2)}
+    return {"bpm": round(max(0.0, bpm), 3), "amplitudePx": round(amplitude_px, 2), **pattern}
 
 
 def _normalize_color_filter(raw: Any) -> dict[str, Any]:
@@ -2059,10 +2092,72 @@ def _normalize_bgm_track(track: dict[str, Any]) -> dict[str, Any] | None:
         "fadeInSec": round(fade_in, 3),
         "fadeOutSec": round(fade_out, 3),
         "useForLipSync": bool(track.get("useForLipSync") or False),
+        # 口パク入力トラックを割り当てるキャラ (素材キャラ ID = cut.state.characters[].characterId)。
+        # 空 = 従来どおり「話者の口パク」に使う。デュエットではキャラごとにボーカル
+        # 素材を分けて割り当てる。useForLipSync=False のときは意味を持たない。
+        "lipSyncCharacterIds": _normalize_character_id_list(track.get("lipSyncCharacterIds")),
+        # 歌唱判定用 MIDI による口パク (このトラックの音源と時間軸を共有する)。
+        "lipSyncMidi": _normalize_lip_sync_midi(track.get("lipSyncMidi")),
+        # プレビュー下の音量メーターにこのトラックを表示する (口パクとは独立。ベッド内 1 本)。
+        "showInMeter": bool(track.get("showInMeter") or False),
         # loop=True なら scene 終端までトラックをループ再生する。
         # 複数 BGM が ON でも排他ではなく、それぞれ独立にループする。
         "loop": bool(track.get("loop") or False),
     }
+
+
+def _normalize_character_id_list(raw: Any) -> list[str]:
+    out: list[str] = []
+    if isinstance(raw, list):
+        for item in raw:
+            value = _nfc(item).strip()
+            if value and value not in out:
+                out.append(value)
+    return out
+
+
+# MIDI オフセットの上限 (±10 分)。入力ミスで桁が飛んだ値を丸める。
+_LIP_SYNC_MIDI_OFFSET_LIMIT_MS = 600_000
+
+
+def _normalize_lip_sync_midi(raw: Any) -> dict[str, Any] | None:
+    """BGM トラックに付く「MIDI で口パク」設定。
+
+    - ``src``: MIDI ファイル (``projects/<id>/assets/midi/*.mid`` 等の論理パス)。
+    - ``offsetMs``: MIDI をずらす量。+ で口パクが遅れ、- で早まる。音源の頭を
+      X ms 削ったなら -X。
+    - ``tracks``: ``[{index, characterIds}]``。MIDI のトラック番号 (0 始まり、
+      ファイル内の MTrk 順) ごとに口パクさせるキャラ。1 キャラに複数トラック、
+      1 トラックに複数キャラ (ユニゾン) も可。キャラが空のトラックは落とす。
+    """
+    if not isinstance(raw, dict):
+        return None
+    src = _nfc(raw.get("src")).strip()
+    if not src:
+        return None
+    try:
+        offset_ms = int(round(float(raw.get("offsetMs") or 0)))
+    except (TypeError, ValueError):
+        offset_ms = 0
+    offset_ms = max(-_LIP_SYNC_MIDI_OFFSET_LIMIT_MS, min(_LIP_SYNC_MIDI_OFFSET_LIMIT_MS, offset_ms))
+    tracks: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for entry in raw.get("tracks") or []:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            index = int(entry.get("index"))
+        except (TypeError, ValueError):
+            continue
+        if index < 0 or index in seen:
+            continue
+        character_ids = _normalize_character_id_list(entry.get("characterIds"))
+        if not character_ids:
+            continue
+        seen.add(index)
+        tracks.append({"index": index, "characterIds": character_ids})
+    tracks.sort(key=lambda item: item["index"])
+    return {"src": src, "offsetMs": offset_ms, "tracks": tracks}
 
 
 def _normalize_video_layer(vl: dict[str, Any], index: int) -> dict[str, Any] | None:
@@ -2252,7 +2347,7 @@ def _normalize_scene(
             if isinstance(cut, dict):
                 cuts.append(_normalize_cut(cut, cut_index, manifest))
     _fill_cut_start_frame(cuts)
-    # useForLipSync は同シーン内で 1 トラックのみ (_normalize_bgm_tracks が担保)。
+    # 話者用の useForLipSync は同シーン内で 1 トラックのみ (_normalize_bgm_tracks が担保)。
     bgm_tracks = _normalize_bgm_tracks(scene.get("bgmTracks"))
     telops_raw = scene.get("telops")
     telops: list[dict[str, Any]] = []
@@ -2392,14 +2487,15 @@ def _normalize_breath(value: Any) -> dict[str, float]:
     return {"amplitudePx": amp, "periodSec": period}
 
 
-def _normalize_bpm_bob(value: Any) -> dict[str, float]:
+def _normalize_bpm_bob(value: Any) -> dict[str, Any]:
+    """シーン全体の BPM ボブ。テンポは scene.bpm (bpmSource=manual) か MIDI。"""
     if not isinstance(value, dict):
-        return {"amplitudePx": 0.0}
+        value = {}
     try:
         amp = max(0.0, float(value.get("amplitudePx") or 0))
     except (TypeError, ValueError):
         amp = 0.0
-    return {"amplitudePx": amp}
+    return {"amplitudePx": amp, **_normalize_bob_pattern(value)}
 
 
 # =============================================================================
@@ -2430,7 +2526,12 @@ BED_OVERRIDE_FIELDS: tuple[str, ...] = ("bpm", "background")
 
 
 def _normalize_bgm_tracks(raw: Any) -> list[dict[str, Any]]:
-    """BGM 配列の正規化 + useForLipSync の単一化 (同一レベル内で 1 本まで)。"""
+    """BGM 配列の正規化 + 「話者用」口パク入力 / 音量メーター表示の単一化 (同一レベル内で 1 本まで)。
+
+    キャラ割り当て (lipSyncCharacterIds) 付きの口パク入力はキャラごとに別音源を
+    使うので複数あってよい。割り当て無し (= 話者の口パクに使う) は従来どおり
+    1 本だけで、2 本目以降は口パク入力を外す。
+    """
     tracks: list[dict[str, Any]] = []
     if isinstance(raw, list):
         for track in raw:
@@ -2438,13 +2539,20 @@ def _normalize_bgm_tracks(raw: Any) -> list[dict[str, Any]]:
                 normalized = _normalize_bgm_track(track)
                 if normalized:
                     tracks.append(normalized)
-    seen_lip_sync = False
+    seen_meter = False
     for track in tracks:
-        if track.get("useForLipSync"):
-            if seen_lip_sync:
-                track["useForLipSync"] = False
-            else:
-                seen_lip_sync = True
+        if track.get("showInMeter"):
+            if seen_meter:
+                track["showInMeter"] = False
+            seen_meter = True
+    seen_speaker_lip_sync = False
+    for track in tracks:
+        if not track.get("useForLipSync") or track.get("lipSyncCharacterIds"):
+            continue
+        if seen_speaker_lip_sync:
+            track["useForLipSync"] = False
+        else:
+            seen_speaker_lip_sync = True
     return tracks
 
 

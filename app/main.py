@@ -10,6 +10,7 @@ import random
 import re
 import shutil
 import subprocess
+import unicodedata
 import sys
 import threading
 import uuid
@@ -162,6 +163,7 @@ from .render import (
     animation_asset_items,
     animation_layers,
     eye_for_frame,
+    MOUTH_VOWEL_FLAGS,
     mouth_for_frame,
     pick_layer,
     resolve_character_paths,
@@ -2216,7 +2218,7 @@ def post_character_layers_save(payload: dict[str, Any]) -> dict[str, Any]:
             continue
         EXCLUSIVE_FLAGS = {
             "eye": {"blinkHalf", "blinkClosed"},
-            "mouth": {"lipClosed", "lipMid", "lipOpen"},
+            "mouth": {"lipClosed", "lipMid", "lipOpen", "lipA", "lipI", "lipU", "lipE", "lipO"},
         }
         existing_flags: dict[str, Any] = (
             dict(target.get("flags") or {}) if isinstance(target.get("flags"), dict) else {}
@@ -2301,7 +2303,7 @@ def post_character_layers_save(payload: dict[str, Any]) -> dict[str, Any]:
     # 排他制約が反映済なので、yaml もそれに合わせて他 combination のフラグを削る。
     EXCLUSIVE_YAML_FLAGS_BY_CATEGORY = {
         "eye": {"blinkHalf", "blinkClosed"},
-        "mouth": {"lipClosed", "lipMid", "lipOpen"},
+        "mouth": {"lipClosed", "lipMid", "lipOpen", "lipA", "lipI", "lipU", "lipE", "lipO"},
     }
     for category, _, flags, combo in flag_updates_applied:
         if not combo:
@@ -2743,6 +2745,46 @@ def _build_preview_visualizer(
     }
 
 
+def _bgm_bed_offset_sec(
+    *,
+    bed_source: dict[str, Any],
+    scene_override: dict[str, Any] | None,
+    scenario: dict[str, Any] | None,
+    cut_id: str,
+) -> float:
+    """BGM の時間軸でのシーン先頭秒。BGM がシーンごとなら 0。
+
+    プロジェクト通し BGM はプロジェクト先頭から鳴り続けるので、カット位置
+    (シーンローカル) にシーンのプロジェクト内開始秒を足さないと、2 シーン目以降の
+    口パクが曲の頭の区間を読んでしまう。live state の ``sceneStartFrame`` があれば
+    それを優先 (保存 debounce 中でも正しい)、無ければディスクの scenario から数える。
+    """
+    from .scenario import _normalize_bed_scope
+    from .v2_export import scene_start_sec_in_project
+
+    if _normalize_bed_scope(bed_source.get("bedScope")).get("bgm") != "project":
+        return 0.0
+    if scene_override is not None and scene_override.get("sceneStartFrame") is not None:
+        try:
+            return max(0, int(scene_override.get("sceneStartFrame"))) / 24.0
+        except (TypeError, ValueError):
+            pass
+    if not scenario:
+        return 0.0
+    for scene in scenario.get("scenes") or []:
+        for cut in (scene or {}).get("cuts") or []:
+            if str((cut or {}).get("id") or "") == cut_id:
+                return scene_start_sec_in_project(scenario, str(scene.get("id") or ""))
+    return 0.0
+
+
+# 焼き込み PNG の中身の決め方を変えたら上げる (= 同じ state でも token を変えて古い
+# cache/preview/*.png を再利用させない)。
+# 2: 外付け保管場所のプロジェクトでキャラ素材が解決できず空 PNG が焼かれていた不具合の
+#    修正 (2026-09-26)。空のまま content-addressable キャッシュに残っているぶんを捨てる。
+_PREVIEW_BAKE_VERSION = 2
+
+
 def _stable_payload_token(
     payload: dict[str, Any],
     *,
@@ -2762,6 +2804,7 @@ def _stable_payload_token(
     """
     canonical = json.dumps(
         {
+            "bakeVersion": _PREVIEW_BAKE_VERSION,
             "payload": payload,
             "visualizer": visualizer_spec or {},
             "telops": telops_spec or [],
@@ -2828,10 +2871,13 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
     # ベッド設定 (projectSettings / bedScope) の供給元。ディスクの scenario を
     # 既定にし、sceneOverride が乗っていればそちらで上書きする。
     bed_source: dict[str, Any] = {}
+    # BGM / 口パク MIDI の時間軸でのシーン先頭秒を出すのに使う (プロジェクト通し BGM)。
+    scenario_for_bed_offset: dict[str, Any] | None = None
     if cut_id_for_lookup:
         try:
             _t_scn0 = _perf()
             scenario_for_lookup = ensure_scenario(manifest, ctx)
+            scenario_for_bed_offset = scenario_for_lookup
             bed_source = {
                 "projectSettings": scenario_for_lookup.get("projectSettings"),
                 "bedScope": scenario_for_lookup.get("bedScope"),
@@ -2941,6 +2987,7 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
             layers_for_token.get("mouth_closed"),
             layers_for_token.get("mouth_mid"),
             layers_for_token.get("mouth_open"),
+            *(layers_for_token.get(f"mouth_{v}") for v in MOUTH_VOWEL_FLAGS),
         ):
             if path:
                 layer_mtimes[str(path)] = _mtime_ns_for(path)
@@ -2954,6 +3001,12 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
             "mouth_closed": layers_for_token.get("mouth_closed"),
             "mouth_mid": layers_for_token.get("mouth_mid"),
             "mouth_open": layers_for_token.get("mouth_open"),
+            # 母音フラグ (lipA〜lipO) の付け替えでも token が変わるように。
+            "mouth_vowels": {
+                v: layers_for_token.get(f"mouth_{v}")
+                for v in MOUTH_VOWEL_FLAGS
+                if layers_for_token.get(f"mouth_{v}")
+            },
             "mtimes": layer_mtimes,
         })
     _t_tok0 = _perf()
@@ -3021,6 +3074,10 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
             "mid": layers_meta.get("mouth_mid"),
             "open": layers_meta.get("mouth_open"),
         }
+        # 母音口形 (lipA〜lipO)。MIDI 口パク用で、フラグを立てたキャラだけ焼く。
+        for _vowel in MOUTH_VOWEL_FLAGS:
+            if layers_meta.get(f"mouth_{_vowel}"):
+                mouth_variants[_vowel] = layers_meta.get(f"mouth_{_vowel}")
         # speaker_id が空 (= 話者未指定) の場合、誰も「非話者」扱いにせず dim を
         # かけない。話者キャラ削除直後など speakerCharacterId が一時的に空になる
         # 状況で、残りキャラが一斉にグレーアウトするのを防ぐ。
@@ -3051,6 +3108,7 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
             ("mouth_closed", "mouth_closed"),
             ("mouth_mid", "mouth_mid"),
             ("mouth_open", "mouth_open"),
+            *((f"mouth_{v}", f"mouth_{v}") for v in MOUTH_VOWEL_FLAGS),
         ):
             if layers_meta.get(variant_key):
                 cache_check_suffixes.append(suffix)
@@ -3079,6 +3137,9 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
                 "mid": url_or_none("mouth_mid") if layers_meta.get("mouth_mid") else None,
                 "open": url_or_none("mouth_open") if layers_meta.get("mouth_open") else None,
             }
+            for _vowel in MOUTH_VOWEL_FLAGS:
+                if layers_meta.get(f"mouth_{_vowel}"):
+                    mouth_urls[_vowel] = url_or_none(f"mouth_{_vowel}")
             _t_bake0 = _perf()
             with Image.open(preview_root / f"{base_prefix}_under.png") as img:
                 layer_w, layer_h = img.size
@@ -3324,19 +3385,30 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
         # 同カット内でキャラ間のタイミングがズレる (一斉まばたき防止)。
         "blinkFramesByChar": {},
         "lipSyncLevels": None,
+        # { [キャラのインスタンス ID]: {kind: "midi"|"level", ...} }。
+        # v2_export.compute_cut_lipsync_by_char 参照。
+        "lipSyncByChar": {},
+        # 体の揺れ (bob) の MIDI 自動 BPM 用 {scene, byChar}。v2_export.compute_cut_beat_maps。
+        "beatMaps": {"scene": None, "byChar": {}},
         "idleMotion": None,
     }
     if target_scene_for_lookup is not None:
         animation_timeline_payload["idleMotion"] = {
             "breath": target_scene_for_lookup.get("breath") or None,
             "bpm": target_scene_for_lookup.get("bpm") or None,
-            "bpmBob": target_scene_for_lookup.get("bpmBob") or None,
+            # sceneOverride (live state) は未正規化なので、揺れ方パラメータを揃える。
+            "bpmBob": (
+                _normalize_bpm_bob(target_scene_for_lookup.get("bpmBob"))
+                if target_scene_for_lookup.get("bpmBob") else None
+            ),
         }
     if target_cut_for_lookup is not None:
         try:
             from .v2_export import (
                 compute_cut_blink_frames,
+                compute_cut_beat_maps,
                 compute_cut_blink_frames_by_char,
+                compute_cut_lipsync_by_char,
                 compute_cut_lipsync_levels,
             )
             from .timecode import PROJECT_FPS as _PROJECT_FPS
@@ -3348,6 +3420,12 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
                 fps=int(_PROJECT_FPS),
                 char_ids=[str(c.get("id") or "") for c in characters_payload if c.get("id")],
             )
+            bed_offset_sec = _bgm_bed_offset_sec(
+                bed_source=bed_source,
+                scene_override=scene_override,
+                scenario=scenario_for_bed_offset,
+                cut_id=cut_id_for_lookup,
+            )
             if animation_defaults.get("lipSync", True) and purpose != "preview":
                 _t_lip0 = _perf()
                 animation_timeline_payload["lipSyncLevels"] = compute_cut_lipsync_levels(
@@ -3358,8 +3436,65 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
                     token=token,
                     fps=int(_PROJECT_FPS),
                     lip_sync_config=config.get("lipSync") or {},
+                    bed_offset_sec=bed_offset_sec,
                 )
                 _timing_ms["lipsync"] = (_perf() - _t_lip0) * 1000.0
+            # 体の揺れの「BPM を MIDI から自動検出」用。キャラの割り当て (素材 ID) で引く。
+            _beat_pairs: list[tuple[str, str]] = []
+            for character_request in request.characters:
+                state_item = next(
+                    (
+                        item for item in (payload.get("characters") or [])
+                        if isinstance(item, dict)
+                        and str(item.get("id") or "") == character_request.id
+                    ),
+                    None,
+                ) or {}
+                _beat_pairs.append((character_request.id, unicodedata.normalize(
+                    "NFC", str(state_item.get("characterId") or ""),
+                )))
+            animation_timeline_payload["beatMaps"] = compute_cut_beat_maps(
+                cut=target_cut_for_lookup,
+                scene=target_scene_for_lookup or {},
+                characters=_beat_pairs,
+                bed_offset_sec=bed_offset_sec,
+            )
+            if animation_defaults.get("lipSync", True):
+                # キャラ単位の口パク (デュエット用ボーカル割り当て / 歌唱判定 MIDI)。
+                # MIDI の口形はプレビューでも使うので purpose に関係なく計算する
+                # (MIDI パースは mtime キャッシュ、フレーム化は数 ms)。音量 levels
+                # (ffmpeg 解析) だけは書き出し時に限る。
+                _t_lipc0 = _perf()
+                char_pairs: list[tuple[str, str]] = []
+                for character_request in request.characters:
+                    if not character_request.show_character:
+                        continue
+                    state_item = next(
+                        (
+                            item for item in (payload.get("characters") or [])
+                            if isinstance(item, dict)
+                            and str(item.get("id") or "") == character_request.id
+                        ),
+                        None,
+                    ) or {}
+                    char_pairs.append(
+                        (character_request.id, unicodedata.normalize(
+                            "NFC", str(state_item.get("characterId") or "")
+                        ))
+                    )
+                animation_timeline_payload["lipSyncByChar"] = compute_cut_lipsync_by_char(
+                    cut=target_cut_for_lookup,
+                    scene=target_scene_for_lookup or {},
+                    characters=char_pairs,
+                    speaker_id=str(speaker_id or ""),
+                    cache_dir=ctx.cache_dir,
+                    project_id=ctx.id,
+                    fps=int(_PROJECT_FPS),
+                    lip_sync_config=config.get("lipSync") or {},
+                    bed_offset_sec=bed_offset_sec,
+                    with_levels=purpose != "preview",
+                )
+                _timing_ms["lipsyncByChar"] = (_perf() - _t_lipc0) * 1000.0
         except Exception:
             # 失敗は致命的でない (preview は real-time AnalyserNode で動く)
             pass
@@ -3403,6 +3538,8 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
         "blinkFrames": animation_timeline_payload["blinkFrames"],
         "blinkFramesByChar": animation_timeline_payload["blinkFramesByChar"],
         "lipSyncLevels": animation_timeline_payload["lipSyncLevels"],
+        "lipSyncByChar": animation_timeline_payload["lipSyncByChar"],
+        "beatMaps": animation_timeline_payload["beatMaps"],
         "idleMotion": animation_timeline_payload["idleMotion"],
         # scene-level の videoTrack 設定 (src/trim/speed/loop/fit/muted)。
         # export では WebCodecsVideoProvider がこれを読んで demux + decode する。
@@ -3426,6 +3563,130 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
             if target_cut_for_lookup is not None else None
         ),
     }
+
+
+def _list_lipsync_midi_files(ctx: ProjectContext) -> list[dict[str, str]]:
+    """プロジェクト → 共通の順に ``assets/midi`` の MIDI を並べる。"""
+    items: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for root in (ctx.root / "assets" / "midi", ASSETS_DIR / "midi"):
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*")):
+            if not path.is_file() or path.suffix.lower() not in (".mid", ".midi"):
+                continue
+            if any(part.startswith(".") for part in path.relative_to(root).parts):
+                continue
+            rel = unicodedata.normalize("NFC", relative_to_root(path))
+            if rel in seen:
+                continue
+            seen.add(rel)
+            items.append({"path": rel, "name": unicodedata.normalize("NFC", path.name)})
+    return items
+
+
+@app.get("/api/projects/{project_id}/lipsync-midi")
+def get_project_lipsync_midi_files(project_id: str) -> dict[str, Any]:
+    """口パク用 MIDI の候補 (シーン設定の BGM カードのプルダウン用)。"""
+    ctx = _ensure_project_ctx(project_id)
+    return {"files": _list_lipsync_midi_files(ctx)}
+
+
+@app.get("/api/projects/{project_id}/lipsync-midi/summary")
+def get_project_lipsync_midi_summary(project_id: str, src: str) -> dict[str, Any]:
+    """MIDI のトラック一覧 (ノート数・歌詞の冒頭・最初/最後のノート秒)。"""
+    from . import midi_lipsync
+
+    _ensure_project_ctx(project_id)
+    try:
+        path = safe_asset_path(src)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not path or not path.is_file():
+        raise HTTPException(status_code=404, detail="MIDI ファイルが見つかりません")
+    try:
+        song = midi_lipsync.load_midi(path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"MIDI を読めません: {exc}") from exc
+    return {"src": unicodedata.normalize("NFC", src), **midi_lipsync.midi_summary(song)}
+
+
+@app.post("/api/projects/{project_id}/lipsync-midi/check")
+def post_project_lipsync_midi_check(project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """MIDI トラック ↔ キャラ割り当ての一致チェック (取り違えの警告用)。
+
+    body: ``{"track": <MIDI 付き BGM トラック>, "bgmTracks": [<同じベッドの BGM 全部>]}``。
+    キャラ専用の口パク入力 (useForLipSync + lipSyncCharacterIds) を持つキャラについて、
+    割り当てた MIDI トラックのノート中にそのボーカル音源が無音の割合を返す。
+    参照音源の無いキャラは判定しない (``checked: false``)。
+    """
+    from . import midi_lipsync
+    from .scenario import _normalize_bgm_tracks
+
+    _ensure_project_ctx(project_id)
+    normalized = _normalize_bgm_tracks([payload.get("track") or {}])
+    track = normalized[0] if normalized else None
+    midi_cfg = (track or {}).get("lipSyncMidi")
+    if not midi_cfg:
+        return {"tracks": [], "threshold": midi_lipsync.MISMATCH_WARN_RATIO}
+    try:
+        midi_path = safe_asset_path(midi_cfg["src"])
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not midi_path or not midi_path.is_file():
+        raise HTTPException(status_code=404, detail="MIDI ファイルが見つかりません")
+    song = midi_lipsync.load_midi(midi_path)
+
+    # キャラ → 参照ボーカル (最初に割り当てた口パク入力)。
+    references: dict[str, dict[str, Any]] = {}
+    for bgm in _normalize_bgm_tracks(payload.get("bgmTracks") or []):
+        if not bgm.get("useForLipSync"):
+            continue
+        for cid in bgm.get("lipSyncCharacterIds") or []:
+            references.setdefault(cid, bgm)
+    ref_db: dict[str, Any] = {}
+    for cid, bgm in references.items():
+        try:
+            audio_path = safe_asset_path(str(bgm.get("src") or ""))
+            if audio_path and audio_path.is_file():
+                ref_db[cid] = midi_lipsync._audio_rms_db(audio_path)
+        except Exception as exc:  # 解析できない音源は判定対象から外すだけ
+            app_logger("lipsync").warning("口パク一致チェック: 音源を読めません %s (%s)", bgm.get("src"), exc)
+
+    offset_sec = float(midi_cfg.get("offsetMs") or 0) / 1000.0
+    midi_trim = float(track.get("trimStartSec") or 0.0)
+
+    def ratio(segments: list, cid: str) -> tuple[float, int]:
+        ref_trim = float(references[cid].get("trimStartSec") or 0.0)
+        return midi_lipsync.silent_while_note_ratio(
+            segments, ref_db[cid], midi_minus_ref_sec=midi_trim - ref_trim - offset_sec,
+        )
+
+    out_tracks = []
+    for entry in midi_cfg.get("tracks") or []:
+        segments = midi_lipsync.track_segments(song, int(entry["index"]))
+        assignments = []
+        for cid in entry.get("characterIds") or []:
+            if cid not in ref_db:
+                assignments.append({"characterId": cid, "checked": False})
+                continue
+            own, note_frames = ratio(segments, cid)
+            better = None
+            for other in ref_db:
+                if other == cid:
+                    continue
+                other_ratio, _ = ratio(segments, other)
+                if other_ratio < own - 0.1 and (better is None or other_ratio < better["silentRatio"]):
+                    better = {"characterId": other, "silentRatio": round(other_ratio, 3)}
+            assignments.append({
+                "characterId": cid,
+                "checked": note_frames > 0,
+                "silentRatio": round(own, 3),
+                "warn": note_frames > 0 and own > midi_lipsync.MISMATCH_WARN_RATIO,
+                "better": better,
+            })
+        out_tracks.append({"index": int(entry["index"]), "assignments": assignments})
+    return {"tracks": out_tracks, "threshold": midi_lipsync.MISMATCH_WARN_RATIO}
 
 
 @app.post("/api/v2/scene-bundle")

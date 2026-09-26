@@ -133,9 +133,11 @@ PSD_IMPORTER_RECOMMENDED_KEY_TO_FLAG: dict[str, str] = {
 # 各カテゴリで認識するフラグ名。manifest entry の `flags` に保存。
 # blinkOpen / lipOpen は per-character 複数立てて OK。
 # blinkHalf / blinkClosed / lipClosed / lipMid は manifest 全体で 1 枚ずつ。
+# lipA / lipI / lipU / lipE / lipO (母音口形、MIDI 口パク用) も manifest 全体で 1 枚ずつ
+# だが、1 枚に複数立ててよい (「あ/え」共用の口に lipA + lipE)。
 PSD_IMPORTER_FLAG_KEYS_BY_CATEGORY: dict[str, set[str]] = {
     "eye": {"blinkOpen", "blinkHalf", "blinkClosed"},
-    "mouth": {"lipClosed", "lipMid", "lipOpen"},
+    "mouth": {"lipClosed", "lipMid", "lipOpen", "lipA", "lipI", "lipU", "lipE", "lipO"},
 }
 
 

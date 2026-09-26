@@ -954,8 +954,12 @@ def _build_audio_amix_segments(
     video_audio_input_idx: int | None,
     sound_effect_inputs: list[tuple[int, dict[str, Any]]] | None = None,
     video_layer_inputs: list[tuple[int, dict[str, Any]]] | None = None,
+    final_label: str = "scene_a",
 ) -> tuple[list[str], str | None]:
     """シーン音声 amix の filter 断片と最終ラベルを返す。
+
+    ``final_label`` は amix 出力のラベル名。1 つの filter_complex で複数回呼ぶ
+    (複数シーン) ときは呼び出しごとに別名を渡すこと (同名だと ffmpeg が失敗する)。
 
     返り値の audio_label は `[name]` 形式 (-map にそのまま渡せる)。
     入力が一つも無ければ (segments, None) を返す。
@@ -1258,7 +1262,7 @@ def _build_audio_amix_segments(
     if len(labels) == 1:
         return segments, f"[{labels[0]}]"
     amix_inputs = "".join(f"[{name}]" for name in labels)
-    final = "scene_a"
+    final = final_label
     segments.append(
         f"{amix_inputs}amix=inputs={len(labels)}:duration=longest:dropout_transition=0:normalize=0[{final}]"
     )

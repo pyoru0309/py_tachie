@@ -651,11 +651,18 @@ def compute_cut_lipsync_levels(
     token: str,
     fps: int,
     lip_sync_config: dict[str, Any],
+    bed_offset_sec: float = 0.0,
 ) -> Optional[dict]:
     """useForLipSync BGM (or cut.audio) からカット範囲の per-frame Float32 levels を計算。
 
-    成功時は cache_dir/lipsync/lvl_<token>.bin に書き出し、{url, shape, dtype} を返す。
-    存在しなければ None。同じ token のファイルがあれば再計算 skip (= cache hit)。
+    **話者の口パク**用。キャラ割り当て (lipSyncCharacterIds) 付きの BGM は
+    ``compute_cut_lipsync_by_char`` が扱うのでここでは使わない。
+
+    ``bed_offset_sec`` は BGM の時間軸でのシーン先頭 (BGM がプロジェクト通しなら
+    そのシーンのプロジェクト内開始秒、シーンごとなら 0)。
+
+    成功時は cache_dir/lipsync/lvl_<token>_<src>.bin に書き出し、{url, shape, dtype} を
+    返す。存在しなければ None。同じファイルがあれば再計算 skip (= cache hit)。
     """
     duration_frame = max(1, int(cut.get("durationFrame") or 0))
     cut_start_sec = max(0, int(cut.get("startFrame") or 0)) / float(PROJECT_FPS)
@@ -686,6 +693,8 @@ def compute_cut_lipsync_levels(
         for bgm in scene.get("bgmTracks") or []:
             if not isinstance(bgm, dict) or not bgm.get("useForLipSync"):
                 continue
+            if bgm.get("lipSyncCharacterIds"):
+                continue  # キャラ専用の口パク入力 (compute_cut_lipsync_by_char 側)
             try:
                 bp = safe_asset_path(str(bgm.get("src") or ""))
             except Exception:
@@ -697,7 +706,7 @@ def compute_cut_lipsync_levels(
                 except (TypeError, ValueError):
                     bgm_trim = 0.0
                 # BGM の bgm_trim 後を 0 秒として扱い、シーン上の `cut_start_sec` から開始
-                audio_start_sec = bgm_trim + cut_start_sec
+                audio_start_sec = bgm_trim + bed_offset_sec + cut_start_sec
                 use_source_cache = True  # 同一 BGM を全カットが共有 → 全長 1 回解析が効く
                 break
 
@@ -707,8 +716,16 @@ def compute_cut_lipsync_levels(
     # cache .bin
     out_dir = cache_dir / "lipsync"
     out_dir.mkdir(parents=True, exist_ok=True)
-    bin_path = out_dir / f"lvl_{token}.bin"
-    rel_path = f"lipsync/lvl_{token}.bin"
+    # token はカット payload 由来で「どの音源のどこを読むか」を含まない。口パク入力
+    # の BGM を差し替え / トリム変更しても古い levels を掴まないよう、音源と開始位置も
+    # ファイル名に混ぜる。
+    import hashlib as _hashlib
+
+    src_key = _hashlib.sha1(
+        f"{audio_path}|{audio_start_sec:.4f}|{cut_total_frames}".encode("utf-8")
+    ).hexdigest()[:10]
+    bin_path = out_dir / f"lvl_{token}_{src_key}.bin"
+    rel_path = f"lipsync/{bin_path.name}"
 
     if not bin_path.exists():
         # 音源全長キャッシュからカット範囲をスライスする (= 同一 BGM 共有時に ffmpeg を
@@ -744,6 +761,295 @@ def compute_cut_lipsync_levels(
         "shape": [cut_total_frames],
         "dtype": "float32",
     }
+
+
+def scene_start_sec_in_project(scenario: dict[str, Any], scene_id: str) -> float:
+    """書き出し映像の時間軸でのシーン開始秒 (= 前にあるシーンの長さの合計)。
+
+    シーンの長さは書き出しと同じ ``_scene_total_duration`` (テロップがカットより後ろへ
+    はみ出していればその分も含む) で数える。音声 mux (_build_project_mux_command) の
+    プロジェクト通し BGM も同じ数え方なので、書き出しでは口パク / MIDI と音がずれない。
+    プレビューは scene-bundle の ``sceneOverride.sceneStartFrame`` (フロントの
+    ``sceneSpans``) を優先するので、ここは主に書き出し経路で使われる。
+    """
+    total = 0.0
+    for scene in scenario.get("scenes") or []:
+        if not isinstance(scene, dict):
+            continue
+        if str(scene.get("id") or "") == scene_id:
+            return total
+        total += _scene_total_duration(resolve_effective_scene(scenario, scene))
+    return 0.0
+
+
+_AUDIO_DURATION_CACHE: dict[tuple[str, int], Optional[float]] = {}
+
+
+def _cached_audio_duration(path: Path) -> Optional[float]:
+    try:
+        key = (str(path), path.stat().st_mtime_ns)
+    except OSError:
+        return None
+    if key not in _AUDIO_DURATION_CACHE:
+        if len(_AUDIO_DURATION_CACHE) > 64:
+            _AUDIO_DURATION_CACHE.clear()
+        _AUDIO_DURATION_CACHE[key] = audio_duration_seconds(path)
+    return _AUDIO_DURATION_CACHE[key]
+
+
+def _bgm_audio_time_map(bgm: dict[str, Any], audio_path: Optional[Path]):
+    """BGM 時間軸の秒 → その BGM 音源ファイル内の秒 (トリム・ループ込み)。
+
+    プレビュー (HTMLAudio: 開始位置 = trimStartSec、ループは 0 秒へ戻る) と同じ写像。
+    """
+    try:
+        trim = max(0.0, float(bgm.get("trimStartSec") or 0.0))
+    except (TypeError, ValueError):
+        trim = 0.0
+    duration = _cached_audio_duration(audio_path) if (bgm.get("loop") and audio_path) else None
+
+    def audio_time(bed_sec: float) -> float:
+        a = trim + bed_sec
+        if duration and duration > 0 and a >= duration:
+            a = a % duration
+        return a
+
+    return audio_time
+
+
+def compute_cut_lipsync_by_char(
+    *,
+    cut: dict[str, Any],
+    scene: dict[str, Any],
+    characters: list[tuple[str, str]],
+    speaker_id: str,
+    cache_dir: Path,
+    project_id: str,
+    fps: int,
+    lip_sync_config: dict[str, Any],
+    bed_offset_sec: float = 0.0,
+    with_levels: bool = True,
+) -> dict[str, dict[str, Any]]:
+    """キャラ単位の口パク入力を解決する (デュエット / 歌唱判定 MIDI)。
+
+    ``characters`` は (キャラのインスタンス ID, 素材キャラ ID) の列。戻り値は
+    インスタンス ID → 次のどちらか。載らなかったキャラは従来の「話者だけ口パク」:
+
+    - ``{"kind": "midi", "shapes": "--aaii..."}``: BGM トラックの ``lipSyncMidi`` で
+      割り当てられたキャラ。1 文字 = PROJECT_FPS の 1 フレーム (midi_lipsync 参照)。
+    - ``{"kind": "level", "trackSrc": src, "levels": {url, shape, dtype}?}``:
+      ``useForLipSync`` + ``lipSyncCharacterIds`` で割り当てたボーカル音源。プレビューは
+      trackSrc の AnalyserNode で実時間駆動し、書き出しは levels (Float32) を使う。
+
+    優先順位: そのカットに話者音声 (cut.audio) があれば話者は話者音声 (セリフは
+    カット単位の明示指定なので最優先) > MIDI > キャラ別ボーカル音源。
+    """
+    from . import midi_lipsync
+    from .scenario import _normalize_bgm_tracks
+
+    duration_frame = max(1, int(cut.get("durationFrame") or 0))
+    cut_start_sec = max(0, int(cut.get("startFrame") or 0)) / float(PROJECT_FPS)
+    cut_bed_start = float(bed_offset_sec) + cut_start_sec
+    cut_total_frames = max(1, int(round(duration_frame * fps / PROJECT_FPS)))
+    speaker_has_voice = bool(cut.get("audio"))
+
+    # sceneOverride 経由の live state は未正規化なので、ここで形を揃える。
+    bgm_tracks = _normalize_bgm_tracks(scene.get("bgmTracks"))
+    midi_sources: dict[str, list[tuple[dict[str, Any], int]]] = {}
+    level_sources: dict[str, dict[str, Any]] = {}
+    for bgm in bgm_tracks:
+        midi_cfg = bgm.get("lipSyncMidi")
+        if midi_cfg:
+            for entry in midi_cfg.get("tracks") or []:
+                for cid in entry.get("characterIds") or []:
+                    midi_sources.setdefault(cid, []).append((bgm, int(entry["index"])))
+        if bgm.get("useForLipSync"):
+            for cid in bgm.get("lipSyncCharacterIds") or []:
+                level_sources.setdefault(cid, bgm)
+    if not midi_sources and not level_sources:
+        return {}
+
+    shapes_cache: dict[str, str] = {}
+
+    def midi_shapes_for(character_id: str) -> Optional[str]:
+        if character_id in shapes_cache:
+            return shapes_cache[character_id]
+        per_bgm: list[str] = []
+        by_bgm: dict[int, tuple[dict[str, Any], list[int]]] = {}
+        for bgm, track_index in midi_sources.get(character_id) or []:
+            by_bgm.setdefault(id(bgm), (bgm, []))[1].append(track_index)
+        for bgm, track_indices in by_bgm.values():
+            midi_cfg = bgm["lipSyncMidi"]
+            try:
+                midi_path = safe_asset_path(str(midi_cfg.get("src") or ""))
+            except ValueError:
+                midi_path = None
+            if not midi_path or not midi_path.is_file():
+                _log.warning("口パク用 MIDI が見つかりません: %s", midi_cfg.get("src"))
+                continue
+            try:
+                song = midi_lipsync.load_midi(midi_path)
+            except (OSError, ValueError) as exc:
+                _log.warning("口パク用 MIDI を読めません: %s (%s)", midi_cfg.get("src"), exc)
+                continue
+            segments = midi_lipsync.merge_segments(
+                midi_lipsync.track_segments(song, index) for index in track_indices
+            )
+            try:
+                audio_path = safe_asset_path(str(bgm.get("src") or ""))
+            except ValueError:
+                audio_path = None
+            audio_time = _bgm_audio_time_map(bgm, audio_path)
+            offset_sec = float(midi_cfg.get("offsetMs") or 0) / 1000.0
+            per_bgm.append(
+                midi_lipsync.shapes_for_frames(
+                    segments,
+                    start_sec=cut_bed_start,
+                    frame_count=cut_total_frames,
+                    fps=float(fps),
+                    time_map=lambda t, _at=audio_time, _off=offset_sec: _at(t) - _off,
+                )
+            )
+        if not per_bgm:
+            shapes_cache[character_id] = None  # type: ignore[assignment]
+            return None
+        # 複数 BGM の MIDI に割り当たっていたら、休符でない方を採る (先勝ち)。
+        combined = per_bgm[0]
+        for other in per_bgm[1:]:
+            combined = "".join(
+                a if a != midi_lipsync.REST else b for a, b in zip(combined, other)
+            )
+        shapes_cache[character_id] = combined
+        return combined
+
+    def levels_for(bgm: dict[str, Any]) -> Optional[dict[str, Any]]:
+        try:
+            audio_path = safe_asset_path(str(bgm.get("src") or ""))
+        except ValueError:
+            return None
+        if not audio_path or not audio_path.exists():
+            return None
+        import hashlib as _hashlib
+
+        try:
+            trim = max(0.0, float(bgm.get("trimStartSec") or 0.0))
+        except (TypeError, ValueError):
+            trim = 0.0
+        start_frame = max(0, int(round((trim + cut_bed_start) * fps)))
+        out_dir = cache_dir / "lipsync"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            mtime = audio_path.stat().st_mtime_ns
+        except OSError:
+            mtime = 0
+        cfg = lip_sync_config or {}
+        key = _hashlib.sha1(
+            json.dumps(
+                [str(audio_path), mtime, start_frame, cut_total_frames, fps,
+                 {k: cfg.get(k) for k in sorted(cfg)}],
+                ensure_ascii=False, default=str,
+            ).encode("utf-8")
+        ).hexdigest()[:16]
+        bin_path = out_dir / f"lvc_{key}.bin"
+        if not bin_path.exists():
+            full = _ensure_full_track_lipsync_levels(audio_path, fps, cfg, cache_dir)
+            if full is None:
+                return None
+            levels = list(full[start_frame : start_frame + cut_total_frames])
+            if len(levels) < cut_total_frames:
+                levels += [0.0] * (cut_total_frames - len(levels))
+            tmp = bin_path.with_suffix(".bin.tmp")
+            tmp.write_bytes(struct.pack(f"<{len(levels)}f", *levels))
+            import os as _os
+
+            _os.replace(tmp, bin_path)
+        return {
+            "url": f"/project-cache/{project_id}/lipsync/{bin_path.name}",
+            "shape": [cut_total_frames],
+            "dtype": "float32",
+        }
+
+    levels_cache: dict[int, Optional[dict[str, Any]]] = {}
+    out: dict[str, dict[str, Any]] = {}
+    for instance_id, character_id in characters:
+        if not instance_id or not character_id:
+            continue
+        if speaker_has_voice and instance_id == speaker_id:
+            continue
+        if character_id in midi_sources:
+            shapes = midi_shapes_for(character_id)
+            if shapes is not None:
+                out[instance_id] = {"kind": "midi", "shapes": shapes}
+                continue
+        bgm = level_sources.get(character_id)
+        if bgm is not None:
+            entry: dict[str, Any] = {"kind": "level", "trackSrc": str(bgm.get("src") or "")}
+            if with_levels:
+                if id(bgm) not in levels_cache:
+                    levels_cache[id(bgm)] = levels_for(bgm)
+                if levels_cache[id(bgm)]:
+                    entry["levels"] = levels_cache[id(bgm)]
+            out[instance_id] = entry
+    return out
+
+
+def compute_cut_beat_maps(
+    *,
+    cut: dict[str, Any],
+    scene: dict[str, Any],
+    characters: list[tuple[str, str]],
+    bed_offset_sec: float = 0.0,
+) -> dict[str, Any]:
+    """体の揺れ (bob) の「BPM を MIDI から自動検出」用の拍位置マップ。
+
+    BGM トラックの歌唱判定 MIDI (lipSyncMidi) のテンポマップを、カット内秒 → 拍位置
+    (四分音符単位) の折れ線 ``{"segments": [[t, beat, beatsPerSec], ...]}`` に写す。
+    時間の対応は口パクと同じ (MIDI 秒 = BGM 音源の秒 − offsetMs、ループは無視)。
+
+    - ``scene``: ベッドで最初に MIDI を持つ BGM のマップ (シーンの揺れ用)
+    - ``byChar``: キャラのインスタンス ID → そのキャラを割り当てた MIDI のマップ
+    MIDI が無ければ ``{"scene": None, "byChar": {}}``。
+    """
+    from . import midi_lipsync
+    from .scenario import _normalize_bgm_tracks
+
+    empty: dict[str, Any] = {"scene": None, "byChar": {}}
+    cut_bed_start = float(bed_offset_sec) + max(0, int(cut.get("startFrame") or 0)) / float(PROJECT_FPS)
+    maps: list[tuple[dict[str, Any], dict[str, Any]]] = []  # (midi_cfg, beat map)
+    for bgm in _normalize_bgm_tracks(scene.get("bgmTracks")):
+        midi_cfg = bgm.get("lipSyncMidi")
+        if not midi_cfg:
+            continue
+        try:
+            midi_path = safe_asset_path(str(midi_cfg.get("src") or ""))
+            song = midi_lipsync.load_midi(midi_path) if midi_path and midi_path.is_file() else None
+        except (OSError, ValueError):
+            song = None
+        if song is None:
+            continue
+        try:
+            trim = max(0.0, float(bgm.get("trimStartSec") or 0.0))
+        except (TypeError, ValueError):
+            trim = 0.0
+        # カット内秒 t ↔ MIDI 秒 m:  m = trim + cut_bed_start + t - offset
+        shift = float(midi_cfg.get("offsetMs") or 0) / 1000.0 - trim - cut_bed_start
+        division = float(song.division)
+        segments = [
+            [round(sec + shift, 6), tick / division, 1.0 / (spt * division)]
+            for tick, sec, spt in song.tempo_segments
+            if spt > 0
+        ]
+        if segments:
+            maps.append((midi_cfg, {"segments": segments}))
+    if not maps:
+        return empty
+    by_char: dict[str, Any] = {}
+    for instance_id, character_id in characters:
+        for midi_cfg, beat_map in maps:
+            if any(character_id in (t.get("characterIds") or []) for t in midi_cfg.get("tracks") or []):
+                by_char[instance_id] = beat_map
+                break
+    return {"scene": maps[0][1], "byChar": by_char}
 
 
 @router.get("/api/v2/export/plan")
@@ -860,8 +1166,13 @@ class ExportMuxRequest(BaseModel):
     cutId: Optional[str] = None
     # mono → stereo 変換 (= ffmpeg `-ac 2`)。v1 既定と一致。
     monoToStereo: bool = True
-    # AAC 音声ビットレート。preset と独立に上書きしたい場合のみ指定。
-    audioBitrate: str = Field("192k", min_length=1, max_length=16)
+    # 音声コーデック。MP4 は AAC のみ (リニア PCM は再生・編集ソフトの多くが読めない)。
+    # mov (ProRes / PNG) はリニア PCM 16bit / 24bit も可。
+    audioCodec: Literal["aac", "pcm_s16le", "pcm_s24le"] = "aac"
+    # AAC 音声ビットレート (PCM では無視)。
+    audioBitrate: str = Field("192k", pattern=r"^(64|96|128|160|192|256|320)k$")
+    # 出力のサンプリング周波数。内部の合成は 48kHz で行い、44.1kHz は最後に 1 回変換する。
+    audioSampleRate: Literal[44100, 48000] = 48000
     # 先頭プリロール (秒)。映像側は client が leadInFrames 個だけ blank を先送り
     # しているので、ここでは音声を adelay で同じだけ後ろにずらす。
     leadInSec: float = Field(0.0, ge=0.0, le=10.0)
@@ -888,6 +1199,8 @@ def _build_project_mux_command(
     mono_to_stereo: bool,
     audio_bitrate: str,
     lead_in_sec: float = 0.0,
+    audio_codec: str = "aac",
+    audio_sample_rate: int = 48000,
 ) -> tuple[list[str], bool]:
     """シナリオ全体の音声を映像に mux する ffmpeg コマンドを組み立てる。
 
@@ -904,14 +1217,27 @@ def _build_project_mux_command(
     ]
     input_count = 1  # 0 は映像
     filter_segments: list[str] = []
-    scene_audio_labels: list[tuple[str, float]] = []  # (label, scene_duration)
+    bed_labels: list[str] = []  # シーン順の bed 音声 (concat する)
+    timeline_labels: list[str] = []  # 全体尺に揃えたタイムライン音声 (amix する)
+    # (scene_index, シーン開始秒, cut_audio, se, vl): 全シーンの尺が出揃ってから組む。
+    timeline_entries: list[tuple[int, float, list, list, list]] = []
 
     scenes = [
         resolve_effective_scene(scenario, s)
         for s in (scenario.get("scenes") or []) if isinstance(s, dict)
     ]
+    # BGM がプロジェクト通しなら、各シーンの BGM は「プロジェクト先頭からの経過」の
+    # 位置から鳴らす (シーンごとに頭から鳴らし直さない。プレビューと同じ)。
+    # シーンの長さは書き出し映像と同じ _scene_total_duration で積む。
+    from .scenario import _normalize_bed_scope
+
+    bgm_is_project_wide = _normalize_bed_scope(scenario.get("bedScope")).get("bgm") == "project"
+    scene_start_in_export = 0.0
+    real_audio = False  # 1 シーンでも実際の音声素材があったか
     for scene_index, scene in enumerate(scenes):
         scene_duration = _scene_total_duration(scene)
+        bgm_bed_offset = scene_start_in_export if bgm_is_project_wide else 0.0
+        scene_start_in_export += scene_duration
 
         # video track audio (現状 v2 export で videoTrack は muted=True 既定だが、
         # 非 muted ケースのために clean PCM 経路を通す。録画素材を背景動画に置く
@@ -967,6 +1293,7 @@ def _build_project_mux_command(
                 bgm_trim_start = max(0.0, float(bgm.get("trimStartSec") or 0.0))
             except (TypeError, ValueError):
                 bgm_trim_start = 0.0
+            bgm_trim_start += bgm_bed_offset
             # ループ ON のときは ffmpeg の -stream_loop -1 で input を無限化。
             # 初回は -ss で trim 位置から再生、EOF 到達後は (ffmpeg 仕様により)
             # 入力の先頭 (= source-time 0) に巻き戻ってループする。BGM 用途として
@@ -1132,40 +1459,82 @@ def _build_project_mux_command(
             vl_entries.append((input_count, group))
             input_count += 1
 
-        # シーン amix を v1 helper で組み立て (出力 length = scene_duration)
-        scene_segments, scene_audio_label = _build_audio_amix_segments(
+        # シーン音声を 2 系統に分けて組む (2026-09-27):
+        #   - bed (BGM / 背景動画の音): シーンに敷くものなのでシーン尺で切り、シーン順に
+        #     concat する。音の無いシーンは尺ぶんの無音で埋める (飛ばすと連結後の音声が
+        #     短くなり、最後の -shortest で**映像までそこで切られる** = 2 シーン目以降が
+        #     書き出されない。ムーンライト伝説で発覚)。
+        #   - timeline (セリフ音声 / 効果音 / 動画レイヤー音声): タイムライン上に置く
+        #     もの。プレビューと同じくシーン境界では切らず、書き出し全体の終わりまで
+        #     鳴らせる尺で組んでから、シーン開始位置へ adelay して全体に重ねる
+        #     (曲を効果音としてシーン 1 に置き、シーン 2 まで鳴らす使い方がある)。
+        bed_segments, bed_label = _build_audio_amix_segments(
             scene_duration,
-            cut_audio_inputs=cut_audio_entries,
+            cut_audio_inputs=[],
             bgm_inputs=bgm_entries,
             video_audio_input_idx=video_audio_input_idx,
+            final_label=f"bedmix{scene_index}",
+        )
+        filter_segments += bed_segments
+        if bed_label is None:
+            filter_segments.append(
+                f"anullsrc=channel_layout=stereo:sample_rate=48000:d={max(0.001, scene_duration):.6f}"
+                f"[bed{scene_index}]"
+            )
+        else:
+            real_audio = True
+            filter_segments.append(f"[{bed_label.strip('[]')}]anull[bed{scene_index}]")
+        bed_labels.append(f"bed{scene_index}")
+        if cut_audio_entries or se_entries or vl_entries:
+            timeline_entries.append((
+                scene_index, scene_start_in_export - scene_duration,
+                cut_audio_entries, se_entries, vl_entries,
+            ))
+
+    total_duration = scene_start_in_export
+    for scene_index, scene_start, cut_audio_entries, se_entries, vl_entries in timeline_entries:
+        span = max(0.001, total_duration - scene_start)  # シーン先頭 → 書き出し終端
+        tl_segments, tl_label = _build_audio_amix_segments(
+            span,
+            cut_audio_inputs=cut_audio_entries,
+            bgm_inputs=[],
+            video_audio_input_idx=None,
             sound_effect_inputs=se_entries,
             video_layer_inputs=vl_entries,
+            final_label=f"tlmix{scene_index}",
         )
-        filter_segments += scene_segments
+        if tl_label is None:
+            continue
+        real_audio = True
+        filter_segments += tl_segments
+        delay_ms = int(round(scene_start * 1000))
+        shift = f"adelay={delay_ms}:all=1,asetpts=N/SR/TB," if delay_ms > 0 else ""
+        filter_segments.append(
+            f"[{tl_label.strip('[]')}]{shift}apad=whole_dur={total_duration:.6f},"
+            f"atrim=duration={total_duration:.6f},aresample=48000[tl{scene_index}]"
+        )
+        timeline_labels.append(f"tl{scene_index}")
 
-        if scene_audio_label is not None:
-            # ラベル名を per-scene に正規化 (helper は単一シーン前提なので名前衝突回避)
-            normalized_label = f"sa{scene_index}"
-            # `[scene_a]` 形式 → 中身を取り出して正規化ラベルでもう 1 段
-            # コピー (anull で 0 コスト)。helper の最終ラベル形式が `[name]` 1 個
-            # なので素朴にリネームする。
-            stripped = scene_audio_label.strip("[]")
-            filter_segments.append(f"[{stripped}]anull[{normalized_label}]")
-            scene_audio_labels.append((normalized_label, scene_duration))
-
-    has_audio = bool(scene_audio_labels)
+    has_audio = real_audio
 
     if has_audio:
-        if len(scene_audio_labels) == 1:
-            final_audio_label = scene_audio_labels[0][0]
+        if len(bed_labels) == 1:
+            bed_all = bed_labels[0]
         else:
-            # シーン跨ぎ concat: [sa0][sa1]...concat=n=N:v=0:a=1[final_a]
-            inputs_concat = "".join(f"[{name}]" for name, _ in scene_audio_labels)
-            n = len(scene_audio_labels)
             filter_segments.append(
-                f"{inputs_concat}concat=n={n}:v=0:a=1[final_a]"
+                "".join(f"[{name}]" for name in bed_labels)
+                + f"concat=n={len(bed_labels)}:v=0:a=1[bed_all]"
+            )
+            bed_all = "bed_all"
+        if timeline_labels:
+            mix_inputs = [bed_all, *timeline_labels]
+            filter_segments.append(
+                "".join(f"[{name}]" for name in mix_inputs)
+                + f"amix=inputs={len(mix_inputs)}:duration=first:dropout_transition=0:normalize=0[final_a]"
             )
             final_audio_label = "final_a"
+        else:
+            final_audio_label = bed_all
         # 先頭プリロール: 映像は client が blank で先送りしているので、音声も
         # 同じだけ adelay で後ろへ。L/R 両 chan に同じ delay。
         if lead_in_sec > 0:
@@ -1182,11 +1551,8 @@ def _build_project_mux_command(
             if "[vl_" in seg or "]vl_" in seg:
                 _log.debug("  vl_filter: %s", seg)
     else:
-        # 無音 mux: anullsrc で全長の無音トラックを足す。leadInSec は先頭で映像も
-        # 無音なので、anullsrc 側に追加で延ばす必要はない (= -shortest が映像側に揃う)。
-        total_dur = sum(d for _, d in scene_audio_labels) or sum(
-            _scene_total_duration(s) for s in scenes
-        ) or 1.0
+        # 無音 mux: anullsrc で全長 (+ leadIn) の無音トラックを足す。
+        total_dur = scene_start_in_export or 1.0
         total_dur += max(0.0, float(lead_in_sec))
         cmd += [
             "-f", "lavfi",
@@ -1198,10 +1564,20 @@ def _build_project_mux_command(
         cmd += ["-map", "0:v", "-map", f"{silence_idx}:a"]
 
     cmd += ["-c:v", "copy"]
-    cmd += ["-c:a", "aac", "-b:a", audio_bitrate]
+    # 音声: AAC はビットレート指定、リニア PCM (mov のみ) は 16bit / 24bit。
+    # 周波数は明示する (合成は 48kHz。44.1kHz ならここで 1 回だけ変換)。
+    if audio_codec in ("pcm_s16le", "pcm_s24le"):
+        cmd += ["-c:a", audio_codec]
+    else:
+        cmd += ["-c:a", "aac", "-b:a", audio_bitrate]
+    cmd += ["-ar", str(int(audio_sample_rate))]
     if mono_to_stereo:
         cmd += ["-ac", "2"]
-    cmd += ["-shortest", str(output_path)]
+    # -shortest は付けない。音声は書き出し全体の尺ちょうどに揃えてある (音声あり =
+    # 各シーンを尺で apad/atrim、無音 = anullsrc の -t)。-shortest はバッファの都合で
+    # 映像を数フレーム手前で切ることがある (174.958s → 174.875s = 2 フレーム欠けを
+    # 実測、2026-09-27)。
+    cmd += [str(output_path)]
     return cmd, has_audio
 
 
@@ -1258,9 +1634,30 @@ def post_export_mux(req: ExportMuxRequest) -> dict:
         synthetic_scene = _make_single_cut_scene(
             resolve_effective_scene(scenario, target_scene), target_cut,
         )
+        # BGM がプロジェクト通しなら、BGM はプロジェクト先頭から鳴っている。
+        # _make_single_cut_scene はシーン内のカット位置しか足さないので、シーンの
+        # 開始秒も足して「そのカットの時点で鳴っている位置」から切り出す。
+        from .scenario import _normalize_bed_scope
+
+        if _normalize_bed_scope(scenario.get("bedScope")).get("bgm") == "project":
+            scene_start = scene_start_sec_in_project(scenario, str(target_scene.get("id") or ""))
+            if scene_start > 0:
+                synthetic_scene["bgmTracks"] = [
+                    {**bgm, "trimStartSec": float(bgm.get("trimStartSec") or 0.0) + scene_start}
+                    for bgm in synthetic_scene.get("bgmTracks") or []
+                    if isinstance(bgm, dict)
+                ]
         scenario_for_mux = {"scenes": [synthetic_scene]}
     else:
         scenario_for_mux = scenario
+
+    # MP4 にリニア PCM は入れない (多くの再生・編集ソフトが読めない)。UI でも選べない
+    # ようにしてあるが、API 直叩きでも黙って壊れたファイルを作らないようにする。
+    if req.audioCodec != "aac" and video_suffix != ".mov":
+        return {
+            "type": "error", "code": ERR_INVALID_CONFIG,
+            "detail": f"{video_suffix} の音声は AAC のみです (リニア PCM は mov で書き出してください)",
+        }
 
     # 4) ffmpeg コマンド組み立て + 実行
     cmd, has_audio = _build_project_mux_command(
@@ -1270,6 +1667,8 @@ def post_export_mux(req: ExportMuxRequest) -> dict:
         mono_to_stereo=req.monoToStereo,
         audio_bitrate=req.audioBitrate,
         lead_in_sec=req.leadInSec,
+        audio_codec=req.audioCodec,
+        audio_sample_rate=req.audioSampleRate,
     )
 
     try:
@@ -1304,6 +1703,9 @@ def post_export_mux(req: ExportMuxRequest) -> dict:
         "type": "done",
         "outputPath": str(final_path),
         "audioRendered": bool(has_audio),
+        "audioCodec": req.audioCodec,
+        "audioBitrate": req.audioBitrate if req.audioCodec == "aac" else None,
+        "audioSampleRate": req.audioSampleRate,
         "ffmpegRc": rc,
         "ffmpegStderrTail": stderr_tail,
         "elapsedSec": elapsed,

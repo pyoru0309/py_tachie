@@ -605,8 +605,44 @@
                 振幅 (px)
                 <input id="characterBobAmplitudeInput" type="number" min="0" max="500" step="1" value="0" />
               </label>
+              <label>
+                BPM の取得
+                <select id="characterBobBpmSourceSelect">
+                  <option value="manual">手入力</option>
+                  <option value="midi">MIDI から自動検出</option>
+                </select>
+              </label>
             </div>
-            <p class="asset-hint">編集中のキャラを、BPM のビートに合わせて上下にゆらします（bob = 浮き沈み）。BPM・振幅のどちらかが 0 のときは無効です。動作モーションと併用できます（揺れながら移動・拡大など）。位相はシーン全体で連続します。</p>
+            <div class="inline-fields">
+              <label>
+                動き
+                <select id="characterBobStyleSelect">
+                  <option value="wave">波（常に揺れる）</option>
+                  <option value="bounce">跳ねる：なめらか</option>
+                  <option value="hop">跳ねる：ジャンプ</option>
+                  <option value="kick">跳ねる：キック</option>
+                  <option value="nod">沈む：うなずき</option>
+                </select>
+              </label>
+              <label>
+                溜め (%)
+                <input id="characterBobHoldInput" type="number" min="0" max="95" step="5" value="70" />
+              </label>
+              <label>
+                リズム
+                <select id="characterBobRateSelect">
+                  <option value="2">BPM の倍</option>
+                  <option value="1">BPM どおり</option>
+                  <option value="0.5">BPM の半分</option>
+                  <option value="0.25">BPM の 1/4</option>
+                </select>
+              </label>
+            </div>
+            <label class="checkbox-row">
+              <input id="characterBobOnlyWhileSingingInput" type="checkbox" />
+              <span>口パクのときだけ体を揺らす（音声 / MIDI）</span>
+            </label>
+            <p class="asset-hint">編集中のキャラを、BPM のビートに合わせて上下にゆらします（bob = 浮き沈み）。振幅が 0、または BPM が取れないときは無効です。「跳ねる」系は 1 周期のうち「溜め」の割合だけ静止し、拍で跳ねます（リズムを取っているような動き。なめらか＝ふわっと、ジャンプ＝放物線、キック＝素早く上がってゆっくり戻る）。「MIDI から自動検出」は BGM の歌唱判定 MIDI のテンポ（途中のテンポ変更も）に合わせ、リズムの倍率も掛かります（例: 180→220 を半分にすると 90→110）。動作モーションと併用できます。位相はシーン全体で連続します。</p>
           </div>
 
           <div class="panel-section">
@@ -1458,6 +1494,43 @@
                 <input id="sceneBpmBobAmplitudeInput" type="number" min="0" max="40" step="1" />
               </label>
             </div>
+            <div class="inline-fields">
+              <label>
+                BPMボブの動き
+                <select id="sceneBpmBobStyleSelect">
+                  <option value="wave">波（常に揺れる）</option>
+                  <option value="bounce">跳ねる：なめらか</option>
+                  <option value="hop">跳ねる：ジャンプ</option>
+                  <option value="kick">跳ねる：キック</option>
+                  <option value="nod">沈む：うなずき</option>
+                </select>
+              </label>
+              <label>
+                溜め (%)
+                <input id="sceneBpmBobHoldInput" type="number" min="0" max="95" step="5" />
+              </label>
+              <label>
+                リズム
+                <select id="sceneBpmBobRateSelect">
+                  <option value="2">BPM の倍</option>
+                  <option value="1">BPM どおり</option>
+                  <option value="0.5">BPM の半分</option>
+                  <option value="0.25">BPM の 1/4</option>
+                </select>
+              </label>
+              <label>
+                BPM の取得
+                <select id="sceneBpmBobBpmSourceSelect">
+                  <option value="manual">シーンの BPM</option>
+                  <option value="midi">MIDI から自動検出</option>
+                </select>
+              </label>
+            </div>
+            <label class="checkbox-row">
+              <input id="sceneBpmBobOnlyWhileSingingInput" type="checkbox" />
+              <span>口パクのときだけ体を揺らす（音声 / MIDI。キャラごとに判定）</span>
+            </label>
+            <p class="asset-hint">BPMボブは「基本」タブの BPM（または BGM の歌唱判定 MIDI のテンポ）に合わせて全キャラを揺らします。「跳ねる」系は「溜め」の割合だけ静止し、拍で跳ねます。「MIDI から自動検出」はシーンの BGM に歌唱判定 MIDI があるときに選べます。</p>
           </section>
 
           <section class="form-tab-panel hidden" data-scene-tab-panel="video">
@@ -3373,6 +3446,33 @@
                 音声を含める
               </label>
               <p class="asset-hint">OFF にすると映像のみのファイル（音声トラックなし）で出力します。透過素材をカット単位で書き出して動画編集ソフトに取り込むとき、音声トラックが無い方が都合が良い場合に使ってください。</p>
+              <div class="export-audio-fields" id="exportOptionsAudioFormatFields">
+                <label>
+                  音声形式
+                  <select id="exportOptionsAudioCodecSelect">
+                    <option value="aac">AAC</option>
+                    <option value="pcm_s16le">リニア PCM 16bit</option>
+                    <option value="pcm_s24le">リニア PCM 24bit</option>
+                  </select>
+                </label>
+                <label id="exportOptionsAudioBitrateWrap">
+                  ビットレート
+                  <select id="exportOptionsAudioBitrateSelect">
+                    <option value="128k">128 kbps</option>
+                    <option value="192k">192 kbps</option>
+                    <option value="256k">256 kbps</option>
+                    <option value="320k">320 kbps</option>
+                  </select>
+                </label>
+                <label>
+                  サンプリング周波数
+                  <select id="exportOptionsAudioSampleRateSelect">
+                    <option value="48000">48 kHz</option>
+                    <option value="44100">44.1 kHz</option>
+                  </select>
+                </label>
+              </div>
+              <p class="asset-hint" id="exportOptionsAudioFormatHint">MP4 の音声は AAC のみです。ProRes / PNG（mov）はリニア PCM（16bit / 24bit）でも書き出せます。既定はプリセットの設定です。音声はいったん 48kHz で合成してから書き出すので、44.1kHz を選ぶと最後に 1 回だけ変換します。</p>
               <label class="checkbox-row">
                 <input id="exportOptionsMonoToStereoInput" type="checkbox" />
                 モノラル音声をステレオにミックスダウン
@@ -3385,7 +3485,7 @@
               </label>
               <label class="checkbox-row">
                 <input type="radio" name="exportTarget" value="project" />
-                シナリオ全体
+                プロジェクト全体（全シーン）
               </label>
             </div>
           </div>

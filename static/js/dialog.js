@@ -11,7 +11,8 @@ import { recordHistory } from "./history.js";
 import { buttonMarkup, opacityToRender } from "./utils.js";
 import { fontDisplayName, globalWeightLabel, weightItemsForFamily } from "./font.js";
 import { TEXT_DEFAULT_LABELS, TELOP_DEFAULT_LABELS, TELOP_TOP_LEVEL_KEYS } from "./bulk-apply.js";
-import { renderPreview } from "./playback.js";
+import { renderPreview, invalidateRendererCachesForConfigChange } from "./playback.js";
+import { buildBgmLipSyncSection } from "./lipsync-bgm-ui.js";
 import { renderTelopTrack, drawTimeline } from "./timeline.js";
 import {
   BED_SCOPE_KEYS,
@@ -19,12 +20,14 @@ import {
   BED_SCOPE_LABELS,
   bedScope,
   projectSettings,
+  resolveSceneBed,
   sceneAtFrame,
 } from "./scenario.js";
 import { renderTelopEditor } from "./telop.js";
 import {
   selectedCharacter,
   updateSelectedCharacterFromControls,
+  syncBobMidiAvailability,
 } from "./character.js";
 
 const deps = {
@@ -287,6 +290,18 @@ export function fillSceneDialog() {
   const bpmBob = scene.bpmBob || {};
   if (elements.sceneBpmBobAmplitude)
     elements.sceneBpmBobAmplitude.value = Number(bpmBob.amplitudePx ?? 0);
+  if (elements.sceneBpmBobStyle) elements.sceneBpmBobStyle.value = bpmBob.style || "wave";
+  if (elements.sceneBpmBobHold)
+    elements.sceneBpmBobHold.value = String(Math.round((bpmBob.hold == null ? 0.7 : Number(bpmBob.hold)) * 100));
+  if (elements.sceneBpmBobRate) elements.sceneBpmBobRate.value = String(Number(bpmBob.rate) || 1);
+  if (elements.sceneBpmBobBpmSource) elements.sceneBpmBobBpmSource.value = bpmBob.bpmSource === "midi" ? "midi" : "manual";
+  if (elements.sceneBpmBobOnlyWhileSinging) elements.sceneBpmBobOnlyWhileSinging.checked = !!bpmBob.onlyWhileSinging;
+  // 「MIDI から自動検出」は、このシーンで実際に鳴る BGM (ベッド解決後) に MIDI があるときだけ。
+  const sceneForMidi = isProjectMode() ? (selectedScene() || scene) : scene;
+  syncBobMidiAvailability(
+    elements.sceneBpmBobBpmSource,
+    (resolveSceneBed(sceneForMidi)?.bgmTracks || []).some((t) => t?.lipSyncMidi?.src),
+  );
   const video = scene.videoTrack;
   const enabled = !!(video && video.src);
   if (elements.sceneVideoEnabled) elements.sceneVideoEnabled.checked = enabled;
@@ -583,6 +598,11 @@ export function applySceneFieldsFromDialog() {
   };
   scene.bpmBob = {
     amplitudePx: Math.max(0, Number(elements.sceneBpmBobAmplitude?.value) || 0),
+    style: elements.sceneBpmBobStyle?.value || "wave",
+    hold: Math.max(0, Math.min(95, Number(elements.sceneBpmBobHold?.value) || 0)) / 100,
+    rate: Number(elements.sceneBpmBobRate?.value) || 1,
+    bpmSource: elements.sceneBpmBobBpmSource?.value === "midi" ? "midi" : "manual",
+    onlyWhileSinging: !!elements.sceneBpmBobOnlyWhileSinging?.checked,
   };
   // F5a: ビジュアライザ設定の書き戻し
   if (!scene.visualizer || typeof scene.visualizer !== "object") scene.visualizer = {};
@@ -648,6 +668,9 @@ export function renderSceneBgmList() {
       deps.scheduleScenarioSave();
       recordHistory();
       renderTelopTrack();
+      if (track.lipSyncMidi || track.useForLipSync) {
+        invalidateRendererCachesForConfigChange().then(() => renderPreview());
+      }
     });
     body.append(srcLabel);
 
@@ -664,20 +687,30 @@ export function renderSceneBgmList() {
     volInput.addEventListener("change", () => {
       track.volume = Math.max(0, Math.min(2, Number(volInput.value) || 1));
       deps.scheduleScenarioSave();
+      recordHistory();
     });
     row.append(volLabel);
 
     const trimInput = document.createElement("input");
     trimInput.type = "number";
     trimInput.min = "0";
-    trimInput.step = "0.1";
-    trimInput.value = Number(track.trimStartSec ?? 0);
+    trimInput.step = "10";
+    // 表示・入力は ms、データは従来どおり秒 (trimStartSec)。MIDI のオフセットと単位を揃える。
+    trimInput.value = String(Math.round((Number(track.trimStartSec) || 0) * 1000));
+    trimInput.title = "音源の頭をこの長さだけ飛ばして鳴らす (ms)。MIDI 口パクはトリム後の音源位置に合わせて動く";
     const trimLabel = document.createElement("label");
-    trimLabel.append("トリム開始", trimInput);
+    trimLabel.append("トリム (ms)", trimInput);
     trimInput.addEventListener("change", () => {
-      track.trimStartSec = Math.max(0, Number(trimInput.value) || 0);
+      const ms = Math.max(0, Math.round(Number(trimInput.value) || 0));
+      trimInput.value = String(ms);
+      track.trimStartSec = ms / 1000;
       deps.scheduleScenarioSave();
+      recordHistory();
       renderTelopTrack();
+      // 口パク (MIDI / キャラ専用ボーカル) はトリム位置から時間軸を取るので取り直す。
+      if (track.lipSyncMidi || track.useForLipSync) {
+        invalidateRendererCachesForConfigChange().then(() => renderPreview());
+      }
     });
     row.append(trimLabel);
 
@@ -691,6 +724,7 @@ export function renderSceneBgmList() {
     fadeInInput.addEventListener("change", () => {
       track.fadeInSec = Math.max(0, Number(fadeInInput.value) || 0);
       deps.scheduleScenarioSave();
+      recordHistory();
     });
     row.append(fadeInLabel);
 
@@ -704,6 +738,7 @@ export function renderSceneBgmList() {
     fadeOutInput.addEventListener("change", () => {
       track.fadeOutSec = Math.max(0, Number(fadeOutInput.value) || 0);
       deps.scheduleScenarioSave();
+      recordHistory();
     });
     row.append(fadeOutLabel);
     body.append(row);
@@ -725,30 +760,45 @@ export function renderSceneBgmList() {
     loopRow.append(loopInput, loopText);
     body.append(loopRow);
 
-    // 口パク用入力ソース指定。シーン内 1 トラックのみ ON にできる（仕様上ラジオ式）。
-    const lipRow = document.createElement("label");
-    lipRow.className = "checkbox-row";
-    lipRow.title = "出力ミックスから外し、口パクメーター・口パク振幅判定の入力ソースとして使う";
-    const lipInput = document.createElement("input");
-    lipInput.type = "checkbox";
-    lipInput.checked = !!track.useForLipSync;
-    lipInput.addEventListener("change", () => {
-      if (lipInput.checked) {
-        tracks.forEach((other, idx) => {
-          other.useForLipSync = idx === index;
-        });
-      } else {
-        track.useForLipSync = false;
-      }
+    // プレビュー下の音量メーターの入力。口パクに使うかどうかとは独立に選べる。
+    // ベッド内 1 本まで (ラジオ式)。どれも選ばなければ従来どおり話者の口パク入力を表示。
+    const meterRow = document.createElement("label");
+    meterRow.className = "checkbox-row";
+    meterRow.title = "プレビュー下の音量メーターにこのトラックの音量を表示する (1 本まで)。未選択なら話者の口パク入力 (セリフ音声 / キャラ未割り当ての口パク入力) を表示";
+    const meterInput = document.createElement("input");
+    meterInput.type = "checkbox";
+    meterInput.checked = !!track.showInMeter;
+    meterInput.addEventListener("change", () => {
+      tracks.forEach((other, idx) => {
+        other.showInMeter = idx === index ? !!meterInput.checked : false;
+      });
       renderSceneBgmList();
       deps.scheduleScenarioSave();
       recordHistory();
-      renderTelopTrack();
     });
-    const lipText = document.createElement("span");
-    lipText.textContent = "このトラックを口パク入力に使う（出力には流さない）";
-    lipRow.append(lipInput, lipText);
-    body.append(lipRow);
+    const meterText = document.createElement("span");
+    meterText.textContent = "音量メーターに反映する（プレビュー）";
+    meterRow.append(meterInput, meterText);
+    body.append(meterRow);
+
+    // 口パク入力 (話者用 / キャラ専用) と歌唱判定 MIDI。lipsync-bgm-ui.js 参照。
+    body.append(buildBgmLipSyncSection(track, index, tracks, {
+      sceneId: isProjectMode() ? null : (selectedScene()?.id || null),
+      rerender: () => renderSceneBgmList(),
+      commit: () => {
+        deps.scheduleScenarioSave();
+        recordHistory();
+        renderTelopTrack();
+        // lipSyncByChar は scene-bundle に載るので、取り置きの bundle / scene を捨てて
+        // プレビューを取り直す (token はカット payload しか覆っていない)。
+        invalidateRendererCachesForConfigChange().then(() => renderPreview());
+        // 体の揺れ (シーン設定・キャラ) の「MIDI から自動検出」の選択可否も追従させる。
+        const hasMidi = (resolveSceneBed(isProjectMode() ? selectedScene() : bedTarget())?.bgmTracks || [])
+          .some((t) => t?.lipSyncMidi?.src);
+        syncBobMidiAvailability(elements.sceneBpmBobBpmSource, hasMidi);
+        syncBobMidiAvailability(elements.characterBobBpmSource, hasMidi);
+      },
+    }));
 
     card.append(body);
     elements.sceneBgmList.append(card);
@@ -765,6 +815,9 @@ export function addSceneBgmTrack() {
     fadeInSec: 0,
     fadeOutSec: 0,
     useForLipSync: false,
+    lipSyncCharacterIds: [],
+    lipSyncMidi: null,
+    showInMeter: false,
     loop: false,
   });
   renderSceneBgmList();
@@ -946,6 +999,13 @@ export async function applyCharacterToAllCuts() {
     motion: character.motion ? JSON.parse(JSON.stringify(character.motion)) : null,
     bobBpm: Number(character.bob?.bpm ?? 0),
     bobAmplitudePx: Number(character.bob?.amplitudePx ?? 0),
+    bobPattern: {
+      style: character.bob?.style || "wave",
+      hold: character.bob?.hold ?? 0.7,
+      rate: Number(character.bob?.rate) || 1,
+      bpmSource: character.bob?.bpmSource === "midi" ? "midi" : "manual",
+      onlyWhileSinging: !!character.bob?.onlyWhileSinging,
+    },
     x: Number(character.character?.x ?? 0),
     y: Number(character.character?.y ?? 0),
     scale: Number(character.character?.scale ?? 1),
@@ -963,6 +1023,12 @@ export async function applyCharacterToAllCuts() {
     { key: "motion", label: "モーション", valueText: src.motion?.type && src.motion.type !== "none" ? src.motion.type : "なし" },
     { key: "bobBpm", label: "BPM", valueText: `${src.bobBpm}` },
     { key: "bobAmplitudePx", label: "振幅", valueText: `${src.bobAmplitudePx}px` },
+    {
+      key: "bobPattern",
+      label: "揺れの動き・溜め・リズム・BPM 取得・口パク連動",
+      valueText: `${src.bobPattern.style} / ${Math.round(src.bobPattern.hold * 100)}% / ×${src.bobPattern.rate}`
+        + ` / ${src.bobPattern.bpmSource === "midi" ? "MIDI" : "手入力"}${src.bobPattern.onlyWhileSinging ? " / 口パク時のみ" : ""}`,
+    },
     { key: "x", label: "X 座標", valueText: `${src.x}` },
     { key: "y", label: "Y 座標", valueText: `${src.y}` },
     { key: "scale", label: "拡大率", valueText: src.scale.toFixed(2) },
@@ -999,10 +1065,11 @@ export async function applyCharacterToAllCuts() {
       if (keys.has("eyeAboveBangs")) target.eyeAboveBangs = src.eyeAboveBangs;
       if (keys.has("frontIds")) target.frontIds = [...src.frontIds];
       if (keys.has("motion")) target.motion = src.motion ? JSON.parse(JSON.stringify(src.motion)) : null;
-      if (keys.has("bobBpm") || keys.has("bobAmplitudePx")) {
+      if (keys.has("bobBpm") || keys.has("bobAmplitudePx") || keys.has("bobPattern")) {
         target.bob = { ...(target.bob || {}) };
         if (keys.has("bobBpm")) target.bob.bpm = src.bobBpm;
         if (keys.has("bobAmplitudePx")) target.bob.amplitudePx = src.bobAmplitudePx;
+        if (keys.has("bobPattern")) Object.assign(target.bob, src.bobPattern);
       }
       target.character = { ...(target.character || {}) };
       if (keys.has("x")) target.character.x = src.x;

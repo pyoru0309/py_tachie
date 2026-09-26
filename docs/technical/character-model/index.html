@@ -255,6 +255,8 @@
       
         
       
+        
+      
     
     
     
@@ -399,6 +401,34 @@
     
   
     音声合成 (VOICEVOX / VOICEPEAK) を使う
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/singing-lipsync/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    歌・デュエットの口パク
   
 
     
@@ -1790,6 +1820,12 @@
 <td>開き口</td>
 <td>○</td>
 </tr>
+<tr>
+<td>mouth</td>
+<td><code>lipA</code> / <code>lipI</code> / <code>lipU</code> / <code>lipE</code> / <code>lipO</code></td>
+<td>母音口形 (歌唱判定 MIDI の口パク用)。1 枚に複数可</td>
+<td>○ (母音ごと)</td>
+</tr>
 </tbody>
 </table>
 <h3 id="_5">目パチの動作ルール<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
@@ -1868,6 +1904,7 @@
 </li>
 <li><code>lipMid</code> フラグ未設定なら mid 帯域も <code>lipOpen</code> ではなく <strong>カット選択の口</strong> にフォールバックします。</li>
 <li>「話している間だけ口パクが乗り、無音区間や口パク OFF ではカット指定の表情がそのまま見える」挙動です。例えば「ジト目で <code>:|</code> のような口」を意図的に選んだカットは、無音区間でその口が維持されます。</li>
+<li>シーン BGM で <strong>キャラ専用の口パク入力</strong> (<code>lipSyncCharacterIds</code>) や <strong>歌唱判定 MIDI</strong> (<code>lipSyncMidi</code>) に割り当てたキャラは、話者でなくても口パクします (デュエット)。MIDI の口パクは歌詞から あ/い/う/え/お/ん の口形を選び、<code>lipA</code>〜<code>lipO</code> の無いキャラは <code>lipOpen</code> (あ・え) / <code>lipMid</code> (い・う・お) に寄せます。詳細は <a href="../../tutorials/singing-lipsync/">歌・デュエットの口パク</a>。</li>
 </ul>
 <h3 id="_9">フラグの設定方法<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
 <ol>

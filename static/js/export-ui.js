@@ -126,7 +126,7 @@ export function fillExportOptionsDialog() {
   if (elements.exportOptionsIncludeAudioInput) {
     elements.exportOptionsIncludeAudioInput.checked = true;
   }
-  // 範囲ラジオは選択中カットがあれば「このカット」、なければ「シナリオ全体」既定。
+  // 範囲ラジオは選択中カットがあれば「このカット」、なければ「プロジェクト全体（全シーン）」既定。
   const targetRadios = document.querySelectorAll('input[name="exportTarget"]');
   const defaultTarget = state.selectedCutId ? "cut" : "project";
   for (const r of targetRadios) {
@@ -136,9 +136,54 @@ export function fillExportOptionsDialog() {
   applyExportOptionsPresetUI();
 }
 
+// ---- 音声形式 (AAC / リニア PCM) ------------------------------------------
+// MP4 は AAC のみ (リニア PCM は多くの再生・編集ソフトが読めない)。mov (ProRes / PNG) は
+// リニア PCM 16bit / 24bit も選べる。サーバ側 (/api/v2/export/mux) でも同じ制約を検査する。
+const PCM_AUDIO_CODECS = new Set(["pcm_s16le", "pcm_s24le"]);
+const AAC_BITRATES = ["128k", "192k", "256k", "320k"];
+
+function presetAllowsPcm(preset) {
+  return String(preset?.extension || "").toLowerCase() === ".mov";
+}
+
+// プリセットが変わったら、音声形式・ビットレートをプリセットの既定に戻す。
+// サンプリング周波数はプリセットに持たないので、選んだ値をそのまま残す。
+function applyAudioFormatFromPreset(preset) {
+  const codecSelect = elements.exportOptionsAudioCodecSelect;
+  if (!codecSelect) return;
+  const allowPcm = presetAllowsPcm(preset);
+  for (const opt of codecSelect.options) {
+    opt.disabled = PCM_AUDIO_CODECS.has(opt.value) && !allowPcm;
+  }
+  const presetCodec = String(preset?.audioCodec || "");
+  codecSelect.value = PCM_AUDIO_CODECS.has(presetCodec) && allowPcm ? presetCodec : "aac";
+  const bitrate = String(preset?.audioBitrate || "");
+  if (elements.exportOptionsAudioBitrateSelect) {
+    elements.exportOptionsAudioBitrateSelect.value = AAC_BITRATES.includes(bitrate) ? bitrate : "192k";
+  }
+  syncAudioFormatControls();
+}
+
+// 「音声を含める」OFF なら全部無効、PCM ならビットレートを隠す。
+export function syncAudioFormatControls() {
+  const include = elements.exportOptionsIncludeAudioInput
+    ? elements.exportOptionsIncludeAudioInput.checked !== false
+    : true;
+  for (const el of [
+    elements.exportOptionsAudioCodecSelect,
+    elements.exportOptionsAudioBitrateSelect,
+    elements.exportOptionsAudioSampleRateSelect,
+  ]) {
+    if (el) el.disabled = !include;
+  }
+  const isPcm = PCM_AUDIO_CODECS.has(elements.exportOptionsAudioCodecSelect?.value);
+  if (elements.exportOptionsAudioBitrateWrap) elements.exportOptionsAudioBitrateWrap.hidden = isPcm;
+}
+
 export function applyExportOptionsPresetUI() {
   const preset = findPreset(elements.exportOptionsPresetSelect?.value);
   if (!preset) return;
+  applyAudioFormatFromPreset(preset);
   if (elements.exportOptionsPresetHint) {
     elements.exportOptionsPresetHint.textContent =
       `${preset.extension || ""} · ${preset.videoCodec || ""}${preset.pixFmt ? ` · ${preset.pixFmt}` : ""}`;
@@ -227,6 +272,15 @@ export function readExportFormValues() {
     showToast("選択中のカットが見つかりません", "error");
     return null;
   }
+  // 音声形式。要素が無い経路 (ダイアログ非経由) はプリセットの既定に従う。
+  const audioCodec = (() => {
+    const picked = elements.exportOptionsAudioCodecSelect?.value
+      || (PCM_AUDIO_CODECS.has(String(preset.audioCodec || "")) ? preset.audioCodec : "aac");
+    return PCM_AUDIO_CODECS.has(picked) && !presetAllowsPcm(preset) ? "aac" : picked;
+  })();
+  const audioBitrate = elements.exportOptionsAudioBitrateSelect?.value
+    || (AAC_BITRATES.includes(String(preset.audioBitrate || "")) ? preset.audioBitrate : "192k");
+  const audioSampleRate = Number(elements.exportOptionsAudioSampleRateSelect?.value) === 44100 ? 44100 : 48000;
   const presetOptions = {};
   const engineId = (elements.exportOptionsEncoderEngineSelect?.value || "").trim();
   if (engineId) presetOptions.videoEncoder = engineId;
@@ -261,6 +315,9 @@ export function readExportFormValues() {
     fastWebcodecs: elements.exportOptionsFastEncodeInput
       ? elements.exportOptionsFastEncodeInput.checked !== false
       : true,
+    audioCodec,
+    audioBitrate,
+    audioSampleRate,
     selectedCutId: state.selectedCutId || null,
   };
 }

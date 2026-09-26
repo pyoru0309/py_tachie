@@ -30,7 +30,9 @@
           "trimStartSec": 0,
           "fadeInSec": 1.0,
           "fadeOutSec": 1.5,
-          "useForLipSync": false
+          "useForLipSync": false,
+          "lipSyncCharacterIds": [],
+          "lipSyncMidi": null
         }
       ],
       "soundEffects": [
@@ -84,15 +86,33 @@
 | `title` | UI に表示するシーン名 |
 | `background` | 静止画背景パス (videoTrack を使う場合は空でも可) |
 | `videoTrack` | 動画背景。`fit` (cover/contain/fit)、`muted`、`loop`、`trim`、`speed` を持つ |
-| `bgmTracks` | BGM 配列。`volume` / `trimStartSec` / `fadeInSec` / `fadeOutSec` / `useForLipSync` / `loop` を持つ |
+| `bgmTracks` | BGM 配列。`volume` / `trimStartSec` / `fadeInSec` / `fadeOutSec` / `useForLipSync` / `lipSyncCharacterIds` / `lipSyncMidi` / `loop` を持つ |
 | `soundEffects` | 効果音配列。`{ id, src, startFrame, durationFrame, loop, fadeInSec, fadeOutSec, audioOffsetSec, volume, linkedCutId }` を持つ。詳細は下記 |
 | `videoLayers` | 動画レイヤー配列。短いクリップ (タイトル / トランジション / 解説動画) を任意区間に置く。下記参照 |
 | `bpm` | 任意。テロップやモーションの拍合わせに使用 |
+| `breath` / `bpmBob` | 体の揺れ。`breath = { amplitudePx, periodSec }`、`bpmBob = { amplitudePx, style, hold, rate, bpmSource, onlyWhileSinging }` (各項目はキャラの `bob` と同じ意味。`bpmSource: "manual"` のテンポは `bpm`) |
 | `cuts` | カット配列 |
 | `telops` | テロップ配列 (カットと独立) |
 | `laneCounts` | 任意。タイムラインの段 (レーン) 数を種別ごとに保持する表示用設定 `{ telop, soundEffect, videoLayer }`。各項目の `lane` と対で使う |
 
-`bgmTracks[].useForLipSync` は 1 シーンにつき 1 トラックだけ ON にできます (ラジオ式)。ON のトラックが口パク解析の入力になります (歌唱+伴奏を分けて納品する場合などに使用)。`loop` を ON にするとシーン終端まで素材を繰り返し再生します (複数 BGM が ON でも排他ではなく、それぞれ独立にループ)。
+`bgmTracks[].useForLipSync` を ON にしたトラックは出力ミックスから外れ、口パク解析の入力になります (歌唱+伴奏を分けて納品する場合などに使用)。`lipSyncCharacterIds` (素材キャラ ID の配列) を指定するとそのキャラ専用の入力になり、話者かどうかに関係なくそのキャラの口を動かします (デュエット用。複数トラック可)。`lipSyncCharacterIds` が空の口パク入力は話者用で、1 シーンにつき 1 トラックだけです。
+
+`bgmTracks[].showInMeter` はプレビュー下の音量メーターに表示するトラック (1 シーン 1 本、口パクとは独立) です。UI の「トリム (ms)」は `trimStartSec` (秒) として保存されます。
+
+`bgmTracks[].lipSyncMidi` は歌唱判定 MIDI による口パクです。
+
+```json
+"lipSyncMidi": {
+  "src": "projects/<id>/assets/midi/song.mid",
+  "offsetMs": -120,
+  "tracks": [
+    { "index": 1, "characterIds": ["maki"] },
+    { "index": 2, "characterIds": ["moca"] }
+  ]
+}
+```
+
+MIDI の時刻はそのトラックの音源ファイルの時刻 (トリム・ループ込み) に対応し、`offsetMs` だけずらします (+ で遅らせる)。`tracks[].index` は MIDI ファイル内のトラック番号 (0 始まり)。MIDI に割り当てたキャラは、キャラ専用の口パク入力より MIDI が優先されます。カットに話者音声 (`cut.audio`) があれば、そのカットの話者はセリフ音声で口パクします。詳細は [歌・デュエットの口パク](../tutorials/singing-lipsync.md)。`loop` を ON にするとシーン終端まで素材を繰り返し再生します (複数 BGM が ON でも排他ではなく、それぞれ独立にループ)。
 
 `soundEffects[]` はシーン中の任意位置に置ける効果音で、`startFrame` から `durationFrame` フレームだけ再生されます。`durationFrame=0` はアセット末尾までの自然終了。`loop=true` で素材長 < 区間長のとき素材を繰り返し、`audioOffsetSec` で素材内の頭出し位置 (= 素材の途中から鳴らす) を指定できます。`fadeInSec` / `fadeOutSec` は区間全体の先頭と末尾にだけ掛かります (= ループ反復の境目には掛けない)。同じ時刻に複数の効果音を重ねることもできます。書き出しでは `adelay` + `volume` + `atrim` で `amix` に合流します。
 
@@ -264,7 +284,7 @@
 | `character.x`, `character.y` | 配置座標 |
 | `character.scale` | 拡大率 |
 | `motion` | per-character モーション (2026-05 改修)。`{ "type": "shake_x"\|"shake_y"\|"zoom"\|"move", "settings": { ... } }` 形式。未設定 (= キーが無いか `null`) なら「動かない」。旧 cut 単位の `motionType` / `motionSettings` は読込時に話者キャラの `motion` へ自動 migration されます |
-| `bob` | per-character の BPM 同期上下ゆれ (2026-06 追加)。`{ "bpm", "amplitudePx" }`。どちらかが 0 / 未設定 (`null`) なら無効。`motion` とは独立に加算されるため、移動・拡大と併用できる。位相はシーン内通算秒で計算し、カットを跨いで連続する |
+| `bob` | per-character の BPM 同期上下ゆれ (2026-06 追加)。`{ "bpm", "amplitudePx", "style", "hold", "rate", "bpmSource", "onlyWhileSinging" }`。`style` = `wave` (既定・常時サイン波) / `bounce` / `hop` / `kick` / `nod` (溜め → 拍で動く)、`hold` = 溜め (0〜0.95)、`rate` = 2 / 1 / 0.5 / 0.25 (BPM に掛ける倍率)、`bpmSource` = `manual` / `midi` (BGM の歌唱判定 MIDI のテンポマップ)、`onlyWhileSinging` = 声が出ているときだけ揺らす。振幅 0、または `manual` で BPM 0 / 未設定 (`null`) なら無効。`motion` とは独立に加算されるため、移動・拡大と併用できる。位相はシーン内通算秒で計算し、カットを跨いで連続する |
 | `crop` | マルチキャラレイアウト用の矩形クリップ `{ x, y, width, height }` (1920×1080 絶対座標)。`null` / 未設定なら全画面表示 |
 | `layoutSlot` | マルチキャラレイアウトのスロット index (0 始まり)。 編集ダイアログ再開時の表示順を保つために保存 |
 

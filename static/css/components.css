@@ -3090,8 +3090,8 @@ dialog::backdrop {
 
 .layer-editor-row {
   display: grid;
-  /* tag(60) | id(min content..1fr) | 表示名 input(160) | flags(220) | actions(auto) */
-  grid-template-columns: 60px minmax(80px, 1fr) 160px 220px auto;
+  /* tag(60) | id(min content..1fr) | 表示名 input(160) | flags(250) | actions(auto) */
+  grid-template-columns: 60px minmax(80px, 1fr) 160px 250px auto;
   gap: 12px;
   align-items: center;
   padding: 6px 8px;
@@ -3191,8 +3191,14 @@ dialog::backdrop {
 /* eye / mouth 行のフラグチェックボックス。grid 第3列 (旧 select の場所) に置く。 */
 .layer-editor-flags {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 4px 12px;
   align-items: center;
+}
+
+.layer-editor-flag-break {
+  flex-basis: 100%;
+  height: 0;
 }
 
 .layer-editor-flag {
@@ -3956,4 +3962,103 @@ dialog::backdrop {
   color: var(--fg-muted);
   font-size: 12px;
   line-height: 1.5;
+}
+
+/* シーン設定 > BGM カードの口パク欄 (static/js/lipsync-bgm-ui.js) */
+.lip-sync-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lip-sync-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.lip-sync-sub-title {
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.lip-sync-sub .asset-hint {
+  margin: 0;
+}
+
+/* キャラ選択チェックボックス群。checkbox-row は grid (18px 1fr) なので、横に並べる
+   ときは auto 幅にしないと 1 行ずつ全幅を取る。 */
+.lip-char-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.lip-char-picks .checkbox-row {
+  grid-template-columns: 18px auto;
+}
+
+.lip-midi-file-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.lip-midi-file-row label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lip-midi-file-row .compact-action-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.lip-midi-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lip-midi-track {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+
+.lip-midi-track-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.lip-midi-warn-line {
+  margin: 2px 0 0;
+  color: var(--warn);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* 書き出しダイアログの音声形式 (音声形式 / ビットレート / サンプリング周波数) を横一列に。
+   親の .settings-checkboxes は縦並びなので、ここだけ横に流す。 */
+.export-audio-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.export-audio-fields label {
+  flex: 1 1 100px;
+  min-width: 0;
+}
+
+.export-audio-fields label[hidden] {
+  display: none;
 }
