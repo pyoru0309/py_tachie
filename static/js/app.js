@@ -52,8 +52,6 @@ import {
   canMergeSceneOfCut,
   setSceneBoundary,
   nearestCutBoundaryIndex,
-  clampItemStartToScene,
-  clampItemDurationToScene,
 } from "./scene-ops.js";
 import {
   fillPlacementPresets,
@@ -1011,8 +1009,6 @@ function bindControls() {
     setSceneBoundary,
     nearestCutBoundaryIndex,
     openSceneDialog,
-    clampItemStartToScene,
-    clampItemDurationToScene,
   });
   bindTelop({
     activeScene,

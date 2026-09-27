@@ -32,7 +32,6 @@ import {
   activeSceneResolved,
   sceneSpans,
   syncSelectedSceneToCurrent,
-  TIMELINE_ITEM_KINDS,
   effectiveCutTransition,
 } from "./scenario.js";
 import { recordHistory } from "./history.js";
@@ -50,8 +49,6 @@ let deps = {
   // シーン操作 (scene-ops.js) と シーン設定ダイアログ (dialog.js) への橋渡し。
   setSceneBoundary: () => false,
   nearestCutBoundaryIndex: () => 0,
-  clampItemStartToScene: (start) => start,
-  clampItemDurationToScene: (start, dur) => dur,
   openSceneDialog: () => {},
   clearTelopSelection: () => {},
   setMultiTelopSelection: () => {},
@@ -1575,29 +1572,6 @@ function snapSec(sec, options = {}) {
   return sec;
 }
 
-// ドラッグ中のアイテムを「シーンをまたがない」ように丸める (§3.5)。
-// 移動は開始位置を最寄りの収まるシーンへ、リサイズは長さをシーン末尾までに詰める。
-// 最後のシーンは後続が無いので自由 (末尾テロップのはみ出しは従来どおり許す)。
-function _fitDraggedItemsToScene(drag) {
-  if (!drag) return;
-  const ids = new Set();
-  if (drag.groupStartMap) for (const id of drag.groupStartMap.keys()) ids.add(id);
-  for (const key of ["telopId", "seId", "vlId"]) if (drag[key]) ids.add(drag[key]);
-  if (ids.size === 0) return;
-  const isResize = String(drag.type || "").startsWith("resize");
-  for (const kind of TIMELINE_ITEM_KINDS) {
-    for (const item of state.scenario?.[kind] || []) {
-      if (!item || !ids.has(item.id)) continue;
-      const dur = Math.max(1, Math.round(Number(item.durationFrame) || 1));
-      if (isResize) {
-        item.durationFrame = deps.clampItemDurationToScene(item.startFrame, dur);
-      } else {
-        item.startFrame = deps.clampItemStartToScene(item.startFrame, dur);
-      }
-    }
-  }
-}
-
 // snap が効いた sec をタイムライン描画から拾えるよう記録 (drawTimeline で縦線描画)。
 // drag 終了 (pointerup) で `_clearSnapIndicator()` を呼んで消す。
 function _recordSnapIndicator(sec) {
@@ -2324,7 +2298,6 @@ export function setupTimelineCanvas() {
         const pos = timelineLocalCoords(canvas, event);
         primary.lane = laneFromPointerY(computeTimelineLayout(), "telop", pos.y);
       }
-      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "marquee") {
       const local = timelineLocalCoords(canvas, event);
@@ -2344,7 +2317,6 @@ export function setupTimelineCanvas() {
       telop.startFrame = secToFrames(Math.max(0, nextStart));
       telop.durationFrame = Math.max(1, secToFrames(newDuration));
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
-      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "resizeTelopEnd") {
       const telop = findTelopById(drag.telopId);
@@ -2356,7 +2328,6 @@ export function setupTimelineCanvas() {
       if (newDuration < TIMELINE_MIN_TELOP_DURATION) return;
       telop.durationFrame = Math.max(1, secToFrames(newDuration));
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
-      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "moveSoundEffect") {
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
@@ -2385,7 +2356,6 @@ export function setupTimelineCanvas() {
         const pos = timelineLocalCoords(canvas, event);
         primary.lane = laneFromPointerY(computeTimelineLayout(), "soundEffect", pos.y);
       }
-      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "resizeSoundEffectStart") {
       const scene = deps.activeScene();
@@ -2415,7 +2385,6 @@ export function setupTimelineCanvas() {
       se.durationFrame = Math.max(1, secToFrames(newDuration));
       se.audioOffsetSec = Math.max(0, newAudioOffset);
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
-      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "resizeSoundEffectEnd") {
       const scene = deps.activeScene();
@@ -2429,7 +2398,6 @@ export function setupTimelineCanvas() {
       if (newDuration < TIMELINE_MIN_TELOP_DURATION) return;
       se.durationFrame = Math.max(1, secToFrames(newDuration));
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
-      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "moveVideoLayer") {
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
@@ -2467,7 +2435,6 @@ export function setupTimelineCanvas() {
           target.startFrame = secToFrames(ns);
         }
       }
-      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "resizeVideoLayerStart") {
       const scene = deps.activeScene();
@@ -2496,7 +2463,6 @@ export function setupTimelineCanvas() {
       vl.startFrame = Math.max(0, secToFrames(nextStart));
       vl.trimStartSec = Math.max(0, drag.startTrimStartSec + finalDelta);
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
-      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "resizeVideoLayerEnd") {
       const scene = deps.activeScene();
@@ -2520,7 +2486,6 @@ export function setupTimelineCanvas() {
       const newTrimEnd = drag.startTrimStartSec + newDuration;
       vl.trimEndSec = Math.max(drag.startTrimStartSec + 0.05, newTrimEnd);
       if (!drag.dirty && Math.abs(dx) >= TIMELINE_DRAG_THRESHOLD) drag.dirty = true;
-      _fitDraggedItemsToScene(drag);
       drawTimeline();
     } else if (drag.type === "resizeCutEnd") {
       // R3: カット右端ドラッグで durationFrame を変更。後続カットと linkedItems は

@@ -11,8 +11,10 @@
 //   mergeSceneWithPrevious(id)    … 前のシーンに結合する (= 区切りを消す)
 //   moveSceneBoundary(i, delta)   … i 番目の区切りをカット単位で動かす
 //
-// タイムラインアイテム (テロップ / 効果音 / 動画レイヤー) はシーンをまたげない。
-// 境界移動でまたぎが生じるときは、確認のうえ境界で長さを詰める (自動分割はしない)。
+// タイムラインアイテム (テロップ / 効果音 / 動画レイヤー) はシーン境界をまたいで
+// 置ける (2026-09-28 に §3.5 の「またげない」を撤回)。所属は開始位置のシーンで、
+// 境界を動かしてもアイテムの長さは変えない。描画は toDiskScenario の
+// carryStraddling が張り出し先のシーンへ持ち越す。
 // =============================================================================
 import { state } from "./state.js";
 import { showToast } from "./toast.js";
@@ -23,7 +25,7 @@ import {
   recalcCutStartSec,
   assignSceneMembership,
 } from "./scenario.js";
-import { PROJECT_FPS, formatTimecode } from "./timecode.js";
+import { PROJECT_FPS } from "./timecode.js";
 
 let deps = {
   scheduleScenarioSave: () => {},
@@ -61,61 +63,6 @@ function stampSceneIds(firstIndices) {
       if (list[k]) list[k].sceneId = sceneList[s].id;
     }
   }
-}
-
-const KIND_LABEL = { telops: "テロップ", soundEffects: "効果音", videoLayers: "動画レイヤー" };
-
-function itemLabel(kind, item) {
-  if (kind === "telops") {
-    const text = String(item?.text || "").replace(/\n/g, " ").trim();
-    return text ? `「${text.slice(0, 12)}${text.length > 12 ? "…" : ""}」` : item?.id || "";
-  }
-  const src = String(item?.src || "");
-  return src ? src.split("/").pop() : item?.id || "";
-}
-
-// シーン境界をまたいでいるアイテムを洗い出す。
-// **最後のシーンは対象外** (後続が無いので「またぎ」にならない。§3.3)。
-function findStraddlingItems() {
-  const spans = sceneSpans(state.scenario);
-  const out = [];
-  if (spans.length <= 1) return out;
-  for (const kind of TIMELINE_ITEM_KINDS) {
-    for (const item of state.scenario?.[kind] || []) {
-      if (!item) continue;
-      const start = Math.max(0, Math.round(Number(item.startFrame) || 0));
-      const dur = Math.max(0, Math.round(Number(item.durationFrame) || 0));
-      if (dur <= 0) continue;
-      const idx = spans.findIndex((span) => start < span.endFrame);
-      if (idx < 0 || idx === spans.length - 1) continue; // 最後のシーンは伸びてよい
-      const limit = spans[idx].endFrame;
-      if (start + dur > limit) {
-        out.push({ kind, item, oldDur: dur, newDur: Math.max(1, limit - start) });
-      }
-    }
-  }
-  return out;
-}
-
-// またぎがあれば確認し、了承されたら境界で詰める。false = 中止。
-function confirmAndTrimStraddlingItems() {
-  const straddling = findStraddlingItems();
-  if (straddling.length === 0) return true;
-  const lines = straddling.slice(0, 8).map((s) => {
-    const from = formatTimecode(s.oldDur);
-    const to = formatTimecode(s.newDur);
-    return `  ・${KIND_LABEL[s.kind]} ${itemLabel(s.kind, s.item)}  ${from} → ${to}`;
-  });
-  const more = straddling.length > 8 ? `\n  ほか ${straddling.length - 8} 件` : "";
-  const ok = window.confirm(
-    `シーン境界をまたぐアイテムが ${straddling.length} 件あります。\n`
-    + `これらは境界の位置で短くなります。\n\n`
-    + lines.join("\n") + more + "\n\n"
-    + `内容を保ちたい場合は、先に「分割（再生位置）」してから操作してください。`,
-  );
-  if (!ok) return false;
-  for (const s of straddling) s.item.durationFrame = s.newDur;
-  return true;
 }
 
 // 構造変更の後始末 (所属正規化 → 保存 → 再描画) をまとめる。
@@ -156,67 +103,6 @@ function nextSceneTitle(insertIndex) {
 }
 
 // ---------------------------------------------------------------------------
-// アイテムをシーンに収める (§3.5 — テロップ / 効果音 / 動画レイヤーはまたげない)
-// ---------------------------------------------------------------------------
-
-// アイテムが収まりうるシーンの「開始フレームの有効範囲」一覧。
-// span の長さがアイテム尺以上のシーンだけが候補になる。
-function fittableStartRanges(durFrame) {
-  const spans = sceneSpans(state.scenario);
-  const out = [];
-  spans.forEach((span, index) => {
-    const length = span.endFrame - span.startFrame;
-    // 最後のシーンは後続が無いので末尾を越えてよい (§3.3)。
-    const isLast = index === spans.length - 1;
-    if (isLast) {
-      out.push({ min: span.startFrame, max: Infinity, span });
-    } else if (length >= durFrame) {
-      out.push({ min: span.startFrame, max: span.endFrame - durFrame, span });
-    }
-  });
-  return out;
-}
-
-// 移動 (ドラッグ / 貼り付け) 用: 開始フレームを「アイテムがまるごと収まる最寄りの
-// シーン」へ丸める。長さは変えない。
-//
-// どのシーンにも収まらない (アイテムがどのシーンより長い) 場合は、最後のシーン
-// (末尾を越えてよい) に落ちるので必ず解が存在する。
-export function clampItemStartToScene(startFrame, durFrame) {
-  const dur = Math.max(1, Math.round(Number(durFrame) || 1));
-  const desired = Math.max(0, Math.round(Number(startFrame) || 0));
-  const ranges = fittableStartRanges(dur);
-  if (ranges.length === 0) return desired;
-  let best = null;
-  let bestDist = Infinity;
-  for (const range of ranges) {
-    const clamped = Math.max(range.min, Math.min(range.max, desired));
-    const dist = Math.abs(clamped - desired);
-    if (dist < bestDist) { bestDist = dist; best = clamped; }
-  }
-  return best == null ? desired : best;
-}
-
-// リサイズ用: 開始フレームが属するシーンの末尾を越えないよう長さを詰める。
-export function clampItemDurationToScene(startFrame, durFrame) {
-  const start = Math.max(0, Math.round(Number(startFrame) || 0));
-  const dur = Math.max(1, Math.round(Number(durFrame) || 1));
-  const spans = sceneSpans(state.scenario);
-  const index = spans.findIndex((span) => start < span.endFrame);
-  if (index < 0 || index === spans.length - 1) return dur; // 最後のシーンは自由
-  return Math.max(1, Math.min(dur, spans[index].endFrame - start));
-}
-
-// アイテム 1 件を「開始位置が入っているシーン」に収める (保険。貼り付け / 分割用)。
-export function fitTimelineItemToScene(item) {
-  if (!item) return item;
-  const dur = Math.max(1, Math.round(Number(item.durationFrame) || 1));
-  item.startFrame = clampItemStartToScene(item.startFrame, dur);
-  item.durationFrame = clampItemDurationToScene(item.startFrame, dur);
-  return item;
-}
-
-// ---------------------------------------------------------------------------
 // (B) カットに対する操作 — 主操作
 // ---------------------------------------------------------------------------
 
@@ -249,14 +135,6 @@ export function splitSceneAtCut(cutId) {
   // index 以降で「元シーンに属していたカット」を新シーンへ移す。
   for (let k = index; k < list.length; k += 1) {
     if (list[k]?.sceneId === source.id) list[k].sceneId = created.id;
-  }
-  if (!confirmAndTrimStraddlingItems()) {
-    // 取り消し: 元に戻す
-    for (let k = index; k < list.length; k += 1) {
-      if (list[k]?.sceneId === created.id) list[k].sceneId = source.id;
-    }
-    sceneList.splice(ownerIdx + 1, 1);
-    return false;
   }
   state.selectedSceneId = created.id;
   commitSceneChange(`「${created.title}」を作りました`);
@@ -352,13 +230,8 @@ export function setSceneBoundary(boundaryIndex, firstCutIndex) {
   const upper = (b + 1 < firstIndices.length ? firstIndices[b + 1] : total) - 1;
   const target = Math.max(lower, Math.min(upper, Math.round(firstCutIndex)));
   if (target === firstIndices[b]) return false;
-  const before = firstIndices.slice();
   firstIndices[b] = target;
   stampSceneIds(firstIndices);
-  if (!confirmAndTrimStraddlingItems()) {
-    stampSceneIds(before);
-    return false;
-  }
   commitSceneChange(null);
   return true;
 }

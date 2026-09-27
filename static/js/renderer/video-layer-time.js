@@ -13,7 +13,7 @@
 
 /**
  * @param {object} layer videoLayer のスキーマ
- *   - startFrame: number  シーン頭からの配置フレーム
+ *   - startFrame: number  シーン頭からの配置フレーム (前シーンから張り出したものは負)
  *   - trimStartSec: number  動画ファイル内の使用開始秒
  *   - trimEndSec: number|null  使用終了秒 (null=ファイル末尾)
  * @param {number} sceneSec 評価する scene 内通算秒
@@ -30,7 +30,11 @@ export function mapVideoLayerSec(layer, sceneSec, fps, videoDurationSec) {
   const f = Number(fps) > 0 ? Number(fps) : 24;
   const dur = Number(videoDurationSec);
   const totalDuration = Number.isFinite(dur) && dur > 0 ? dur : 0;
-  const startSec = Math.max(0, (Number(layer?.startFrame) || 0) / f);
+  // ★ 負の startFrame を許す: 前のシーンから張り出した動画レイヤーは、
+  //   張り出し先のシーンでは「シーン頭より前に始まった」ものとして渡される
+  //   (scenario.js toDiskScenario の carryStraddling)。0 に丸めると素材の頭から
+  //   再生し直してしまう。
+  const startSec = (Number(layer?.startFrame) || 0) / f;
   const trimStart = Math.max(0, Number(layer?.trimStartSec) || 0);
   // 終端は trimEndSec があればそれ、無ければ素材末尾。両者を duration でクランプ。
   const rawTrimEnd = layer?.trimEndSec != null ? Number(layer.trimEndSec) : totalDuration;

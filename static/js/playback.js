@@ -2194,8 +2194,11 @@ async function renderPreviewV2(cut, requestId) {
   // playLiveCutV2 が改めて lookahead 付き window で rebuild するので、
   // 停止中の VL provider は最小限で十分。
   const liveSceneForLayersStill = state.scenario || null;
-  const { windowedLayers: windowedVideoLayersStill, windowKey: vlWindowKeyStill } =
-    _computeVideoLayerWindow(liveSceneForLayersStill, cut, 0);
+  const {
+    windowedLayers: windowedVideoLayersStill,
+    absoluteLayers: absoluteVideoLayersStill,
+    windowKey: vlWindowKeyStill,
+  } = _computeVideoLayerWindow(liveSceneForLayersStill, cut, 0);
   layerData.videoLayers = windowedVideoLayersStill;
   const cutStart = cutStartSec(cut);
   const cutDur = cutDurationSec(cut);
@@ -2234,7 +2237,7 @@ async function renderPreviewV2(cut, requestId) {
   // 動画レイヤー (videoLayers) も preview 用に per-layer 準備。window フィルタ後を渡す。
   const { providersById: videoLayerProvidersById } = await prepareVideoLayersForPreview(
     liveSceneForLayersStill, cutStart + previewSec,
-    { windowedLayers: windowedVideoLayersStill },
+    { windowedLayers: absoluteVideoLayersStill },
   );
 
   // 同じ token の scene が既にあれば reuse、なければ build。
@@ -2570,7 +2573,8 @@ let _sceneInstanceBuildQueue = Promise.resolve();
 // layer の終了 frame は trimEnd - trimStart を fps 倍した値。speed は無視 (= 1.0
 // 既定、速度変更ありなら厳密には short になるが安全側に倒すため 1.0 で計算)。
 function _videoLayerOverlapsCut(layer, cutStartFrame, cutDurationFrame) {
-  const layerStart = Math.max(0, Number(layer?.startFrame) || 0);
+  // 前シーンから張り出した VL は負の startFrame を持つ (0 に丸めない)。
+  const layerStart = Number(layer?.startFrame) || 0;
   const trimStart = Math.max(0, Number(layer?.trimStartSec) || 0);
   const trimEndRaw = layer?.trimEndSec;
   const trimEnd = trimEndRaw == null ? null : Math.max(trimStart, Number(trimEndRaw) || trimStart);
@@ -2639,18 +2643,25 @@ function _computeVideoLayerWindow(scene, focusCut, lookaheadCuts = 0) {
   //   renderer は `sceneSec = cutStartSec + elapsed` の **シーンローカル**時間で
   //   VL の in/out を判定する (cutStartSec は scene-bundle 由来 = シーンローカル)。
   //   そのままだと 2 つめ以降のシーンで VL の出入りがシーン先頭分ずれる。
-  //   アイテムはシーンをまたげない (§3.5) ので、フォーカス中のカットと同じ
-  //   シーンの VL だけに絞り、そのシーンの開始フレームだけ引いて渡す。
+  //   フォーカス中のカットが属するシーンの開始フレームを引いて渡す。
+  //   ★ 所属シーンでは絞らない: 前のシーンから境界をまたいで張り出した VL は
+  //     負の startFrame になり、mapVideoLayerSec がそのまま続きを出す。
+  //     (旧実装は所属シーン一致で filter していたため、またいだ VL が境界の
+  //      先で再生されなかった)
+  //   後ろのシーンの VL は時間窓 (lookahead) で入ってきても、ローカル時間では
+  //   まだ始まっていない (inactive) ので害は無い。
+  //
+  // absoluteLayers: 絶対フレームのままの窓内 VL。`<video>` / VL 音声の同期
+  //   (syncVideoLayerEls) はタイムラインの絶対秒で回すのでこちらを使う。
+  //   シーンローカルで回すと境界で時計が巻き戻り、またいだ VL の音が seek し直す。
   const focusSceneId = focusCut.sceneId || null;
   const spans = sceneSpans(state.scenario);
   const sceneStartFrame = spans.find((sp) => sp.id === focusSceneId)?.startFrame || 0;
-  const rebased = windowed
-    .filter((layer) => !focusSceneId || !layer?.sceneId || layer.sceneId === focusSceneId)
-    .map((layer) => (sceneStartFrame > 0
-      ? { ...layer, startFrame: Math.max(0, (Number(layer.startFrame) || 0) - sceneStartFrame) }
-      : layer));
+  const rebased = windowed.map((layer) => (sceneStartFrame > 0
+    ? { ...layer, startFrame: (Number(layer.startFrame) || 0) - sceneStartFrame }
+    : layer));
   const windowKey = rebased.map((l) => l?.id).filter(Boolean).sort().join("|");
-  return { windowedLayers: rebased, windowKey };
+  return { windowedLayers: rebased, absoluteLayers: windowed, windowKey };
 }
 
 // 直列化された buildSceneFromLayerData。前の build が終わるまで次は待つ。
@@ -2688,7 +2699,12 @@ function prefetchSceneInstance(cut) {
     // 動画レイヤーは scene-level の配列で、それぞれ時間範囲を持つ。cut の時間範囲に
     // 重なる layer が 1 つもなければ、この cut の間は動画レイヤーが描画されないので
     // provider 不要 → prefetch 対象にできる。
-    if (_anyActiveVideoLayer(layerData, cutStartFrameVal, cutDurationFrameVal)) return null;
+    // ★ bundle の VL はシーンローカル frame なので、カット位置も bundle の
+    //   cutStartSec (シーンローカル) で比べる。
+    const localCutStartFrame = Number.isFinite(Number(layerData.cutStartSec))
+      ? Math.round(Number(layerData.cutStartSec) * PROJECT_FPS)
+      : cutStartFrameVal;
+    if (_anyActiveVideoLayer(layerData, localCutStartFrame, cutDurationFrameVal)) return null;
     try {
       return await _serialBuildScene(layerData, null, null, state.videoLayerDurations);
     } catch (err) {
@@ -3083,8 +3099,11 @@ export async function playLiveCutV2(cut, _options = {}) {
   // これで scene 全 VL に対する `<video preload=auto>` + clean PCM `<audio>` の
   // 常時保持を停止し、ブラウザバッファ消費を有界化する。
   const liveSceneForLayersTop = state.scenario || null;
-  const { windowedLayers: windowedVideoLayers, windowKey: vlWindowKey } =
-    _computeVideoLayerWindow(liveSceneForLayersTop, cut, getPrefetchLookahead());
+  const {
+    windowedLayers: windowedVideoLayers,
+    absoluteLayers: absoluteVideoLayers,
+    windowKey: vlWindowKey,
+  } = _computeVideoLayerWindow(liveSceneForLayersTop, cut, getPrefetchLookahead());
   // layerData.videoLayers も窓フィルタ後で固定する。これに合わせて
   // scene-builder は window 内 VL の plane だけ作る。
   layerData.videoLayers = windowedVideoLayers;
@@ -3109,7 +3128,7 @@ export async function playLiveCutV2(cut, _options = {}) {
   // 動画レイヤー: per-layer の HTMLVideoElement + VideoTextureProvider を準備。
   // window フィルタ後の VL のみ ensure する (A1)。
   const { providersById: videoLayerProvidersById } = await prepareVideoLayersForPreview(
-    liveSceneForLayersTop, livePreviewSceneSec, { windowedLayers: windowedVideoLayers },
+    liveSceneForLayersTop, livePreviewSceneSec, { windowedLayers: absoluteVideoLayers },
   );
 
   // scene-bundle が返す token は state の SHA1。直前のカットと完全に同じ state
@@ -3415,8 +3434,10 @@ export async function playLiveCutV2(cut, _options = {}) {
         // 動画レイヤー: per-layer HTMLVideoElement の play/pause/seek を毎フレーム同期。
         // mesh.visible は scene-builder の update() 側で mapVideoLayerSec を再計算
         // して切り替えるが、video element 側の再生制御はこちらで行う。
-        if (Array.isArray(layerData.videoLayers) && layerData.videoLayers.length > 0) {
-          syncVideoLayerEls(layerData.videoLayers, timelineOffsetSec + clamped, 24, true);
+        // ★ 要素の同期はタイムライン絶対秒 × 絶対フレームの VL で行う
+        //   (layerData.videoLayers はシーンローカルに寄せた renderer 用)。
+        if (absoluteVideoLayers.length > 0) {
+          syncVideoLayerEls(absoluteVideoLayers, timelineOffsetSec + clamped, 24, true);
         }
 
         const motionOffsetByChar = computePerCharacterMotionOffsets(layerData.characters, quantized);

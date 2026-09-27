@@ -580,10 +580,14 @@ def audio_volume_by_frame(
 # ---------------------------------------------------------------------------
 
 
-def _scene_total_duration(scene: dict[str, Any]) -> float:
+def _scene_total_duration(scene: dict[str, Any], *, include_telops: bool = True) -> float:
     """シーン上で「絵が必要な」時間長を返す。
 
     cuts / telops の末尾のうち最も遅いもの。
+    ``include_telops=False`` のときはカット末尾だけで決める。最後以外のシーンでは
+    テロップが次のシーンへまたがって置かれうる (編集面はフラットなタイムライン)
+    ので、呼び出し側は最後のシーンだけテロップのはみ出しを尺に含める。含めると
+    またぎテロップの分だけ無地の後置きフレームが挟まり、以降のシーンがずれる。
     videoTrack / BGM / videoLayers では延ばさない (= シーン全体に敷くトラックなので
     length を伸ばす意味が無い)。VL が cuts/telops 終端を越えて配置されていても
     export では cut 終端で自動 trim される (= bgmTracks と同じ思想、2026-05-21 確定)。
@@ -596,7 +600,7 @@ def _scene_total_duration(scene: dict[str, Any]) -> float:
         start = max(0, int(cut.get("startFrame") or 0))
         duration = max(1, int(cut.get("durationFrame") or 0))
         end_frame = max(end_frame, start + duration)
-    for telop in scene.get("telops") or []:
+    for telop in (scene.get("telops") or []) if include_telops else []:
         if not isinstance(telop, dict):
             continue
         start = max(0, int(telop.get("startFrame") or 0))
@@ -689,7 +693,9 @@ def _make_single_cut_scene(orig_scene: dict[str, Any], cut: dict[str, Any]) -> d
         if not isinstance(vl, dict):
             continue
         try:
-            old_vl_start_frame = max(0, int(vl.get("startFrame") or 0))
+            # 前のシーンから張り出した VL は負の startFrame で渡される
+            # (v2_export の _carry_straddling_video_layers)。0 に丸めない。
+            old_vl_start_frame = int(vl.get("startFrame") or 0)
         except (TypeError, ValueError):
             continue
         try:

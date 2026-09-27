@@ -367,7 +367,13 @@ function setupRendererAndCanvas(canvas, width, height, readbackMode, onLog) {
   return { renderer, gl };
 }
 
-async function fetchSceneBundle(cut, projectId = "") {
+// sceneItems: { telops, videoLayers } を渡すと、bundle のそれを差し替える。
+//   サーバはディスクのシーン (= 所有アイテムだけ) から bundle を組むので、前の
+//   シーンから境界をまたいで張り出したテロップ / 動画レイヤーが入らない。
+//   書き出し用のシナリオ (toDiskScenario carryStraddling) は張り出し分を負の
+//   startFrame で持っているので、そちらを正とする。どちらも raw 値のまま
+//   renderer に渡る配列なので、差し替えても形は変わらない。
+async function fetchSceneBundle(cut, projectId = "", sceneItems = null) {
   const cutState = cut.state || {};
   const body = {
     ...cutState,
@@ -388,7 +394,20 @@ async function fetchSceneBundle(cut, projectId = "") {
   if (projectId && data?.projectId && data.projectId !== projectId) {
     throw new Error(`scene-bundle project mismatch: expected ${projectId}, got ${data.projectId}`);
   }
+  if (sceneItems && data) {
+    if (Array.isArray(sceneItems.telops)) data.telops = sceneItems.telops;
+    if (Array.isArray(sceneItems.videoLayers)) data.videoLayers = sceneItems.videoLayers;
+  }
   return data;
+}
+
+// 書き出しシナリオのシーンから、bundle に差し込むアイテムを取り出す。
+function sceneItemsOf(scenarioScene) {
+  if (!scenarioScene || typeof scenarioScene !== "object") return null;
+  return {
+    telops: Array.isArray(scenarioScene.telops) ? scenarioScene.telops : [],
+    videoLayers: Array.isArray(scenarioScene.videoLayers) ? scenarioScene.videoLayers : [],
+  };
 }
 
 async function fetchExportPlan() {
@@ -509,10 +528,10 @@ function _computeExportSceneState(rd, f, { withLipSync = true } = {}) {
 
 // A-side 用: 次カットの先頭フレームを焼いてテクスチャを返す。失敗時は null。
 // build → frame0 capture → dispose (RT に焼き済みなので texture は生きる)。
-async function _prepareExportASideTex(nextCut, projectId, fps) {
+async function _prepareExportASideTex(nextCut, projectId, fps, nextSceneItems = null) {
   let inst = null;
   try {
-    const layerData = await fetchSceneBundle(nextCut, projectId);
+    const layerData = await fetchSceneBundle(nextCut, projectId, nextSceneItems);
     inst = await buildSceneFromLayerData(layerData, null, null, null);
     if (!inst) return null;
     const rd0 = _buildExportRenderData(layerData, fps, Number(layerData.cutStartSec) || 0, Math.max(1, Number(nextCut.durationFrame) || 0), null);
@@ -721,12 +740,15 @@ async function renderCutFrames({
   videoLayerProvidersById = null,
   videoLayerDurations = null,
   projectId = "",
+  // 書き出しシナリオ上のこのカット / 次カットのシーンのアイテム (fetchSceneBundle 参照)。
+  sceneItems = null,
+  nextSceneItems = null,
 }) {
   // ★ カット境界コスト計測 (律速診断): fetchSceneBundle (HTTP + サーバ bundle 焼き) と
   //   buildSceneFromLayerData (キャラ PNG decode + GPU texture upload + scene 構築) を
   //   分離累積する。per-frame render ではなく「カット切替コスト × cut 数」が律速かを見る。
   const _tFetch = performance.now();
-  const layerData = await fetchSceneBundle(cut, projectId);
+  const layerData = await fetchSceneBundle(cut, projectId, sceneItems);
   if (ctx) {
     ctx.fetchBundleMs = (ctx.fetchBundleMs || 0) + (performance.now() - _tFetch);
     // サーバが返す bundle 生成コスト内訳 (_timing) を累積 → fetch の 849ms/cut の正体
@@ -945,7 +967,7 @@ async function renderCutFrames({
   let aSideTex = null;
   let aSideStartFrame = total;
   if (!transparent && nextCut && trNextType !== "none" && trNextDurFrames > 0) {
-    aSideTex = await _prepareExportASideTex(nextCut, projectId, fps);
+    aSideTex = await _prepareExportASideTex(nextCut, projectId, fps, nextSceneItems);
     aSideStartFrame = total - Math.floor(trNextDurFrames / 2);
   }
   // 先頭カット (前カット無しの単段フェードイン) は overlay 経路を使う。straddle が
@@ -1127,6 +1149,8 @@ async function renderGapFrames({
 export async function runExportSession({
   canvas,
   cut,
+  // カットが属するシーンのテロップ / 動画レイヤー (前シーンからの張り出し込み)。
+  sceneItems = null,
   projectId,
   exportConfig,
   onLog = () => {},
@@ -1232,6 +1256,7 @@ export async function runExportSession({
     includeVisualizer, includeVideoTrack, transparent,
     readback, sender, ctx: frameCtx, onLog, shouldAbort,
     projectId,
+    sceneItems,
   });
 
   // 全フレーム送信完了。残るは PBO drain → ffmpeg の EOF 待ち + ファイル close。
@@ -1498,6 +1523,10 @@ export async function runProjectExportSession({
       // 最初の cut の bundle を fetch して scene telops を取得 (cut frame 用に
       // どうせ後で fetch するので、結果を使い回せると重複しないが、別 fetch でも
       // server cache が効く)
+      // 書き出しシナリオのテロップ (前シーンからの張り出し込み) があればそれを使う。
+      if (!sceneTelopsCache && Array.isArray(scenarioScene.telops)) {
+        sceneTelopsCache = scenarioScene.telops;
+      }
       if (!sceneTelopsCache) {
         const firstCut = scenarioScene.cuts?.[0];
         if (firstCut) {
@@ -1571,6 +1600,7 @@ export async function runProjectExportSession({
       // されるので、シーン末尾カットの次は次シーンの先頭カット。ただし
       // post-roll (telop のはみ出し) があるシーンは隣接しないので straddle しない。
       let nextScenarioCut = null;
+      let nextSceneItems = sceneItemsOf(scenarioScene);
       if (cIdx + 1 < planScene.cuts.length) {
         const nextPlanCut = planScene.cuts[cIdx + 1];
         if (Number(nextPlanCut.startFrame) === sceneFrameIdx + planCut.durationFrame) {
@@ -1591,6 +1621,7 @@ export async function runProjectExportSession({
           nextScenarioCut = (nextScenarioScene.cuts || [])[0]
             || (nextScenarioScene.cuts || []).find((c) => c.id === nextPlanCut.id)
             || null;
+          nextSceneItems = sceneItemsOf(nextScenarioScene);
         }
       }
       await renderCutFrames({
@@ -1602,6 +1633,8 @@ export async function runProjectExportSession({
         videoLayerProvidersById,
         videoLayerDurations,
         projectId,
+        sceneItems: sceneItemsOf(scenarioScene),
+        nextSceneItems,
       });
       sceneFrameIdx += planCut.durationFrame;
       // 前シーンから持ち越した provider は、シーンまたぎ straddle を消費した

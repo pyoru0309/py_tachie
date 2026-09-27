@@ -766,8 +766,8 @@ def compute_cut_lipsync_levels(
 def scene_start_sec_in_project(scenario: dict[str, Any], scene_id: str) -> float:
     """書き出し映像の時間軸でのシーン開始秒 (= 前にあるシーンの長さの合計)。
 
-    シーンの長さは書き出しと同じ ``_scene_total_duration`` (テロップがカットより後ろへ
-    はみ出していればその分も含む) で数える。音声 mux (_build_project_mux_command) の
+    シーンの長さは書き出しと同じ ``_scene_total_duration`` で数える (対象より前の
+    シーンは最後のシーンではないので、テロップのはみ出しは含めない)。音声 mux (_build_project_mux_command) の
     プロジェクト通し BGM も同じ数え方なので、書き出しでは口パク / MIDI と音がずれない。
     プレビューは scene-bundle の ``sceneOverride.sceneStartFrame`` (フロントの
     ``sceneSpans``) を優先するので、ここは主に書き出し経路で使われる。
@@ -778,8 +778,42 @@ def scene_start_sec_in_project(scenario: dict[str, Any], scene_id: str) -> float
             continue
         if str(scene.get("id") or "") == scene_id:
             return total
-        total += _scene_total_duration(resolve_effective_scene(scenario, scene))
+        total += _scene_total_duration(
+            resolve_effective_scene(scenario, scene), include_telops=False,
+        )
     return 0.0
+
+
+def _carry_straddling_video_layers(scenario: dict[str, Any], scene_id: str) -> list[dict[str, Any]]:
+    """``scene_id`` より前のシーンが所有する動画レイヤーを、そのシーンのローカル
+    時間 (= 負の startFrame) に寄せて返す。
+
+    編集面はフラットなタイムラインなので、動画レイヤーはシーン境界をまたいで
+    置ける。ディスクでは開始位置のシーンだけが所有するため、単一カット書き出し
+    で後ろのシーンのカットを切り出すときはここで持ち越す。本当に掛かっているか
+    (= 素材長) の判定は受け手の ``_make_single_cut_scene`` の重なり判定に任せる。
+    シーンの長さはカット末尾で数える (フロントの sceneSpans と同じ)。
+    """
+    out: list[dict[str, Any]] = []
+    scene_start = 0
+    earlier: list[tuple[int, dict[str, Any]]] = []
+    for scene in scenario.get("scenes") or []:
+        if not isinstance(scene, dict):
+            continue
+        if str(scene.get("id") or "") == scene_id:
+            for owner_start, vl in earlier:
+                moved = dict(vl)
+                moved["startFrame"] = owner_start + int(vl.get("startFrame") or 0) - scene_start
+                out.append(moved)
+            return out
+        for vl in scene.get("videoLayers") or []:
+            if isinstance(vl, dict):
+                earlier.append((scene_start, vl))
+        scene_start += sum(
+            max(1, int(c.get("durationFrame") or 0))
+            for c in scene.get("cuts") or [] if isinstance(c, dict)
+        )
+    return out
 
 
 _AUDIO_DURATION_CACHE: dict[tuple[str, int], Optional[float]] = {}
@@ -1089,7 +1123,11 @@ def get_export_plan() -> dict:
     scenes_out: list[dict] = []
     grand_total = 0
 
-    for sidx, scene in enumerate(scenario.get("scenes") or []):
+    raw_scenes = scenario.get("scenes") or []
+    last_sidx = max(
+        (i for i, s in enumerate(raw_scenes) if isinstance(s, dict)), default=-1,
+    )
+    for sidx, scene in enumerate(raw_scenes):
         if not isinstance(scene, dict):
             continue
         # bedScope に従いプロジェクト通し設定を反映した「解決済みシーン」で読む。
@@ -1097,7 +1135,9 @@ def get_export_plan() -> dict:
 
         # v1 と同じロジックで scene 末尾を求める。fps == PROJECT_FPS なので
         # ceil(duration_sec * fps) は frame と一致する。
-        duration_sec = _scene_total_duration(scene)
+        # テロップのはみ出しで尺を伸ばすのは最後のシーンだけ (途中のシーンの
+        # はみ出しは次のシーンへのまたぎ。_scene_total_duration の注記参照)。
+        duration_sec = _scene_total_duration(scene, include_telops=(sidx == last_sidx))
         scene_total_frames = max(1, int(round(duration_sec * fps)))
 
         # 背景: scene["background"] は assets 相対パス文字列 (`scene_background`
@@ -1235,7 +1275,9 @@ def _build_project_mux_command(
     scene_start_in_export = 0.0
     real_audio = False  # 1 シーンでも実際の音声素材があったか
     for scene_index, scene in enumerate(scenes):
-        scene_duration = _scene_total_duration(scene)
+        scene_duration = _scene_total_duration(
+            scene, include_telops=(scene_index == len(scenes) - 1),
+        )
         bgm_bed_offset = scene_start_in_export if bgm_is_project_wide else 0.0
         scene_start_in_export += scene_duration
 
@@ -1631,9 +1673,14 @@ def post_export_mux(req: ExportMuxRequest) -> dict:
         if target_cut is None:
             return {"type": "error", "code": ERR_INVALID_CONFIG, "detail": f"cutId={req.cutId} not found"}
         # 単一カット書き出しもベッド設定を解決してから 1 シーンに畳む。
-        synthetic_scene = _make_single_cut_scene(
-            resolve_effective_scene(scenario, target_scene), target_cut,
-        )
+        # 前のシーンから境界をまたいで張り出した動画レイヤーも、このカットに
+        # 掛かっていれば音を出す (_make_single_cut_scene が重なり区間を切り出す)。
+        effective_scene = dict(resolve_effective_scene(scenario, target_scene))
+        effective_scene["videoLayers"] = [
+            *_carry_straddling_video_layers(scenario, str(target_scene.get("id") or "")),
+            *(effective_scene.get("videoLayers") or []),
+        ]
+        synthetic_scene = _make_single_cut_scene(effective_scene, target_cut)
         # BGM がプロジェクト通しなら、BGM はプロジェクト先頭から鳴っている。
         # _make_single_cut_scene はシーン内のカット位置しか足さないので、シーンの
         # 開始秒も足して「そのカットの時点で鳴っている位置」から切り出す。

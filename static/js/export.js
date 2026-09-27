@@ -296,10 +296,16 @@ async function runV2Export(formValues) {
     + `alphaPreset=${formValues.transparent} (bg/videoTrack は常に描く)`,
   );
 
-  // 書き出しセッションは scenes[i].cuts / videoLayers をディスク形式で読む。
+  // 書き出しセッションは scenes[i].cuts / telops / videoLayers をディスク形式で読む。
   // resolveTransitions: シーン先頭カットの transition を実効値 (シーン側が
-  // 上書きしていればそれ) に差し替える。書き出し経路専用で、保存には影響しない。
-  const diskScenario = toDiskScenario(state.scenario, { resolveTransitions: true });
+  // 上書きしていればそれ) に差し替える。
+  // carryStraddling: 前のシーンから境界をまたいで張り出したテロップ / 動画
+  // レイヤーを、張り出し先のシーンにも負の startFrame で載せる。
+  // どちらも書き出し経路専用で、保存には影響しない。
+  const diskScenario = toDiskScenario(state.scenario, {
+    resolveTransitions: true,
+    carryStraddling: true,
+  });
   let result;
   if (formValues.target === "project") {
     result = await runProjectExportSession({
@@ -316,10 +322,15 @@ async function runV2Export(formValues) {
   } else {
     const cut = selectedCutFromScenario(diskScenario, formValues.selectedCutId);
     if (!cut) throw new Error("選択中のカットが見つかりません");
+    const ownerScene = (diskScenario.scenes || [])
+      .find((scene) => (scene?.cuts || []).includes(cut)) || null;
     const totalFrames = Math.max(1, Number(cut.durationFrame) || 0);
     result = await runExportSession({
       canvas,
       cut,
+      sceneItems: ownerScene
+        ? { telops: ownerScene.telops || [], videoLayers: ownerScene.videoLayers || [] }
+        : null,
       projectId,
       exportConfig: { ...baseExportConfig, totalFrames },
       onLog,

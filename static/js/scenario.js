@@ -568,10 +568,20 @@ export function assignSceneMembership(scenario = state.scenario) {
 // options.resolveTransitions = true のとき、シーン先頭カットの `transition` を
 // **実効値** (シーン側が上書きしていればそれ) に差し替える。書き出し経路専用の
 // オプションで、保存では使わない (使うと上書き結果がディスクに焼き付いてしまう)。
+//
+// options.carryStraddling = true のとき、前のシーンから張り出しているテロップ /
+// 動画レイヤーを、張り出し先のシーンにも **負の startFrame** で複製して載せる
+// (`carriedFromSceneId` 付き)。描画はシーン単位 (シーンローカル時間) なので、
+// これが無いとまたいだアイテムは境界で消える。描画専用 (プレビューの
+// sceneOverride / 書き出し) で、**保存・履歴では絶対に使わない** (複製が
+// 実体として焼き付く)。効果音は時間軸がプロジェクト絶対なので複製しない。
+// 動画レイヤーの音声も書き出し mux はディスク (所有シーン) から組むので、
+// 複製が二重に鳴ることはない。
 export function toDiskScenario(scenario = state.scenario, options = {}) {
   const spans = sceneSpans(scenario);
   const laneCounts = scenario?.laneCounts || { telop: 1, soundEffect: 1, videoLayer: 1 };
   const resolveTransitions = !!options.resolveTransitions;
+  const carryStraddling = !!options.carryStraddling;
   const rebase = (item, offset) => ({
     ...item,
     startFrame: Math.max(0, Math.round(Number(item.startFrame) || 0) - offset),
@@ -595,7 +605,8 @@ export function toDiskScenario(scenario = state.scenario, options = {}) {
     }
     return spans[spans.length - 1]?.id;
   };
-  const scenes = spans.map((span) => {
+  const spanIndexById = new Map(spans.map((span, i) => [span.id, i]));
+  const scenes = spans.map((span, here) => {
     const pick = (list) => (list || [])
       .filter((item) => item && itemSceneId(item) === span.id)
       .map((item) => rebase(item, span.startFrame));
@@ -608,12 +619,28 @@ export function toDiskScenario(scenario = state.scenario, options = {}) {
         cutsOut[0] = { ...cutsOut[0], transition: { ...sceneTransition } };
       }
     }
+    // 前のシーンが所有し、このシーンの頭まで張り出しているアイテム。
+    const carried = (kind, list) => {
+      if (!carryStraddling || here === 0) return [];
+      return (list || [])
+        .filter((item) => {
+          if (!item) return false;
+          const owner = spanIndexById.get(itemSceneId(item));
+          if (owner == null || owner >= here) return false;
+          return timelineItemEndFrame(kind, item) > span.startFrame;
+        })
+        .map((item) => ({
+          ...item,
+          startFrame: Math.round(Number(item.startFrame) || 0) - span.startFrame,
+          carriedFromSceneId: itemSceneId(item),
+        }));
+    };
     return {
       ...span.scene,
       cuts: cutsOut,
-      telops: pick(scenario.telops),
+      telops: [...carried("telops", scenario.telops), ...pick(scenario.telops)],
       soundEffects: pick(scenario.soundEffects),
-      videoLayers: pick(scenario.videoLayers),
+      videoLayers: [...carried("videoLayers", scenario.videoLayers), ...pick(scenario.videoLayers)],
       laneCounts: { ...laneCounts },
     };
   });
@@ -626,9 +653,26 @@ export function toDiskScenario(scenario = state.scenario, options = {}) {
   };
 }
 
+// アイテムの終端フレーム (プロジェクト絶対)。動画レイヤーは長さを trim から
+// 求めるので、trimEndSec が無く素材長も未解決なら Infinity (= 張り出している
+// かもしれない側に倒す。描画側は範囲外なら非表示にするので害は無い)。
+export function timelineItemEndFrame(kind, item) {
+  const start = Math.round(Number(item?.startFrame) || 0);
+  if (kind === "videoLayers") {
+    if (item?.trimEndSec != null && Number.isFinite(Number(item.trimEndSec))) {
+      const span = Math.max(0, Number(item.trimEndSec) - videoLayerTrimStartSec(item));
+      return start + Math.round(span * PROJECT_FPS);
+    }
+    const dur = Number(state.videoLayerDurations?.get?.(item?.src)?.duration) || 0;
+    return dur > 0 ? start + videoLayerDurationFrame(item, dur) : Infinity;
+  }
+  return start + Math.max(0, Math.round(Number(item?.durationFrame) || 0));
+}
+
 // 指定シーン 1 つ分だけをディスク形式で取り出す (scene-bundle の sceneOverride 用)。
+// 描画専用なので、前のシーンから張り出したアイテムも載せる (carryStraddling)。
 export function sceneToDisk(sceneId, scenario = state.scenario) {
-  const disk = toDiskScenario(scenario);
+  const disk = toDiskScenario(scenario, { carryStraddling: true });
   return disk.scenes.find((scene) => scene.id === sceneId) || disk.scenes[0] || null;
 }
 
