@@ -180,6 +180,8 @@ async function requestBedScopeChange(key, nextScope) {
     showToast("ビジュアライザに合わせて BGM もプロジェクト通しにしました");
   }
   syncBedScopeControls();
+  // BGM のスコープが変わると「再生される BGM」= ビジュアライザの音源候補も変わる。
+  renderVisualizerAudioOptions();
   deps.scheduleScenarioSave();
   recordHistory();
   renderPreview();
@@ -321,6 +323,44 @@ export function fillSceneDialog() {
 // F5a: シーンの「オーディオビジュアライザー」セクション
 // =============================================================================
 
+// ビジュアライザの音源候補 = **実際に鳴る BGM** (bedScope 解決後)。
+// サーバ (`find_visualizer_audio_track`) は resolve_effective_scene 後の bgmTracks から
+// 音源を引くので、候補も同じ集合にする。シーン自身の bgmTracks をそのまま並べると、
+// BGM がプロジェクト通しのとき「使われていないシーン側の BGM」(複製元プロジェクトの
+// 音源が残っているなど) が並び、実際の BGM は選べなかった。
+// selected を省略すると、今 select で選ばれている値を保つ (BGM 編集後の再描画用)。
+function renderVisualizerAudioOptions(selected = null) {
+  const select = elements.sceneVisualizerAudio;
+  if (!select) return;
+  const current = selected != null ? selected : String(select.value || "");
+  const bed = bedTarget();
+  const tracks = isProjectMode() ? (bed?.bgmTracks || []) : (resolveSceneBed(bed)?.bgmTracks || []);
+  select.innerHTML = "";
+  const noneOpt = document.createElement("option");
+  noneOpt.value = "";
+  noneOpt.textContent = "音源なし (時間駆動のみ)";
+  select.append(noneOpt);
+  const seen = new Set();
+  for (const track of tracks) {
+    if (!track || !track.src || seen.has(track.src)) continue;
+    seen.add(track.src);
+    const opt = document.createElement("option");
+    opt.value = track.src;
+    opt.textContent = track.src.split("/").pop() || track.src;
+    opt.title = track.src;
+    select.append(opt);
+  }
+  // 候補に無い保存値は黙って消さずに見せる (保存時に "" で上書きされないように)。
+  if (current && !seen.has(current)) {
+    const opt = document.createElement("option");
+    opt.value = current;
+    opt.textContent = `${current.split("/").pop() || current}（再生される BGM にありません）`;
+    opt.title = current;
+    select.append(opt);
+  }
+  select.value = current;
+}
+
 async function fillSceneVisualizerSection() {
   const scene = bedTarget();
   if (!scene.visualizer || typeof scene.visualizer !== "object") {
@@ -334,21 +374,7 @@ async function fillSceneVisualizerSection() {
   }
 
   // 音源 BGM トラック select
-  if (elements.sceneVisualizerAudio) {
-    elements.sceneVisualizerAudio.innerHTML = "";
-    const noneOpt = document.createElement("option");
-    noneOpt.value = "";
-    noneOpt.textContent = "音源なし (時間駆動のみ)";
-    elements.sceneVisualizerAudio.append(noneOpt);
-    for (const track of scene.bgmTracks || []) {
-      if (!track || !track.src) continue;
-      const opt = document.createElement("option");
-      opt.value = track.src;
-      opt.textContent = track.src;
-      elements.sceneVisualizerAudio.append(opt);
-    }
-    elements.sceneVisualizerAudio.value = viz.audioTrackId || "";
-  }
+  renderVisualizerAudioOptions(viz.audioTrackId || "");
 
   // プラグイン select (非同期で /api 取得)
   const plugins = await loadVisualizerPlugins();
@@ -623,6 +649,8 @@ export function commitSceneFromDialog() {
 }
 
 export function renderSceneBgmList() {
+  // BGM の追加 / 削除はビジュアライザの音源候補にも効く。
+  renderVisualizerAudioOptions();
   if (!elements.sceneBgmList) return;
   const scene = bedTarget();
   if (!Array.isArray(scene.bgmTracks)) scene.bgmTracks = [];
@@ -668,6 +696,7 @@ export function renderSceneBgmList() {
       deps.scheduleScenarioSave();
       recordHistory();
       renderTelopTrack();
+      renderVisualizerAudioOptions();
       if (track.lipSyncMidi || track.useForLipSync) {
         invalidateRendererCachesForConfigChange().then(() => renderPreview());
       }

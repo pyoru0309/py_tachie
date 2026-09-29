@@ -187,9 +187,14 @@ def relative_to_root(path: Path) -> str:
       置かれうる。その場合でも **論理パスは従来どおり ``projects/<id>/...``** を返す。
       シナリオ JSON に埋まっているアセットパスや ``/assets/...`` ルートの形を変えずに
       済ませるためで、逆変換は ``resolve_root_rel`` が保管場所を横断して行う。
+
+    ★ 返す論理パスは常に **NFC**。ファイル名を NFD で保存するボリューム (Windows 共用
+      NTFS 等。NFC への改名も定着しない) では rglob が NFD 名を返すため、そのままだと
+      シナリオ (NFC) の src と素材一覧の path が文字列一致せず「未スキャン」扱いになる。
+      NFC 名でも同じファイルを開けるので、逆変換 (resolve_root_rel) は影響を受けない。
     """
     try:
-        return path.relative_to(PROJECT_ROOT).as_posix()
+        return unicodedata.normalize("NFC", path.relative_to(PROJECT_ROOT).as_posix())
     except ValueError:
         pass
     resolved = path.resolve(strict=False)
@@ -199,7 +204,7 @@ def relative_to_root(path: Path) -> str:
         except ValueError:
             continue
         # <保管場所>/<project_id>/... → projects/<project_id>/...
-        return Path("projects").joinpath(rel).as_posix()
+        return unicodedata.normalize("NFC", Path("projects").joinpath(rel).as_posix())
     raise ValueError(f"{path!r} is not under PROJECT_ROOT or any project location")
 
 

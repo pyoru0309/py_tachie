@@ -2610,26 +2610,29 @@ function _anyActiveVideoLayer(layerData, cutStartFrame, cutDurationFrame) {
 //   - lookaheadCuts は再生中の prefetch lookahead (= 全体設定 preview.prefetchLookahead)
 //
 // 戻り値:
-//   { windowedLayers: VL[], windowKey: string }
+//   { windowedLayers: VL[], absoluteLayers: VL[], windowKey: string }
+//   ★ absoluteLayers は早期 return を含む**全経路で必ず配列**を返す。欠けると
+//     再生 tick の `absoluteVideoLayers.length` が落ちて再生ヘッドが止まる
+//     (動画レイヤーの無いプロジェクトで発生、2026-09-28)。
 //   windowKey は VL ID のソート済み join。SceneInstance reuse 判定で「window が
 //   変わったら同 token でも rebuild」を可能にするためのキー。
 function _computeVideoLayerWindow(scene, focusCut, lookaheadCuts = 0) {
   const layers = Array.isArray(scene?.videoLayers) ? scene.videoLayers : [];
   if (!layers.length) {
-    return { windowedLayers: [], windowKey: "" };
+    return { windowedLayers: [], absoluteLayers: [], windowKey: "" };
   }
   if (!focusCut) {
     // focus 不明なら旧挙動 (フィルタなし) にフォールバック。
     const all = layers.slice();
     const key = all.map((l) => l?.id).filter(Boolean).sort().join("|");
-    return { windowedLayers: all, windowKey: key };
+    return { windowedLayers: all, absoluteLayers: all, windowKey: key };
   }
   const cuts = state.scenario?.cuts || [];
   const idx = cuts.findIndex((c) => c?.id === focusCut.id);
   if (idx < 0) {
     const all = layers.slice();
     const key = all.map((l) => l?.id).filter(Boolean).sort().join("|");
-    return { windowedLayers: all, windowKey: key };
+    return { windowedLayers: all, absoluteLayers: all, windowKey: key };
   }
   const fromIdx = Math.max(0, idx - 1);
   const toIdx = Math.min(cuts.length - 1, idx + Math.max(0, lookaheadCuts));

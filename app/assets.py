@@ -169,7 +169,7 @@ def asset_items(paths: list[Path], prefix: str) -> list[dict[str, str]]:
         items.append(
             {
                 "id": f"{prefix}_{len(items) + 1:02d}",
-                "name": path.stem,
+                "name": unicodedata.normalize("NFC", path.stem),
                 "path": rel_path,
             }
         )
