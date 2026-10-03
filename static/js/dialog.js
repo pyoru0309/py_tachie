@@ -484,6 +484,30 @@ function renderSceneVisualizerParams(plugins, viz) {
       input = document.createElement("select");
       _fillVizFontWeightSelect(input, "", String(value ?? ""));
       label.append(input);
+    } else if (type === "midi_file") {
+      // 固定の選択肢 (spec.options) + プロジェクト / 共通の assets/midi の MIDI。
+      // ファイル一覧は非同期で足す。保存値が一覧に無くても消さずに見せる。
+      input = document.createElement("select");
+      const options = Array.isArray(spec.options) ? spec.options : [];
+      for (const opt of options) {
+        const optionEl = document.createElement("option");
+        optionEl.value = String(opt.value ?? "");
+        optionEl.textContent = String(opt.label ?? opt.value ?? "");
+        input.append(optionEl);
+      }
+      const current = String(value ?? "");
+      // 保存値のファイルは一覧の到着を待たずに足しておく (待つ間に value が空へ
+      // 倒れ、他のパラメータ編集の保存で「MIDI を使わない」に化けるのを防ぐ)。
+      if (current && !options.some((opt) => String(opt.value ?? "") === current)) {
+        const optionEl = document.createElement("option");
+        optionEl.value = current;
+        optionEl.textContent = current.split("/").pop() || current;
+        optionEl.title = current;
+        input.append(optionEl);
+      }
+      input.value = current;
+      label.append(input);
+      _fillVizMidiFileOptions(input, current, options.map((opt) => String(opt.value ?? "")));
     } else {
       input = document.createElement("input");
       input.type = "number";
@@ -495,6 +519,12 @@ function renderSceneVisualizerParams(plugins, viz) {
     }
     input.dataset.paramKey = spec.key;
     input.dataset.paramType = type;
+    if (spec.hint) {
+      const hint = document.createElement("span");
+      hint.className = "asset-hint";
+      hint.textContent = String(spec.hint);
+      label.append(hint);
+    }
     // family を変えたら同じ container 内の font_weight セレクタを書体が持つ
      // weight だけに絞る (本体 telop / dialogue と同じ整合)。
     if (type === "font") {
@@ -512,6 +542,40 @@ function renderSceneVisualizerParams(plugins, viz) {
   const familyId = fontSel ? fontSel.value : "";
   for (const wsel of container.querySelectorAll('select[data-param-type="font_weight"]')) {
     _fillVizFontWeightSelect(wsel, familyId, wsel.value);
+  }
+}
+
+// midi_file パラメータの select に、プロジェクト → 共通の assets/midi の MIDI を足す。
+// 一覧の取得は口パク用 MIDI の候補と同じ API。
+async function _fillVizMidiFileOptions(selectEl, current, fixedValues = []) {
+  const pid = state.activeProjectId || state.manifest?.projectId || "";
+  let files = [];
+  if (pid) {
+    try {
+      const r = await fetch(`/api/projects/${encodeURIComponent(pid)}/lipsync-midi`);
+      const data = r.ok ? await r.json() : {};
+      files = Array.isArray(data?.files) ? data.files : [];
+    } catch {
+      files = [];
+    }
+  }
+  const known = new Set(Array.from(selectEl.options).map((o) => o.value));
+  const listed = new Set();
+  for (const file of files) {
+    if (!file?.path) continue;
+    listed.add(file.path);
+    if (known.has(file.path)) continue;
+    known.add(file.path);
+    const opt = document.createElement("option");
+    opt.value = file.path;
+    opt.textContent = file.name || file.path.split("/").pop();
+    opt.title = file.path;
+    selectEl.append(opt);
+  }
+  // 保存値のファイルが一覧に無い (削除・移動された) ときはそう表示する。
+  if (current && !listed.has(current) && !fixedValues.includes(current)) {
+    const opt = Array.from(selectEl.options).find((o) => o.value === current);
+    if (opt) opt.textContent = `${current.split("/").pop() || current}（見つかりません）`;
   }
 }
 
@@ -559,7 +623,7 @@ function readVisualizerParamsFromControls() {
   for (const el of container.querySelectorAll("[data-param-key]")) {
     const key = el.dataset.paramKey;
     const type = el.dataset.paramType;
-    if (type === "color" || type === "select" || type === "font" || type === "font_weight") {
+    if (type === "color" || type === "select" || type === "font" || type === "font_weight" || type === "midi_file") {
       out[key] = el.value;
     } else {
       const n = Number(el.value);
@@ -961,6 +1025,60 @@ export function promptApplyScope({ kind = "カット", selectedCount = 0 } = {})
     allBtn.addEventListener("click", () => finish("all"));
     cancelBtn.addEventListener("click", () => finish(null));
     dialog.addEventListener("close", () => finish(null));
+    dialog.showModal();
+    migrateInDialogToasts();
+  });
+}
+
+// 汎用の確認モーダル (window.confirm の代替)。promptApplyScope と同じ見た目で、
+// 呼び出し元をブロックせず Promise で返す。Esc / キャンセルは false。
+//   promptConfirm({ title, message, note?, confirmLabel?, cancelLabel? }) -> Promise<boolean>
+export function promptConfirm({
+  title = "確認",
+  message = "",
+  note = "",
+  confirmLabel = "OK",
+  cancelLabel = "キャンセル",
+} = {}) {
+  return new Promise((resolve) => {
+    const dialog = document.createElement("dialog");
+    dialog.className = "apply-scope-dialog";
+    const h = document.createElement("h2");
+    h.textContent = title;
+    const p = document.createElement("p");
+    p.className = "apply-scope-desc";
+    p.textContent = message;
+    dialog.append(h, p);
+    if (note) {
+      const n = document.createElement("p");
+      n.className = "apply-scope-desc";
+      n.textContent = note;
+      dialog.append(n);
+    }
+    const actions = document.createElement("div");
+    actions.className = "apply-scope-actions";
+    const okBtn = document.createElement("button");
+    okBtn.type = "button";
+    okBtn.className = "primary-button";
+    okBtn.textContent = confirmLabel;
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "ghost-button";
+    cancelBtn.textContent = cancelLabel;
+    actions.append(okBtn, cancelBtn);
+    dialog.append(actions);
+    document.body.append(dialog);
+    let done = false;
+    const finish = (val) => {
+      if (done) return;
+      done = true;
+      if (dialog.open) dialog.close();
+      dialog.remove();
+      resolve(val);
+    };
+    okBtn.addEventListener("click", () => finish(true));
+    cancelBtn.addEventListener("click", () => finish(false));
+    dialog.addEventListener("close", () => finish(false));
     dialog.showModal();
     migrateInDialogToasts();
   });

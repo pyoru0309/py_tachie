@@ -13,9 +13,16 @@ import { toDiskScenario } from "./scenario.js";
 //   しまい、`scenes[i].cuts` が空なので**全アイテムが消える**。
 //   ディスク形式で持てば、復元は読み込みと同じ経路になり対称になる。
 //   (dev_docs/plans/multi-scene.md §3.2)
+//
+// ★ さらに **深いコピー** にすること。toDiskScenario は item を浅くコピーする
+//   (`{...item}`) だけなので、cut.state / characters / telop.style などは
+//   ライブのメモリと参照共有になる。一括適用のように他カットの cut.state を
+//   その場で書き換える経路があると、過去のスナップショットまで書き換わって
+//   undo を何回押しても戻らなくなる (2026-10-03 に背景・場面の一括適用で確認)。
+//   書き換え側を 1 つずつ直すより、ここで断つ方が漏れが無い。
 export function takeScenarioSnapshot() {
   return {
-    scenario: toDiskScenario(state.scenario),
+    scenario: JSON.parse(JSON.stringify(toDiskScenario(state.scenario))),
     selectedCutId: state.selectedCutId,
   };
 }

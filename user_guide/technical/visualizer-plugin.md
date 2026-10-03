@@ -36,6 +36,14 @@ PARAMS = [...]               # ユーザー設定可能なパラメータ仕様
 GL_MODULE = "/static/js/visualizers/awesomeviz.js"   # 必須
 GL_VERSION = 1                                        # 任意 (省略時 1)
 GL_FRAME_RATE = 24                                    # 任意。plugin が希望する更新粒度 (省略時は project の characterAnimationFps)
+SOURCE_SLICE = True                                   # 任意。False = 音源単位キャッシュ (全長解析 + 行スライス) を使わない
+                                                      #   (カット外の時刻のデータを返すプラグイン用。例: pitch_roll)
+
+# 任意。解析結果がパラメータの値そのもの以外 (音源トラックに付いた MIDI、パラメータで
+# 指定したファイルの更新時刻 等) に依存するときに実装。戻り値の文字列が解析キャッシュの
+# トークンに混ざる。params は defaults とマージ済み。
+def cache_signature(track: dict | None, params: dict) -> str:
+    ...
 
 # 音声解析が必要な場合のみ実装する (任意)
 def gl_data_streams(params, audio, time_grid_sec, fps) -> dict[str, np.ndarray | dict]:
@@ -82,7 +90,7 @@ per-cut で「フレームごとに事前解析した値」をブラウザに渡
 | 名前 | 型 | 内容 |
 | --- | --- | --- |
 | `params` | `dict[str, Any]` | ユーザ入力 (defaults とマージ済) |
-| `audio` | `AudioContext` または `None` | scene 内の連続 PCM (mono float32 [-1, 1])。`audio.window(t, L)` / `audio.spectrum_db(t, ...)` / `audio.amplitude_db(t, ...)` などで切り出す |
+| `audio` | `AudioContext` または `None` | scene 内の連続 PCM (mono float32 [-1, 1])。`audio.window(t, L)` / `audio.spectrum_db(t, ...)` / `audio.amplitude_db(t, ...)` などで切り出す。`audio.track` で解析対象の BGM トラック設定 (`lipSyncMidi` 等) を、`audio.source_key` で音源の同一性キー (モジュール内メモ化用) を参照できる |
 | `time_grid_sec` | `np.ndarray` | per-cut の各フレーム秒 (`cut_start_sec + i / fps` の配列) |
 | `fps` | `int` | 解析 fps (= `GL_FRAME_RATE` または project の characterAnimationFps) |
 

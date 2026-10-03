@@ -48,6 +48,13 @@ class AudioContext:
 
     sample_rate: int
     pcm: np.ndarray
+    # 解析対象の BGM トラック (bgmTracks の 1 要素)。トラック側の設定 (歌唱判定
+    # MIDI など) を参照したいプラグイン用。pcm は trimStartSec 適用済みなので、
+    # pcm の 0 秒 = ファイル内 trimStartSec 秒。
+    track: dict[str, Any] | None = None
+    # 音源の同一性 (path:mtime_ns:trim)。プラグイン内の重い全長解析を
+    # モジュールレベルでメモ化するときのキー。
+    source_key: str = ""
 
     def window(self, time_sec: float, length_sec: float = 0.05) -> np.ndarray:
         """time_sec を中心 (anchor 右端) とした窓を返す。長さが足りない場合は 0 埋め。"""
@@ -388,6 +395,14 @@ class PluginInfo:
     # plugin ソースファイルの mtime_ns。解析コード自体の変更でキャッシュを
     # 無効化するためにトークンへ混ぜる。
     source_mtime_ns: int = 0
+    # 音源単位キャッシュ (全長グリッド解析 + 行スライス) を使うか。カット外の
+    # 時刻のデータ (スクロール表示の前後数秒など) を返すプラグインは行スライス
+    # できないので ``SOURCE_SLICE = False`` で宣言し、無駄な全長解析を避ける。
+    source_slice: bool = True
+    # 解析キャッシュのトークンへ混ぜる追加シグネチャ ((トラック設定, パラメータ) → str)。
+    # パラメータの値そのもの以外 (トラックに付いた MIDI / パラメータで指定した
+    # ファイルの更新時刻など) に解析結果が依存するプラグイン用。
+    cache_signature: Callable[[dict[str, Any] | None, dict[str, Any]], str] | None = None
 
 
 _DISCOVER_LOCK = threading.Lock()
@@ -483,6 +498,9 @@ def discover_plugins(force: bool = False) -> dict[str, PluginInfo]:
                 source_mtime_ns = path.stat().st_mtime_ns
             except OSError:
                 source_mtime_ns = 0
+            cache_signature_fn = getattr(module, "cache_signature", None)
+            if not callable(cache_signature_fn):
+                cache_signature_fn = None
             plugins[key] = PluginInfo(
                 key=key,
                 name=name,
@@ -493,6 +511,8 @@ def discover_plugins(force: bool = False) -> dict[str, PluginInfo]:
                 gl_frame_rate=gl_frame_rate,
                 analysis_keys=analysis_keys,
                 source_mtime_ns=source_mtime_ns,
+                source_slice=bool(getattr(module, "SOURCE_SLICE", True)),
+                cache_signature=cache_signature_fn,
             )
         _DISCOVER_CACHE = plugins
         return plugins
@@ -755,6 +775,19 @@ def _stream_lock(token: str) -> threading.Lock:
         return lock
 
 
+def _plugin_signature(
+    info: PluginInfo, audio_track: dict[str, Any] | None, merged_params: dict[str, Any]
+) -> dict[str, str]:
+    """プラグイン宣言の追加シグネチャ。未宣言なら空 (= 既存トークンと互換)。"""
+    if info.cache_signature is None:
+        return {}
+    try:
+        return {"pluginSig": str(info.cache_signature(audio_track, merged_params))}
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("plugin %s cache_signature raised: %s", info.key, exc)
+        return {"pluginSig": "error"}
+
+
 def compute_stream_token(
     info: PluginInfo,
     merged_params: dict[str, Any],
@@ -763,6 +796,7 @@ def compute_stream_token(
     trim_start_sec: float,
     fps: int,
     time_grid_sec: "np.ndarray | list[float]",
+    audio_track: dict[str, Any] | None = None,
 ) -> str:
     """解析入力だけから成る 16 桁トークン。
 
@@ -793,6 +827,7 @@ def compute_stream_token(
             "fps": int(fps),
             "start": round(float(grid[0]) if grid.size else 0.0, 6),
             "frames": int(grid.size),
+            **_plugin_signature(info, audio_track, merged_params),
         },
         sort_keys=True,
         ensure_ascii=False,
@@ -876,6 +911,7 @@ def compute_source_token(
     audio_path: Path | None,
     trim_start_sec: float,
     fps: int,
+    audio_track: dict[str, Any] | None = None,
 ) -> str:
     """音源単位キャッシュのトークン。compute_stream_token から grid 情報を除いたもの。"""
     if info.analysis_keys is None:
@@ -899,6 +935,7 @@ def compute_source_token(
             "audio": audio_sig,
             "trimStart": round(float(trim_start_sec or 0.0), 6),
             "fps": int(fps),
+            **_plugin_signature(info, audio_track, merged_params),
         },
         sort_keys=True,
         ensure_ascii=False,
@@ -1124,6 +1161,7 @@ def ensure_visualizer_streams(
         trim_start_sec=trim_start,
         fps=fps,
         time_grid_sec=time_grid_sec,
+        audio_track=audio_track,
     )
     cached = _load_stream_manifest(cache_dir, token)
     if cached is not None:
@@ -1135,13 +1173,14 @@ def ensure_visualizer_streams(
             return cached
         manifest: dict[str, dict[str, Any]] | None = None
         # --- 音源単位キャッシュからの行スライスを試す ---
-        if audio_path is not None:
+        if audio_path is not None and info.source_slice:
             src_token = compute_source_token(
                 info,
                 merged,
                 audio_path=audio_path,
                 trim_start_sec=trim_start,
                 fps=fps,
+                audio_track=audio_track,
             )
             if allow_source_build:
                 source_manifest = _ensure_source_streams(
@@ -1260,4 +1299,13 @@ def build_audio_context_for_track(
     if trim_start > 0:
         skip = min(pcm.size, int(round(trim_start * sample_rate)))
         pcm = pcm[skip:]
-    return AudioContext(sample_rate=sample_rate, pcm=pcm)
+    try:
+        mtime_ns = path.stat().st_mtime_ns
+    except OSError:
+        mtime_ns = 0
+    return AudioContext(
+        sample_rate=sample_rate,
+        pcm=pcm,
+        track=track,
+        source_key=f"{path.resolve()}:{mtime_ns}:{trim_start}",
+    )

@@ -14,11 +14,20 @@
 //
 // レコード形式: { id, name, characterId, x, y, scale }
 //   characterId = キャラ**定義** ID (インスタンス ID ではない)。
+//
+// 上書き保存の自動反映: 「上書き前のプリセットと X / Y / 拡大率が一致する同じキャラ」
+// を、そのプリセットを使っているキャラとみなし、確認のうえ他カットも書き換える
+// (一致判定は fillPlacementPresets の自動選択と同じ)。
 // =============================================================================
 import { state } from "./state.js";
 import { elements } from "./elements.js";
 import { showToast } from "./toast.js";
-import { selectedCharacter } from "./character.js";
+import { selectedCharacter, updateSelectedCharacterFromControls } from "./character.js";
+import { updateSelectedCutFromCurrent, scheduleScenarioSave } from "./scenario-actions.js";
+import { recordHistory } from "./history.js";
+import { renderPreview } from "./playback.js";
+import { markThumbnailDirty } from "./thumbnail.js";
+import { promptConfirm } from "./dialog.js";
 
 let deps = {
   handleEditorChanged: () => {},
@@ -76,16 +85,18 @@ export function fillPlacementPresets(selectedId = null) {
     const curX = _numOr(elements.characterX?.value, NaN);
     const curY = _numOr(elements.characterY?.value, NaN);
     const curScale = _numOr(elements.characterScale?.value, NaN);
-    const match = presets.find(
-      (p) => Math.round(p.x) === Math.round(curX)
-        && Math.round(p.y) === Math.round(curY)
-        && Math.abs(p.scale - curScale) < 1e-6,
-    );
+    const match = presets.find((p) => placementMatches(p, curX, curY, curScale));
     value = match?.id || "";
   }
   select.value = value;
   syncPlacementPresetName();
   updatePlacementPresetButtons();
+}
+
+function placementMatches(preset, x, y, scale) {
+  return Math.round(preset.x) === Math.round(_numOr(x, NaN))
+    && Math.round(preset.y) === Math.round(_numOr(y, NaN))
+    && Math.abs(preset.scale - _numOr(scale, NaN)) < 1e-6;
 }
 
 export function syncPlacementPresetName() {
@@ -163,15 +174,54 @@ export async function saveCurrentPlacementPreset() {
   const index = presets.findIndex(
     (item) => item.id === preset.id && (item.characterId || "") === characterId,
   );
+  const oldPreset = index >= 0 ? presets[index] : null;
+  // 上書きのとき: 上書き前の立ち位置のままの同じキャラ (他カット) を探す。
+  // 編集中カットは入力欄が正本なので対象外 (live の currentCharacters とずれないように)。
+  updateSelectedCharacterFromControls();
+  updateSelectedCutFromCurrent();
+  const isTarget = (ch) => Boolean(ch) && (ch.characterId || "") === characterId
+    && placementMatches(oldPreset, ch.character?.x, ch.character?.y, ch.character?.scale);
+  const targetCuts = oldPreset
+    ? (state.scenario?.cuts || []).filter(
+      (cut) => cut.id !== state.selectedCutId && (cut.state?.characters || []).some(isTarget),
+    )
+    : [];
+  const targetCutIds = new Set(targetCuts.map((cut) => cut.id));
+  const targets = targetCuts;
+  const propagate = targets.length > 0 && await promptConfirm({
+    title: "配置プリセットの上書き",
+    message: `「${oldPreset.name}」の立ち位置にいる他の ${targetCutIds.size} カットのキャラにも、新しい配置を反映しますか？`,
+    note: "反映しない場合は、プリセットと編集中のカットだけが更新されます。",
+    confirmLabel: `${targetCutIds.size} カットにも反映する`,
+    cancelLabel: "反映しない",
+  });
   if (index >= 0) presets[index] = preset;
   else presets.push(preset);
   const saved = await savePresetsToServer(presets);
+  if (propagate) {
+    // cut.state / characters は履歴スナップショットと共有されているので、その場で
+    // 書き換えず新しいオブジェクトへ差し替える (undo を壊さない)。
+    for (const cut of targetCuts) {
+      cut.state = {
+        ...cut.state,
+        characters: cut.state.characters.map((ch) => (isTarget(ch)
+          ? { ...ch, character: { ...(ch.character || {}), x: preset.x, y: preset.y, scale: preset.scale } }
+          : ch)),
+      };
+    }
+    scheduleScenarioSave();
+    recordHistory();
+    markThumbnailDirty();
+    renderPreview();
+  }
   // サーバ側で ID が衝突回避リネームされている可能性があるので、名前で拾い直す。
   const persisted = saved.find(
     (item) => (item.characterId || "") === characterId && item.name === name,
   );
   fillPlacementPresets(persisted?.id || preset.id);
-  showToast("配置プリセットを保存しました");
+  showToast(propagate
+    ? `配置プリセットを保存し、${targetCutIds.size} カットに反映しました`
+    : "配置プリセットを保存しました");
 }
 
 export async function deleteCurrentPlacementPreset() {

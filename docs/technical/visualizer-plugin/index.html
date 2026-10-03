@@ -1736,10 +1736,18 @@
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">GL_MODULE</span> <span class="o">=</span> <span class="s2">&quot;/static/js/visualizers/awesomeviz.js&quot;</span>   <span class="c1"># 必須</span>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">GL_VERSION</span> <span class="o">=</span> <span class="mi">1</span>                                        <span class="c1"># 任意 (省略時 1)</span>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">GL_FRAME_RATE</span> <span class="o">=</span> <span class="mi">24</span>                                    <span class="c1"># 任意。plugin が希望する更新粒度 (省略時は project の characterAnimationFps)</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># 音声解析が必要な場合のみ実装する (任意)</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="k">def</span><span class="w"> </span><span class="nf">gl_data_streams</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">audio</span><span class="p">,</span> <span class="n">time_grid_sec</span><span class="p">,</span> <span class="n">fps</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">]:</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="o">...</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">SOURCE_SLICE</span> <span class="o">=</span> <span class="kc">True</span>                                   <span class="c1"># 任意。False = 音源単位キャッシュ (全長解析 + 行スライス) を使わない</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>                                                      <span class="c1">#   (カット外の時刻のデータを返すプラグイン用。例: pitch_roll)</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="c1"># 任意。解析結果がパラメータの値そのもの以外 (音源トラックに付いた MIDI、パラメータで</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># 指定したファイルの更新時刻 等) に依存するときに実装。戻り値の文字列が解析キャッシュの</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="c1"># トークンに混ざる。params は defaults とマージ済み。</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="k">def</span><span class="w"> </span><span class="nf">cache_signature</span><span class="p">(</span><span class="n">track</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="o">...</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="c1"># 音声解析が必要な場合のみ実装する (任意)</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="k">def</span><span class="w"> </span><span class="nf">gl_data_streams</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">audio</span><span class="p">,</span> <span class="n">time_grid_sec</span><span class="p">,</span> <span class="n">fps</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">]:</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="o">...</span>
 </span></code></pre></div>
 <p><code>GL_MODULE</code> が宣言されていないプラグインは UI に出さずスキップされます (起動ログに <code>[visualizer] skipping &lt;file&gt;: GL_MODULE が定義されていません</code> が出ます)。</p>
 <h3 id="params"><code>PARAMS</code> の書き方<a class="headerlink" href="#params" title="Permanent link">&para;</a></h3>
@@ -1813,7 +1821,7 @@
 <tr>
 <td><code>audio</code></td>
 <td><code>AudioContext</code> または <code>None</code></td>
-<td>scene 内の連続 PCM (mono float32 [-1, 1])。<code>audio.window(t, L)</code> / <code>audio.spectrum_db(t, ...)</code> / <code>audio.amplitude_db(t, ...)</code> などで切り出す</td>
+<td>scene 内の連続 PCM (mono float32 [-1, 1])。<code>audio.window(t, L)</code> / <code>audio.spectrum_db(t, ...)</code> / <code>audio.amplitude_db(t, ...)</code> などで切り出す。<code>audio.track</code> で解析対象の BGM トラック設定 (<code>lipSyncMidi</code> 等) を、<code>audio.source_key</code> で音源の同一性キー (モジュール内メモ化用) を参照できる</td>
 </tr>
 <tr>
 <td><code>time_grid_sec</code></td>

@@ -12,12 +12,26 @@
 // 正本は projects/<id>/scene_layer_presets.json ({ foreground: [...], background: [...] })。
 // manifest には sceneLayerPresets として同梱される。
 // X / Y の null は cut.state と同じく「中央配置」を意味し、そのまま保持する。
+//
+// 上書き保存の自動反映: カットは「どのプリセットから来たか」を保存しない。代わりに
+// 「上書き前のプリセットと全項目が一致するカット = そのプリセットを使っている
+// カット」とみなし、確認のうえ新しい値へ書き換える。手で値を変えたカットは一致
+// しなくなるので自然に対象外になり、この機能以前に適用したカットも対象に入る。
 // =============================================================================
 import { state } from "./state.js";
 import { elements } from "./elements.js";
 import { showToast } from "./toast.js";
 import { normalizeColorValue } from "./utils.js";
-import { ensureSelectValue, setSwatchDisplay } from "./scenario-actions.js";
+import {
+  ensureSelectValue,
+  setSwatchDisplay,
+  updateSelectedCutFromCurrent,
+  scheduleScenarioSave,
+} from "./scenario-actions.js";
+import { recordHistory } from "./history.js";
+import { renderPreview } from "./playback.js";
+import { markThumbnailDirty } from "./thumbnail.js";
+import { promptConfirm } from "./dialog.js";
 
 let deps = {
   handleEditorChanged: () => {},
@@ -121,9 +135,61 @@ function sameNullableNumber(a, b) {
   return Math.abs(Number(a) - Number(b)) < 1e-6;
 }
 
+// cut.state をプリセット形式で読み出す (payload() / loadCut と同じ既定値の解釈)。
+function readCutState(kind, cs) {
+  const s = cs || {};
+  if (kind === "foreground") {
+    return {
+      image: String(s.foreground || ""),
+      x: _numOrNull(s.foregroundX),
+      y: _numOrNull(s.foregroundY),
+      scale: _scaleOrOne(s.foregroundScale),
+    };
+  }
+  // background キーが無いカットは manifest の既定背景を表示している (loadCut と同じ解釈)。
+  const background = Object.hasOwn(s, "background")
+    ? s.background
+    : (state.manifest?.defaults?.background || "");
+  return {
+    image: String(background || ""),
+    x: _numOrNull(s.backgroundX),
+    y: _numOrNull(s.backgroundY),
+    scale: _scaleOrOne(s.backgroundScale),
+    blurPx: _clamp(s.backgroundBlurPx, 0, 200, 0),
+    color: normalizeColorValue(s.backgroundColor || "#000000", "#000000").toLowerCase(),
+    colorOpacity: _clamp(s.backgroundColorOpacity, 0, 1, 0),
+  };
+}
+
+// プリセットの値を cut.state へ書き込む (payload() と同じキー・同じ形)。
+function writeCutState(kind, cs, preset) {
+  if (kind === "foreground") {
+    cs.foreground = preset.image || "";
+    cs.foregroundX = preset.x ?? null;
+    cs.foregroundY = preset.y ?? null;
+    cs.foregroundScale = _scaleOrOne(preset.scale);
+    return;
+  }
+  cs.background = preset.image || "";
+  cs.backgroundX = preset.x ?? null;
+  cs.backgroundY = preset.y ?? null;
+  cs.backgroundScale = _scaleOrOne(preset.scale);
+  cs.backgroundBlurPx = _clamp(preset.blurPx, 0, 200, 0);
+  cs.backgroundColor = normalizeColorValue(preset.color || "#000000", "#000000");
+  cs.backgroundColorOpacity = _clamp(preset.colorOpacity, 0, 1, 0);
+}
+
+// 画像パスは NFC で比べる (外付け NTFS が NFD を返すことがあるため)。
+function samePath(a, b) {
+  return String(a || "").normalize("NFC") === String(b || "").normalize("NFC");
+}
+
 function matchesControls(kind, preset) {
-  const cur = readControls(kind);
-  if ((preset.image || "") !== cur.image) return false;
+  return matchesValues(kind, preset, readControls(kind));
+}
+
+function matchesValues(kind, preset, cur) {
+  if (!samePath(preset.image, cur.image)) return false;
   if (!sameNullableNumber(preset.x, cur.x) || !sameNullableNumber(preset.y, cur.y)) return false;
   if (!sameNullableNumber(_scaleOrOne(preset.scale), cur.scale)) return false;
   if (kind === "background") {
@@ -237,12 +303,43 @@ export async function saveCurrentSceneLayerPreset(kind) {
   const preset = { id, name, ...readControls(kind) };
   const presets = [...presetsOf(kind)];
   const index = presets.findIndex((p) => p.id === id);
+  const oldPreset = index >= 0 ? presets[index] : null;
+  // 上書きのとき: 上書き前の値のままの他カット (= このプリセットを使っているカット) を探す。
+  updateSelectedCutFromCurrent();
+  const targets = oldPreset
+    ? (state.scenario?.cuts || []).filter(
+      (cut) => cut.id !== state.selectedCutId && matchesValues(kind, oldPreset, readCutState(kind, cut.state)),
+    )
+    : [];
+  const propagate = targets.length > 0 && await promptConfirm({
+    title: `${k.label}プリセットの上書き`,
+    message: `「${oldPreset.name}」を使っている他の ${targets.length} カットにも、新しい${k.label}の設定を反映しますか？`,
+    note: "反映しない場合は、プリセットと編集中のカットだけが更新されます。",
+    confirmLabel: `${targets.length} カットにも反映する`,
+    cancelLabel: "反映しない",
+  });
   if (index >= 0) presets[index] = preset;
   else presets.push(preset);
   const saved = await savePresetsToServer(kind, presets);
   const persisted = saved.find((p) => p.id === id) || saved.find((p) => p.name === name);
+  if (propagate) {
+    const value = persisted || preset;
+    for (const cut of targets) {
+      // cut.state は履歴スナップショット (toDiskScenario の浅いコピー) と共有されて
+      // いるので、その場で書き換えず新しいオブジェクトへ差し替える (undo を壊さない)。
+      const next = { ...(cut.state || {}) };
+      writeCutState(kind, next, value);
+      cut.state = next;
+    }
+    scheduleScenarioSave();
+    recordHistory();
+    markThumbnailDirty();
+    renderPreview();
+  }
   fillSceneLayerPresets(kind, persisted?.id || id);
-  showToast(`${k.label}プリセットを保存しました`);
+  showToast(propagate
+    ? `${k.label}プリセットを保存し、${targets.length} カットに反映しました`
+    : `${k.label}プリセットを保存しました`);
 }
 
 export async function deleteCurrentSceneLayerPreset(kind) {
