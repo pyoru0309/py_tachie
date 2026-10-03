@@ -565,6 +565,142 @@ def save_placement_presets(
     return out
 
 
+# ---------------------------------------------------------------------------
+# 前景プリセット / 背景プリセット (scene layer presets)
+#
+# 演出タブの「前景 (画像 / X / Y / 拡大率)」と「背景 (画像 / X / Y / 拡大率 /
+# ぼかし / 背景色 / 背景色の不透明度)」を、それぞれ名前付きで保存して任意の
+# カットへ呼び出す。前景と背景は**独立した 2 系統**で、片方を保存・適用しても
+# もう片方には触れない。
+# 保存先は projects/<id>/scene_layer_presets.json の 1 ファイル
+# ({"foreground": [...], "background": [...]})。
+# X / Y は null = 中央配置 (cut.state と同じルール) をそのまま保持する。
+# ---------------------------------------------------------------------------
+
+SCENE_LAYER_PRESET_KINDS = ("foreground", "background")
+
+
+def _normalize_scene_layer_preset(item: Any, index: int, kind: str) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        return None
+    label = "前景" if kind == "foreground" else "背景"
+    name = str(item.get("name") or f"{label}{index}").strip() or f"{label}{index}"
+    raw_id = str(item.get("id") or f"{kind}_{index}").strip()
+    preset_id = re.sub(r"\s+", "_", raw_id) or f"{kind}_{index}"
+
+    def _pos(key: str) -> float | None:
+        value = item.get(key)
+        if value is None or value == "":
+            return None
+        try:
+            n = float(value)
+        except (TypeError, ValueError):
+            return None
+        return round(n, 2) if n == n and abs(n) != float("inf") else None
+
+    try:
+        scale = float(item.get("scale", 1.0))
+    except (TypeError, ValueError):
+        scale = 1.0
+    if not (scale > 0):
+        scale = 1.0
+    record: dict[str, Any] = {
+        "id": preset_id,
+        "name": name,
+        "image": str(item.get("image") or "").replace("\\", "/"),
+        "x": _pos("x"),
+        "y": _pos("y"),
+        "scale": round(min(4.0, max(0.05, scale)), 4),
+    }
+    if kind == "background":
+        try:
+            blur = max(0.0, min(200.0, float(item.get("blurPx", 0) or 0)))
+        except (TypeError, ValueError):
+            blur = 0.0
+        color = str(item.get("color") or "#000000").strip()
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+            color = "#000000"
+        try:
+            opacity = max(0.0, min(1.0, float(item.get("colorOpacity", 0) or 0)))
+        except (TypeError, ValueError):
+            opacity = 0.0
+        record["blurPx"] = round(blur, 2)
+        record["color"] = color.lower()
+        record["colorOpacity"] = round(opacity, 4)
+    return record
+
+
+def _normalize_scene_layer_preset_list(raw: Any, kind: str, *, rename_duplicates: bool) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    used: set[str] = set()
+    for index, item in enumerate(raw, start=1):
+        record = _normalize_scene_layer_preset(item, index, kind)
+        if record is None:
+            continue
+        if record["id"] in used:
+            if not rename_duplicates:
+                continue
+            base = record["id"]
+            suffix = 2
+            while f"{base}_{suffix}" in used:
+                suffix += 1
+            record["id"] = f"{base}_{suffix}"
+        used.add(record["id"])
+        out.append(record)
+    return out
+
+
+def _read_scene_layer_presets_file(ctx: ProjectContext) -> dict[str, Any]:
+    path = ctx.scene_layer_presets_path
+    if not path.exists():
+        return {}
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except (json.JSONDecodeError, OSError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def ensure_scene_layer_presets(ctx: ProjectContext | None = None) -> dict[str, list[dict[str, Any]]]:
+    """projects/<id>/scene_layer_presets.json を読み込んで正規化した dict を返す。
+
+    ファイルが無い場合は両方とも空配列 (作成はしない ── 保存時に初めて書き出す)。
+    """
+    ctx = ctx or current_project()
+    raw = _read_scene_layer_presets_file(ctx)
+    return {
+        kind: _normalize_scene_layer_preset_list(raw.get(kind), kind, rename_duplicates=False)
+        for kind in SCENE_LAYER_PRESET_KINDS
+    }
+
+
+def save_scene_layer_presets(
+    payload: dict[str, Any], ctx: ProjectContext | None = None
+) -> dict[str, list[dict[str, Any]]]:
+    """前景 / 背景のどちらか一方 (payload["kind"]) のプリセット配列を丸ごと置き換える。
+
+    もう一方の系統はディスク上の内容をそのまま残す (= 前景と背景は独立して保存できる)。
+    保存後の両系統を返す。
+    """
+    ctx = ctx or current_project()
+    kind = str(payload.get("kind") or "")
+    if kind not in SCENE_LAYER_PRESET_KINDS:
+        raise ValueError("kind must be 'foreground' or 'background'")
+    presets_payload = payload.get("presets")
+    if not isinstance(presets_payload, list):
+        raise ValueError("presets must be a list")
+    current = ensure_scene_layer_presets(ctx)
+    current[kind] = _normalize_scene_layer_preset_list(presets_payload, kind, rename_duplicates=True)
+    ctx.scene_layer_presets_path.parent.mkdir(parents=True, exist_ok=True)
+    with ctx.scene_layer_presets_path.open("w", encoding="utf-8") as handle:
+        json.dump(current, handle, ensure_ascii=False, indent=2)
+    write_project_file(ctx)
+    return current
+
+
 def ensure_expression_presets(manifest: dict[str, Any], ctx: ProjectContext | None = None) -> list[dict[str, Any]]:
     """project + asset の表情プリセットをマージして返す。
 

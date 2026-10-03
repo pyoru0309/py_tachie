@@ -953,6 +953,26 @@
             </div>
             <div class="inline-fields">
               <label>
+                前景プリセット
+                <select id="foregroundPresetSelect"></select>
+              </label>
+              <label>
+                プリセット名
+                <input id="foregroundPresetNameInput" type="text" placeholder="前景1" />
+              </label>
+            </div>
+            <div class="button-row">
+              <button id="saveForegroundPresetButton" type="button" title="編集中のカットの前景の画像 / X / Y / 拡大率 を名前付きで保存します（選択中のプリセットがあれば上書き）">
+                <span class="msym button-icon" aria-hidden="true">bookmark_add</span>
+                <span>前景プリセット保存</span>
+              </button>
+              <button id="deleteForegroundPresetButton" type="button">
+                <span class="msym button-icon" aria-hidden="true">delete</span>
+                <span>削除</span>
+              </button>
+            </div>
+            <div class="inline-fields">
+              <label>
                 背景
                 <select id="backgroundSelect"></select>
               </label>
@@ -1000,6 +1020,27 @@
               </label>
             </div>
             <p class="asset-hint">背景画像が未指定のときに表示される色です（既定は完全透明）。背景画像を指定するとそちらが優先されます。</p>
+            <div class="inline-fields">
+              <label>
+                背景プリセット
+                <select id="backgroundPresetSelect"></select>
+              </label>
+              <label>
+                プリセット名
+                <input id="backgroundPresetNameInput" type="text" placeholder="背景1" />
+              </label>
+            </div>
+            <div class="button-row">
+              <button id="saveBackgroundPresetButton" type="button" title="編集中のカットの背景の画像 / X / Y / 拡大率 / ぼかし / 背景色 / 不透明度 を名前付きで保存します（選択中のプリセットがあれば上書き）">
+                <span class="msym button-icon" aria-hidden="true">bookmark_add</span>
+                <span>背景プリセット保存</span>
+              </button>
+              <button id="deleteBackgroundPresetButton" type="button">
+                <span class="msym button-icon" aria-hidden="true">delete</span>
+                <span>削除</span>
+              </button>
+            </div>
+            <p class="asset-hint">前景プリセットと背景プリセットは別々に保存・呼び出しできます。プルダウンで選ぶと編集中のカットへすぐ反映されます（元に戻すで取り消せます）。</p>
             <div class="button-row">
               <button id="applyEffectSceneToAllCutsButton" type="button" title="背景・背景ぼかし・背景色・前景を、他カットへ一括反映します">
                 <span class="msym button-icon" aria-hidden="true">done_all</span>

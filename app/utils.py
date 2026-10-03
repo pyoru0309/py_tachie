@@ -42,6 +42,7 @@ class ProjectContext:
     config_path: Path
     presets_path: Path
     placement_presets_path: Path
+    scene_layer_presets_path: Path
     scenario_path: Path
     manifest_path: Path
     psd_manifest_path: Path
@@ -95,6 +96,7 @@ def project_context(project_id: str | None = None) -> ProjectContext:
         config_path=root / "config.json",
         presets_path=root / "expression_presets.json",
         placement_presets_path=root / "placement_presets.json",
+        scene_layer_presets_path=root / "scene_layer_presets.json",
         scenario_path=root / "scenarios" / "main.json",
         manifest_path=root / "generated" / "manifest.json",
         psd_manifest_path=root / "assets" / "character_manifest.json",

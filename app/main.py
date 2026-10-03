@@ -241,6 +241,7 @@ from .scenario import (
     default_scenario,
     ensure_expression_presets,
     ensure_placement_presets,
+    ensure_scene_layer_presets,
     ensure_scenario,
     resolve_effective_scene,
     first_character_id,
@@ -249,6 +250,7 @@ from .scenario import (
     normalize_scenario,
     save_expression_presets,
     save_placement_presets,
+    save_scene_layer_presets,
     scenario_cuts,
 )
 
@@ -940,7 +942,7 @@ def _rewrite_project_scoped_paths(project_root: Path, old_id: str, new_id: str) 
     old_prefix = f"projects/{old_id}/"
     new_prefix = f"projects/{new_id}/"
     rewrite_targets = list(project_root.glob("scenarios/*.json"))
-    for name in ("project.json", "config.json", "expression_presets.json", "placement_presets.json"):
+    for name in ("project.json", "config.json", "expression_presets.json", "placement_presets.json", "scene_layer_presets.json"):
         candidate = project_root / name
         if candidate.exists():
             rewrite_targets.append(candidate)
@@ -1296,6 +1298,7 @@ def restore_project_backup(project_id: str, backup_id: str) -> dict[str, Any]:
     manifest["config"] = config
     manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
     manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
+    manifest["sceneLayerPresets"] = ensure_scene_layer_presets(ctx)
     manifest["project"] = read_project_file(ctx)
     manifest["projectId"] = ctx.id
     return {**result, "manifest": manifest, "scenario": scenario}
@@ -1376,6 +1379,7 @@ def rescan_project_assets() -> dict[str, Any]:
     manifest["config"] = config
     manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
     manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
+    manifest["sceneLayerPresets"] = ensure_scene_layer_presets(ctx)
     return manifest
 
 
@@ -1393,6 +1397,7 @@ def _manifest_for_ctx(ctx) -> dict[str, Any]:
     manifest["config"] = config_out
     manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
     manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
+    manifest["sceneLayerPresets"] = ensure_scene_layer_presets(ctx)
     manifest["project"] = read_project_file(ctx)
     manifest["projectId"] = ctx.id
     return manifest
@@ -1511,6 +1516,20 @@ def update_placement_presets(payload: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.post("/api/scene-layer-presets")
+def update_scene_layer_presets(payload: dict[str, Any]) -> dict[str, Any]:
+    """前景プリセット / 背景プリセットのどちらか一方 (payload.kind) を保存する。
+
+    projects/<id>/scene_layer_presets.json が正本。もう一方の系統には触れない。
+    """
+    try:
+        ctx = current_project()
+        presets = save_scene_layer_presets(payload, ctx)
+        return {"presets": presets}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.get("/api/characters/expression-presets")
 def get_asset_expression_presets(assetRoot: str) -> dict[str, Any]:
     """assets/<id>/expression_presets.json をアセット管理画面用に返す。"""
@@ -1623,6 +1642,7 @@ def post_asset_hairstyle_presets(payload: dict[str, Any]) -> dict[str, Any]:
         manifest = ensure_manifest(ctx)
         manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
         manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
+        manifest["sceneLayerPresets"] = ensure_scene_layer_presets(ctx)
     return {"presets": saved, "manifest": manifest}
 
 
@@ -1677,6 +1697,7 @@ def post_asset_expression_presets(payload: dict[str, Any]) -> dict[str, Any]:
         manifest = ensure_manifest(ctx)
         manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
         manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
+        manifest["sceneLayerPresets"] = ensure_scene_layer_presets(ctx)
     return {"presets": saved, "manifest": manifest}
 
 
@@ -1692,6 +1713,7 @@ def update_character(payload: dict[str, Any]) -> dict[str, Any]:
             manifest["config"] = config
             manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
             manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
+            manifest["sceneLayerPresets"] = ensure_scene_layer_presets(ctx)
         else:
             manifest = common_character_manifest()
         return {"character": character_manifest, "manifest": manifest}
@@ -1718,6 +1740,7 @@ def delete_character(payload: dict[str, Any]) -> dict[str, Any]:
         manifest["config"] = config
         manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
         manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
+        manifest["sceneLayerPresets"] = ensure_scene_layer_presets(ctx)
         manifest["project"] = read_project_file(ctx)
         manifest["projectId"] = ctx.id
         return {"deleted": character_id, "manifest": manifest, "scenario": ensure_scenario(manifest, ctx)}
@@ -1760,6 +1783,7 @@ async def import_character(
         manifest["config"] = config
         manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
         manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
+        manifest["sceneLayerPresets"] = ensure_scene_layer_presets(ctx)
         manifest["project"] = read_project_file(ctx)
         manifest["projectId"] = ctx.id
         return {"character": character_manifest, "manifest": manifest}
@@ -4883,6 +4907,7 @@ def synthesize_tts(payload: dict[str, Any]) -> dict[str, Any]:
         manifest["config"] = config
         manifest["expressionPresets"] = ensure_expression_presets(manifest, ctx)
         manifest["placementPresets"] = ensure_placement_presets(manifest, ctx)
+        manifest["sceneLayerPresets"] = ensure_scene_layer_presets(ctx)
         response["manifest"] = manifest
     return response
 

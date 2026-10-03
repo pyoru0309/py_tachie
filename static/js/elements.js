@@ -48,6 +48,15 @@ export const elements = {
   centerForegroundYButton: document.querySelector("#centerForegroundYButton"),
   centerBackgroundXButton: document.querySelector("#centerBackgroundXButton"),
   centerBackgroundYButton: document.querySelector("#centerBackgroundYButton"),
+  // 前景プリセット / 背景プリセット (演出タブ)。互いに独立した 2 系統。
+  foregroundPreset: document.querySelector("#foregroundPresetSelect"),
+  foregroundPresetName: document.querySelector("#foregroundPresetNameInput"),
+  saveForegroundPresetButton: document.querySelector("#saveForegroundPresetButton"),
+  deleteForegroundPresetButton: document.querySelector("#deleteForegroundPresetButton"),
+  backgroundPreset: document.querySelector("#backgroundPresetSelect"),
+  backgroundPresetName: document.querySelector("#backgroundPresetNameInput"),
+  saveBackgroundPresetButton: document.querySelector("#saveBackgroundPresetButton"),
+  deleteBackgroundPresetButton: document.querySelector("#deleteBackgroundPresetButton"),
   // ケンバーンズ (シーン全体のズーム・パン)。演出タブ。
   kenBurnsEnabled: document.querySelector("#kenBurnsEnabledInput"),
   kenBurnsStartScale: document.querySelector("#kenBurnsStartScaleInput"),

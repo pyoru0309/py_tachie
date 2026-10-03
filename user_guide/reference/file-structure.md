@@ -32,6 +32,7 @@ projects/<project_id>/
   config.json
   expression_presets.json
   placement_presets.json
+  scene_layer_presets.json
   scenarios/
     main.json
   assets/
@@ -82,6 +83,10 @@ projects/<project_id>/
 プロジェクト固有の **配置プリセット** (キャラ 1 体の立ち位置) を保存します。各エントリは `{id, name, characterId, x, y, scale}` です。
 
 表情プリセットと違いアセット側 (`assets/characters/<id>/`) には正本を持たず、**このファイルだけが正本**です。詳細は [キャラクターモデル](../technical/character-model.md#placement-presets) を参照してください。
+
+## `scene_layer_presets.json`
+
+演出タブの **前景プリセット / 背景プリセット** を保存します。`{"foreground": [...], "background": [...]}` の 2 系統で、前景は `{id, name, image, x, y, scale}`、背景はそれに `blurPx, color, colorOpacity` を加えたものです。`x` / `y` の `null` は中央配置を表します。
 
 ## `scenarios/main.json`
 
@@ -141,6 +146,7 @@ three.js / mp4box.js のローカル取得状況を記録します。サーバ�
     ├── config.json
     ├── expression_presets.json
     ├── placement_presets.json
+    ├── scene_layer_presets.json
     ├── scenarios/main.json
     └── assets/
 ```

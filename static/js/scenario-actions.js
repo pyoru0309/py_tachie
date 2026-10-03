@@ -54,6 +54,7 @@ import {
 import { combineNarratorAndStyle } from "./tts.js";
 import { renderSoundEffectEditor } from "./sound-effect.js";
 import { renderVideoLayerEditor } from "./video-layer.js";
+import { fillAllSceneLayerPresets } from "./scene-layer-presets.js";
 
 const deps = {
   applyEditorTargetView: () => {},
@@ -400,7 +401,7 @@ export function applyKenBurnsToControls(raw) {
 
 // HEX 表示要素は app.js init で <span> から編集可能な <input> へ格上げされる。
 // span のときは textContent、input のときは value に書き込む (両対応)。
-function setSwatchDisplay(swatch, color) {
+export function setSwatchDisplay(swatch, color) {
   if (!swatch) return;
   if (swatch.tagName === "INPUT") swatch.value = color;
   else swatch.textContent = color;
@@ -1168,6 +1169,8 @@ export async function loadCut(cut, options = {}) {
   if (elements.backgroundY) {
     elements.backgroundY.value = _numOrNull(data.backgroundY) == null ? "" : String(_numOrNull(data.backgroundY));
   }
+  // 前景 / 背景プリセットの select を、いま流し込んだ値に一致するものへ合わせる。
+  fillAllSceneLayerPresets();
   applyKenBurnsToControls(data.kenBurns);
   // M-1: motionType / motionSettings は character.motion へ統合。
   // loadCut の段階では仮 reset しておき、loadCharacterIntoControls (= 選択中キャラ

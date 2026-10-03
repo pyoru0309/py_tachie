@@ -60,6 +60,12 @@ import {
   deleteCurrentPlacementPreset,
   bindPlacementPresets,
 } from "./character-placement-presets.js";
+import {
+  bindSceneLayerPresets,
+  applySelectedSceneLayerPreset,
+  saveCurrentSceneLayerPreset,
+  deleteCurrentSceneLayerPreset,
+} from "./scene-layer-presets.js";
 import { bindMotionPivotPicker, exitMotionPivotPicking } from "./motion-pivot-picker.js";
 import { bindPreviewInteractions } from "./preview-interactions.js";
 import {
@@ -1102,6 +1108,7 @@ function bindControls() {
   });
   bindDialogueVoice();
   bindPlacementPresets({ handleEditorChanged });
+  bindSceneLayerPresets({ handleEditorChanged });
   bindSceneOps({
     scheduleScenarioSave,
     renderPreview,
@@ -1623,6 +1630,23 @@ function bindControls() {
   elements.centerForegroundYButton?.addEventListener("click", () => _centerAxis(elements.foregroundY));
   elements.centerBackgroundXButton?.addEventListener("click", () => _centerAxis(elements.backgroundX));
   elements.centerBackgroundYButton?.addEventListener("click", () => _centerAxis(elements.backgroundY));
+  // 前景プリセット / 背景プリセット。互いに独立した 2 系統。
+  for (const [kind, select, saveButton, deleteButton] of [
+    ["foreground", elements.foregroundPreset, elements.saveForegroundPresetButton, elements.deleteForegroundPresetButton],
+    ["background", elements.backgroundPreset, elements.saveBackgroundPresetButton, elements.deleteBackgroundPresetButton],
+  ]) {
+    select?.addEventListener("change", () => applySelectedSceneLayerPreset(kind));
+    saveButton?.addEventListener("click", () => {
+      withBusy(saveButton, "保存中", () => saveCurrentSceneLayerPreset(kind)).catch((error) => {
+        showToast(error.message, "error");
+      });
+    });
+    deleteButton?.addEventListener("click", () => {
+      withBusy(deleteButton, "削除中", () => deleteCurrentSceneLayerPreset(kind)).catch((error) => {
+        showToast(error.message, "error");
+      });
+    });
+  }
   // ケンバーンズ: 開始/終了の入替・リセット。
   elements.kenBurnsSwapButton?.addEventListener("click", () => {
     const swap = (a, b) => {
