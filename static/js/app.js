@@ -8,6 +8,7 @@ import {
   fillTelopDefaultFontWeights,
   registerProjectFonts,
   watchSystemFontsReady,
+  setSystemFontLoadedHandler,
 } from "./font.js";
 import { state } from "./state.js";
 import { elements } from "./elements.js";
@@ -124,6 +125,7 @@ import {
 import {
   bindPlayback,
   renderPreview,
+  invalidateRendererCachesForConfigChange,
   stopPreviewPlayback,
   playPreviewPlayback,
   setTogglePlayUi,
@@ -2017,6 +2019,13 @@ async function init() {
   );
   // PC インストール済みフォントのスキャン完了を待ってフォント一覧へ反映する
   watchSystemFontsReady(refreshManifest);
+  // 名前で見つからない PC フォント (Windows の Adobe Fonts 等) をファイルから
+  // 読み込み終えたら、代替フォントで焼かれたテロップ / セリフを描き直す。
+  setSystemFontLoadedHandler(() => {
+    invalidateRendererCachesForConfigChange()
+      .then(() => renderPreview())
+      .catch((err) => console.warn("system font redraw failed", err));
+  });
   const defaults = state.manifest.defaults;
 
   fillProjectSelect();

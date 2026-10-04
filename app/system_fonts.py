@@ -582,6 +582,64 @@ def resolve_face(family_id: str, weight_id: str) -> tuple[str, int] | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# ブラウザへのフォントファイル配信
+#
+# ブラウザ (canvas) は PC フォントを `font-family: "名前"` で OS から引く。ところが
+# Windows の Adobe Fonts は CoreSync フォルダに置かれるだけで OS のフォント登録に
+# 載らないため、Chrome / Edge からは名前で見つからず代替フォントで描かれる
+# (名前はサーバの CoreSync 直接走査で一覧に出るので「名前は合っているのに字形が
+# 違う」になる)。そういうフォントはブラウザが FontFace として読み込めるよう、
+# カタログにある face だけを返す。TTC/OTC は FontFace が読めないので該当 face を
+# 単体の sfnt に切り出す (重いので少数をメモリに保持)。
+# ---------------------------------------------------------------------------
+
+_FACE_BYTES_CACHE: dict[tuple[str, int, int], bytes] = {}
+_FACE_BYTES_LIMIT = 4
+_face_bytes_lock = threading.Lock()
+
+
+def face_file(family_id: str, weight_id: str) -> tuple[Path | bytes, str] | None:
+    """(ファイルパス または 切り出した bytes, media type)。カタログ外は None。"""
+    face = resolve_face(family_id, weight_id)
+    if face is None:
+        return None
+    path = Path(face[0])
+    index = face[1]
+    try:
+        with path.open("rb") as handle:
+            magic = handle.read(4)
+        stat = path.stat()
+    except OSError:
+        return None
+    if magic != b"ttcf":
+        return path, ("font/otf" if magic == b"OTTO" else "font/ttf")
+    key = (str(path), stat.st_mtime_ns, max(0, index))
+    with _face_bytes_lock:
+        cached = _FACE_BYTES_CACHE.get(key)
+    if cached is None:
+        import io
+
+        from fontTools.ttLib import TTCollection  # noqa: PLC0415
+
+        try:
+            collection = TTCollection(str(path), lazy=True)
+            font = collection.fonts[max(0, index)]
+            buffer = io.BytesIO()
+            font.save(buffer)
+            cached = buffer.getvalue()
+            collection.close()
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("system font face extract failed (%s #%s): %s", path.name, index, exc)
+            return None
+        with _face_bytes_lock:
+            while len(_FACE_BYTES_CACHE) >= _FACE_BYTES_LIMIT:
+                _FACE_BYTES_CACHE.pop(next(iter(_FACE_BYTES_CACHE)))
+            _FACE_BYTES_CACHE[key] = cached
+    media = "font/otf" if cached[:4] == b"OTTO" else "font/ttf"
+    return cached, media
+
+
 __all__ = [
     "enabled",
     "ensure_ready",
@@ -590,4 +648,5 @@ __all__ = [
     "status_payload",
     "manifest_entries",
     "resolve_face",
+    "face_file",
 ]

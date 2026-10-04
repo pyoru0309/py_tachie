@@ -5296,6 +5296,24 @@ def system_fonts_status_endpoint() -> dict[str, Any]:
     return payload
 
 
+@app.get("/api/system-fonts/file")
+def system_fonts_file_endpoint(family: str, weight: str = "regular") -> Response:
+    """PC フォントの実ファイル (ブラウザの FontFace 用)。
+
+    ブラウザが OS から名前で引けない PC フォント (Windows の Adobe Fonts 等) を
+    読み込ませるための口。カタログにある family / weight の face だけを返し、
+    任意パスは受け付けない。TTC は該当 face を切り出して返す。
+    """
+    result = system_fonts_mod.face_file(family, weight)
+    if result is None:
+        raise HTTPException(status_code=404, detail="フォントが見つかりません")
+    body, media_type = result
+    headers = {"Cache-Control": "private, max-age=3600"}
+    if isinstance(body, Path):
+        return FileResponse(body, media_type=media_type, headers=headers)
+    return Response(content=body, media_type=media_type, headers=headers)
+
+
 @app.post("/api/system-fonts/rescan")
 def system_fonts_rescan_endpoint() -> dict[str, Any]:
     """PC フォントの強制再スキャン (同期)。Adobe Fonts のアクティベート直後などに使う。"""
