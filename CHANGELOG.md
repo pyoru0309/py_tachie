@@ -5,7 +5,16 @@
 
 ## [Unreleased]
 
-（dev チャネルで先行配信中。stable への取り込みは検証後になります。）
+## [0.5.0] - 2026-10-04
+
+1 本の動画を複数のシーンで組み立てられるようになった、大きめのアップデートです。
+シーンごとの設定と「プロジェクト通し」の設定を切り替えられるほか、歌唱判定 MIDI
+による口パクとデュエット、プロジェクトの保管場所の追加、テロップの座布団、
+新しいビジュアライザ「歌声ピッチロール」、前景 / 背景プリセットなどを追加しました。
+Windows で Adobe Fonts のフォントが正しい字形で描かれなかった不具合も直しています。
+
+（本リリースは py_tachie/dev チャネルで先行配信していた変更を、検証を経て
+stable に取り込んだものです。）
 
 ### Added
 - **新しいビジュアライザ「歌声ピッチロール」**。歌声だけの音源から実際に歌った音程を
@@ -592,7 +601,8 @@ WebGL → WebSocket → ffmpeg のまま、**ブラウザ内 WebCodecs で H.264
   - キャラクター素材: `maki_py`, `moca_py` (作者: pyoru0309 / 改変自由)
   - 背景・前景・装飾画像・音声: `assets/audio`, `backgrounds`, `foregrounds`, `overlays` (作者: pyoru0309 / 改変自由)
 
-[Unreleased]: https://github.com/pyoru0309/py_tachie/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/pyoru0309/py_tachie/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.5.0
 [0.4.0]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.4.0
 [0.3.0]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.3.0
 [0.2.2]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.2.2
