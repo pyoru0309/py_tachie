@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-06
+
+v0.5.0 の不具合修正です。
+
+### Fixed
+- **複数シーンのプロジェクトで、セリフ / テロップの字幕（SRT / VTT）が最初のシーンの分しか
+  書き出されない不具合を直しました。** すべてのシーンの字幕が、プロジェクト全体の動画と
+  同じ時刻で書き出されます。シーンの境界をまたぐテロップも正しい時刻に入ります。
+
+### Changed
+- テロップの設定を他のテロップへ一括反映するときの確認文を、「シーン内 N 件」から
+  「プロジェクト内 N 件」に改めました（実際の対象はもともとプロジェクト全体のテロップで、
+  動作は変わりません）。
+
 ## [0.5.0] - 2026-10-04
 
 1 本の動画を複数のシーンで組み立てられるようになった、大きめのアップデートです。
@@ -601,7 +615,8 @@ WebGL → WebSocket → ffmpeg のまま、**ブラウザ内 WebCodecs で H.264
   - キャラクター素材: `maki_py`, `moca_py` (作者: pyoru0309 / 改変自由)
   - 背景・前景・装飾画像・音声: `assets/audio`, `backgrounds`, `foregrounds`, `overlays` (作者: pyoru0309 / 改変自由)
 
-[Unreleased]: https://github.com/pyoru0309/py_tachie/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/pyoru0309/py_tachie/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.5.1
 [0.5.0]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.5.0
 [0.4.0]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.4.0
 [0.3.0]: https://github.com/pyoru0309/py_tachie/releases/tag/v0.3.0
