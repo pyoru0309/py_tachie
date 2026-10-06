@@ -789,7 +789,7 @@ export function renderTelopEditor() {
     const targetLabel = sourceKind === "mv_text" ? "MV 文字" : "通常テロップ";
     const result = await deps.promptBulkApply({
       title: "テロップに一括反映",
-      description: `このテロップの設定を、シーン内 他の ${candidateCount} 件の ${targetLabel} に反映します。チェックを入れた項目だけが反映されます。`,
+      description: `このテロップの設定を、プロジェクト内 他の ${candidateCount} 件の ${targetLabel} に反映します。チェックを入れた項目だけが反映されます。`,
       items,
     });
     if (!result.confirmed || result.selectedKeys.size === 0) return;

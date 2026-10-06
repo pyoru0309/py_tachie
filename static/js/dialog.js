@@ -1661,7 +1661,7 @@ export function promptApplyToAllTelops({ description } = {}) {
     }
     if (elements.applyToAllTelopsDescription) {
       elements.applyToAllTelopsDescription.textContent =
-        description || `シーン内 ${telops.length} 件のテロップに反映しますか？（個別の値を上書きします）`;
+        description || `プロジェクト内 ${telops.length} 件のテロップに反映しますか？（個別の値を上書きします）`;
     }
     let resolved = false;
     const cleanup = (decision) => {

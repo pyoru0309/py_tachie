@@ -5,8 +5,54 @@ from datetime import datetime
 from typing import Any
 
 from .paths import PROJECT_ROOT
-from .timecode import frames_to_sec
+from .timecode import PROJECT_FPS, frames_to_sec
 from .utils import ProjectContext, read_project_file
+
+
+def _scenes_in_project_time(scenario: dict[str, Any]) -> list[tuple[int, dict[str, Any]]]:
+    """全シーンを ``(書き出し映像の時間軸でのシーン開始フレーム, シーン)`` で返す。
+
+    ディスク形式のシナリオは cuts / telops をシーンごとに持ち、frame はシーン
+    ローカル (各シーン先頭 = 0)。**全シーン**を順に並べ、前にあるシーンの長さを
+    足してプロジェクト時刻に直す。長さの数え方はプロジェクト全体の動画書き出し
+    (v2_export.scene_start_sec_in_project = カット末尾まで) と同じなので、字幕の
+    時刻が書き出した動画とずれない。シーンの境界をまたいで置かれたテロップは
+    開始位置のシーンが所有しているので、開始フレーム + オフセットで正しく並ぶ。
+
+    以前は ``scenes[0]`` だけを読んでいて、複数シーンのプロジェクトでは最初の
+    シーンの分しか書き出されなかった。
+    """
+    from .export_video import _scene_total_duration  # 局所 import (循環回避)
+
+    scenes = scenario.get("scenes")
+    if not isinstance(scenes, list) or not scenes:
+        # 旧形式 (cuts 直下)。テロップはシーンにしか置けないので無し。
+        return [(0, {"cuts": scenario.get("cuts") or [], "telops": []})]
+    out: list[tuple[int, dict[str, Any]]] = []
+    offset = 0
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            continue
+        out.append((offset, scene))
+        offset += max(1, round(_scene_total_duration(scene, include_telops=False) * PROJECT_FPS))
+    return out
+
+
+def _shifted(item: dict[str, Any], offset: int) -> dict[str, Any]:
+    """startFrame をプロジェクト時刻へずらしたコピー (startFrame 欠落は元のまま)。"""
+    if offset and item.get("startFrame") is not None:
+        return {**item, "startFrame": int(item.get("startFrame") or 0) + offset}
+    return item
+
+
+def _project_cuts_and_telops(scenario: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """全シーンのカットとテロップを、プロジェクト時刻の startFrame で返す。"""
+    cuts: list[dict[str, Any]] = []
+    telops: list[dict[str, Any]] = []
+    for offset, scene in _scenes_in_project_time(scenario):
+        cuts.extend(_shifted(c, offset) for c in scene.get("cuts") or [] if isinstance(c, dict))
+        telops.extend(_shifted(t, offset) for t in scene.get("telops") or [] if isinstance(t, dict))
+    return cuts, telops
 
 
 def yaml_quote(value: str) -> str:
@@ -98,14 +144,7 @@ def generate_export_text(
                 scenario = json.load(handle)
         else:
             scenario = {}
-    cuts = []
-    if isinstance(scenario.get("scenes"), list) and scenario["scenes"]:
-        scene = scenario["scenes"][0]
-        cuts = scene.get("cuts") or []
-        telops = scene.get("telops") or []
-    else:
-        cuts = scenario.get("cuts") or []
-        telops = []
+    cuts, telops = _project_cuts_and_telops(scenario)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     serif_path = export_dir / f"{timestamp}-serif.yaml"
     telop_path = export_dir / f"{timestamp}-telop.yaml"
@@ -245,13 +284,7 @@ def _collect_subtitle_entries(scenario: dict[str, Any], kind: str) -> list[dict[
     - text が空 (または表示尺 0) の要素は字幕として無意味なので除外する。
     - start 昇順に並べる (SRT/VTT のキュー番号を素直に振るため)。
     """
-    if isinstance(scenario.get("scenes"), list) and scenario["scenes"]:
-        scene = scenario["scenes"][0]
-        cuts = scene.get("cuts") or []
-        telops = scene.get("telops") or []
-    else:
-        cuts = scenario.get("cuts") or []
-        telops = []
+    cuts, telops = _project_cuts_and_telops(scenario)
 
     entries: list[dict[str, Any]] = []
     if kind == "telop":

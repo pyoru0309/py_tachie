@@ -582,7 +582,7 @@ export async function saveConfig() {
       }));
       const result = await promptBulkApply({
         title: "テロップに一括反映",
-        description: `変更したテロップ既定値を、シーン内 ${telopCount} 件のテロップに反映します。チェックを入れた項目だけが反映されます。`,
+        description: `変更したテロップ既定値を、プロジェクト内 ${telopCount} 件のテロップに反映します。チェックを入れた項目だけが反映されます。`,
         items,
       });
       if (result.confirmed && result.selectedKeys.size > 0) {
