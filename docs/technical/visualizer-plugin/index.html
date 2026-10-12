@@ -257,6 +257,8 @@
       
         
       
+        
+      
     
     
     
@@ -429,6 +431,34 @@
     
   
     歌・デュエットの口パク
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/character-deform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    体の一部を動かす（伸縮・揺れピン）
   
 
     
@@ -2277,6 +2307,12 @@ contract のまま <code>THREE.Object3D</code> / <code>THREE.InstancedMesh</code
 <td>LED グリッド</td>
 <td>BPM に合わせて光るドットマトリクス</td>
 <td>フルスクリーン fragment shader で <code>floor(uv * grid)</code> セル分割 + ハッシュ関数で per-cell color / pulse 決定。<code>ctx.sceneBpm</code> を読みつつ <code>params.bpm &gt; 0</code> で上書き</td>
+</tr>
+<tr>
+<td><code>laser_beams</code></td>
+<td>レーザー光線</td>
+<td>固定光源 (2 列まで) から扇形のビームが BPM に合わせて振れる / 交差する / 面になる</td>
+<td>光源ごとの扇 (向き・開き・面らしさ・色) を JS で毎フレーム求めて vec4 uniform 配列に流し、fragment shader は「光源から見た角度 → 扇の中の最寄りビーム → 垂直距離」で O(光源数) に描く。フレーズ (数拍) ごとにパターンをシードのハッシュで選び、変わり目は 1 拍で補間。<code>AdditiveBlending</code> の例</td>
 </tr>
 <tr>
 <td><code>glow_shapes</code></td>

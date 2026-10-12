@@ -14,6 +14,7 @@ nav = [
     "tutorials/import-character.md",
     "tutorials/voice-synthesis.md",
     "tutorials/singing-lipsync.md",
+    "tutorials/character-deform.md",
     "tutorials/export-video.md"
   ]},
   {"リファレンス" = [

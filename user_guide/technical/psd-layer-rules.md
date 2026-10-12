@@ -176,6 +176,7 @@ hairstylePresets:
 - `flags:` の各キーはレイヤー名 (combination) で、値は当該レイヤーに立てるフラグの配列です。
 - `expressionPresets` / `hairstylePresets` 内のレイヤー参照は **環境固有 ID ではなくレイヤー名** (= `character_manifest.json` の各エントリの `name` フィールド) で記述します。配布した YAML を別環境で取り込んでも layer 名一致で flags / preset を復元できます。
 - `removeWhite` / `voice` / `color` は character_manifest.json の `defaults` / メタを反映します。空でも常に書き出します（透過ミラー）。
+- `deform` (体の変形 = 伸縮範囲・揺れピン) は設定があるときだけ書き出します。PSD を取り込み直しても、この YAML から復元されます ([キャラクター定義の変形](scenario-format.md#character-deform))。
 - 旧名 `.import.yaml` は read 経路で fallback 参照されます (write は新名のみ)。手動移行は不要です。
 
 ### PSD 内 `import_manifest.yml` テキストレイヤー (1 枚 PSD 配布用)

@@ -257,6 +257,8 @@
       
         
       
+        
+      
     
     
     
@@ -429,6 +431,34 @@
     
   
     歌・デュエットの口パク
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/character-deform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    体の一部を動かす（伸縮・揺れピン）
   
 
     
@@ -920,6 +950,17 @@
     <span class="md-ellipsis">
       
         キャラクターカラー
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        体の変形（伸縮範囲・揺れピン）
       
     </span>
   </a>
@@ -1480,6 +1521,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        体の変形（伸縮範囲・揺れピン）
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1727,6 +1779,13 @@ PSD インポート時に <code>thumb</code> / <code>thumbnail</code> / <code>�
 <li>タイムライン下部の <strong>カットバー</strong> の塗り色</li>
 </ul>
 <p>「未指定」（<code>color</code> 空文字）のときは従来どおりテーマのアクセントカラーが使われます。話者キャラが未設定のカット、もしくは話者キャラの色が未指定のカットも未指定扱いです。色を再設定したいときは、ピッカーの右の <code>restart_alt</code> ボタン（「未指定（アクセントカラーを使う）に戻す」）を押すと初期化できます。</p>
+<h2 id="_19">体の変形（伸縮範囲・揺れピン）<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h2>
+<p><code>キャラ管理</code> でキャラクターを選んで開くダイアログの <strong>体の変形（伸縮範囲・揺れピン）</strong> 欄から <strong>変形を編集…</strong> を押すと、大きな編集画面が開きます。ここで、キャラの絵のどこを動かすかを決めます。</p>
+<ul>
+<li><strong>伸縮範囲</strong>: 体の揺れを「範囲を伸び縮みさせる」にしたとき、伸縮させる範囲（基準線＝腰 / 上端＝首）</li>
+<li><strong>揺れピン</strong>: 髪・衣装などに置くと周りがふわふわ揺れるピンと、揺れを打ち消す固定ピン</li>
+</ul>
+<p>設定は <code>character_manifest.json</code> の <code>deform</code> に保存され、<code>import_manifest.yml</code> にも書き出されます。編集画面で「反映して閉じる」を押したあと、キャラ詳細の <strong>保存</strong> で確定します。使い方は <a href="../../tutorials/character-deform/">体の一部を動かす（伸縮・揺れピン）</a> を参照してください。</p>
 
 
 

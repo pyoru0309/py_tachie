@@ -1,0 +1,1737 @@
+
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="立ち絵合成・シナリオプレビュー・動画書き出しツールの利用マニュアル">
+      
+      
+        <meta name="author" content="立ち絵システム">
+      
+      
+      
+        <link rel="prev" href="../singing-lipsync/">
+      
+      
+        <link rel="next" href="../export-video/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.33">
+    
+    
+      
+        <title>体の一部を動かす（伸縮・揺れピン） - 立ち絵システム ユーザーガイド</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.53a7feaf.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=LINE+Seed+JP:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"LINE Seed JP";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="ナビゲーション"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          コンテンツにスキップ
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="ヘッダー">
+    <a href="../.." title="立ち絵システム ユーザーガイド" class="md-header__button md-logo" aria-label="立ち絵システム ユーザーガイド" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="ナビゲーション">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            立ち絵システム ユーザーガイド
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              体の一部を動かす（伸縮・揺れピン）
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="ダークモードに切替"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="ダークモードに切替" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="ライトモードに切替"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="ライトモードに切替" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="検索">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="検索">
+  <button type="button" class="md-search__button">
+    検索
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="ナビゲーション" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="立ち絵システム ユーザーガイド" class="md-nav__button md-logo" aria-label="立ち絵システム ユーザーガイド" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    立ち絵システム ユーザーガイド
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ホーム
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    チュートリアル
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    チュートリアル
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    はじめに
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../create-project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクトを作成する
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../import-character/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    キャラクターをインポートする
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../voice-synthesis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    音声合成 (VOICEVOX / VOICEPEAK) を使う
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../singing-lipsync/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    歌・デュエットの口パク
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    体の一部を動かす（伸縮・揺れピン）
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    体の一部を動かす（伸縮・揺れピン）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        体の変形の編集画面を開く
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="体の変形の編集画面を開く">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        表示の拡大縮小・移動
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        試しに動かす
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stretch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 体の伸縮
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 体の伸縮">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        伸縮する範囲を決める
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カットで伸び縮みさせる
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sway-pins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 揺れピン
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 揺れピン">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ピンを置く
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ピンの設定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        まとめて変える
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カットでの強さ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        困ったとき
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        設定の保存先
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../export-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PNG / 動画 / 字幕を書き出す
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リファレンス
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    リファレンス
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    編集画面リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/title-editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    タイトル組版エディタ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/project-settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクト設定リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    素材管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/file-structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ファイル構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    テクニカルガイド
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    テクニカルガイド
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/character-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    キャラクターモデルの推奨構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/psd-layer-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PSD レイヤー命名規則
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/scenario-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シナリオ形式
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/rendering-and-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    レンダリングと動画生成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/visualizer-plugin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    オーディオビジュアライザ開発ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    トラブルシュート
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        体の変形の編集画面を開く
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="体の変形の編集画面を開く">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        表示の拡大縮小・移動
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        試しに動かす
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stretch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 体の伸縮
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 体の伸縮">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        伸縮する範囲を決める
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カットで伸び縮みさせる
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sway-pins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 揺れピン
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 揺れピン">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ピンを置く
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ピンの設定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        まとめて変える
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カットでの強さ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        困ったとき
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        設定の保存先
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="ナビゲーション" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    ホーム
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../getting-started/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    チュートリアル
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+<h1 id="_1">体の一部を動かす（伸縮・揺れピン）<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<p>立ち絵を動かす方法は、これまで「キャラ全体の位置を動かす」（モーション・体の揺れ）だけでした。<strong>体の変形</strong> を使うと、キャラの絵の一部だけを動かせます。</p>
+<table>
+<thead>
+<tr>
+<th>機能</th>
+<th>動き</th>
+<th>向いている場面</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>体の伸縮</strong></td>
+<td>腰から上などの範囲だけが、リズムに合わせて縦に伸び縮みする</td>
+<td>歌・ダンスでリズムを取る、弾むような喜び</td>
+</tr>
+<tr>
+<td><strong>揺れピン</strong></td>
+<td>ピンを置いた髪・衣装の周りが、ふわふわ揺れる</td>
+<td>髪やスカート、リボンが風になびく</td>
+</tr>
+</tbody>
+</table>
+<p>どちらも、<strong>動かす場所</strong> はキャラ詳細で決めて <strong>キャラの定義</strong> に保存し、<strong>動かす量</strong> はカットごとに決める、という分担です。一度場所を決めておけば、どのカット・どのプロジェクトでも同じ場所が動きます。</p>
+<div class="admonition note">
+<p class="admonition-title">書き出しでも同じ動き</p>
+<p>動きはシーンの経過時間から計算します。カットをまたいでも途切れず、シークしても書き出しても同じ形になります。光彩・ドロップシャドウも一緒に変形します。</p>
+</div>
+<h2 id="_2">体の変形の編集画面を開く<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<ol>
+<li>ヘッダーの <strong>キャラ管理</strong> で、キャラクターを選んで開きます（キャラ詳細）。</li>
+<li><strong>体の変形（伸縮範囲・揺れピン）</strong> 欄に、いまの設定の概要が出ています。<strong>変形を編集…</strong> を押すと、大きな編集画面が開きます。</li>
+<li>上の <strong>伸縮範囲 / 揺れピン</strong> で、編集するものを切り替えます。</li>
+<li>編集が終わったら <strong>反映して閉じる</strong> を押し、キャラ詳細の <strong>保存</strong> で確定します。</li>
+</ol>
+<p><strong>キャンセル</strong>（または Esc キー）を押すと、編集画面を開いたときの状態に戻ります。反映したけれどまだ保存していないときは、概要に「（未保存の変更あり）」と出ます。</p>
+<h3 id="_3">表示の拡大縮小・移動<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<p>髪先など細かい場所は、拡大してから作業すると楽です。</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>拡大縮小</td>
+<td>ピンチ / Ctrl（Mac は ⌘）+ ホイール（カーソルの位置を中心に拡大縮小）、または上部の − ＋ ボタン</td>
+</tr>
+<tr>
+<td>表示の移動</td>
+<td>2 本指スクロール / スペースキーを押しながらドラッグ / ホイール（中ボタン）でドラッグ</td>
+</tr>
+<tr>
+<td>全体を表示</td>
+<td><strong>全体表示</strong> ボタン</td>
+</tr>
+</tbody>
+</table>
+<p>倍率の表示（例: 45%）は、絵の実寸に対する大きさです。</p>
+<h3 id="_4">試しに動かす<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<p><strong>試しに動かす</strong> を押すと、本番と同じ描き方で絵が動きます。もう一度押すと止まります。</p>
+<ul>
+<li>揺れピンは、実際の振れ幅のまま揺れます（カットの強さ 100% のとき）。</li>
+<li>伸縮範囲は、範囲を確かめるための控えめな動きです。実際の伸び縮みの大きさは、カットの体の揺れの <strong>振幅</strong> で決まります。</li>
+</ul>
+<h2 id="stretch">1. 体の伸縮<a class="headerlink" href="#stretch" title="Permanent link">&para;</a></h2>
+<h3 id="_5">伸縮する範囲を決める<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p>編集画面で <strong>伸縮範囲</strong> を選びます。絵の上に 2 本の線が出ます。</p>
+<table>
+<thead>
+<tr>
+<th>線</th>
+<th>意味</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>基準線（腰）</strong></td>
+<td>ここより下は動きません（足元は床に着いたまま）</td>
+</tr>
+<tr>
+<td><strong>上端（首）</strong></td>
+<td>ここより上（頭）は、形を変えずに一緒に上下します。<strong>上端（首）を指定する</strong> をオンにすると出ます</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>線はドラッグで動かします。線から離れた所を押すと、近い方の線がそこへ移ります。</li>
+<li>位置は数値（絵の上端からの %）でも入力できます。</li>
+<li><strong>体積の保持</strong> は、伸びたときに横を細く、縮んだときに横を太くする度合いです。0% にすると横幅は変わりません。</li>
+<li><strong>既定に戻す</strong> で、「足元を基準に全身が伸縮する」状態に戻ります。範囲を決めていないキャラも、この既定で伸縮します。</li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">上端を指定するかどうか</p>
+<p>上端を指定しないと、基準線から頭のてっぺんまでが一様に伸びるので、顔も縦に伸びます。顔の形を保ちたいときは、首のあたりに上端を置いてください。</p>
+</div>
+<h3 id="_6">カットで伸び縮みさせる<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<p>伸び縮みは、体の揺れの <strong>揺らし方</strong> で「範囲を伸び縮みさせる」を選ぶと始まります。</p>
+<ul>
+<li><strong>キャラごと</strong>: キャラ配置タブの <strong>BPM 上下ゆれ</strong> → <strong>揺らし方</strong></li>
+<li><strong>シーン全体（全キャラ）</strong>: シーン設定の <strong>体の揺れ</strong> タブ → <strong>BPM ボブの揺らし方</strong></li>
+</ul>
+<p><strong>振幅 (px)</strong> は、伸縮範囲の上端（上端を指定していなければ頭のてっぺん）が何 px 動くかになります。動き（波 / 跳ねる / 沈む）・溜め・リズム・BPM の取得・口パクのときだけ揺らす、はそのまま使えます。「沈む：うなずき」なら、拍で縮みます。</p>
+<div class="admonition note">
+<p class="admonition-title">位置の揺れと組み合わせる</p>
+<p>シーン全体の BPM ボブを「全身の位置」、キャラの BPM 上下ゆれを「範囲の伸縮」にするなど、2 つを組み合わせることもできます。</p>
+</div>
+<h2 id="sway-pins">2. 揺れピン<a class="headerlink" href="#sway-pins" title="Permanent link">&para;</a></h2>
+<h3 id="_7">ピンを置く<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<p>編集画面で <strong>揺れピン</strong> を選び、<strong>クリックで追加するピン</strong> で種類を選んでから、絵の上をクリックします。</p>
+<table>
+<thead>
+<tr>
+<th>ピン</th>
+<th>表示</th>
+<th>働き</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>揺れピン</strong></td>
+<td>実線の円 + 揺れる向きの矢印</td>
+<td>円の中が揺れます。中心ほど大きく、縁に近いほど小さく揺れます</td>
+</tr>
+<tr>
+<td><strong>固定ピン</strong></td>
+<td>赤い点線の円 + 中心の四角</td>
+<td>円の中は揺れません。近くの揺れピンの揺れを打ち消します</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>ピンはドラッグで動かします。</li>
+<li>大きさは、選択中のピンの右端にある白いつまみ（または円の縁）をドラッグして変えます。</li>
+<li>新しいピンは、画面上でおよそ同じ大きさになるように置かれます。拡大して置くと小さなピンになります。</li>
+<li>1 キャラにつき 16 本まで置けます。</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">円にかかった所はすべて動きます</p>
+<p>揺れピンは「髪」だけを選んで動かすのではなく、<strong>円の中の絵</strong> をまとめて動かします。髪と腕や胴体が同じ円にかかると、腕や胴体も揺れます。揺れてほしくない所（顔・腕・胴体など）には <strong>固定ピン</strong> を置いて押さえてください。</p>
+</div>
+<h3 id="_8">ピンの設定<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<p>ピンを選ぶと、横の <strong>選択中のピン</strong> 欄で値を変えられます。</p>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>種類</td>
+<td>揺れ / 固定</td>
+</tr>
+<tr>
+<td>大きさ (%)</td>
+<td>影響する円の半径（絵の高さに対する %）</td>
+</tr>
+<tr>
+<td>振れ幅 (%)</td>
+<td>揺れる幅（円の半径に対する %）。大きすぎると絵が崩れるので 40% まで</td>
+</tr>
+<tr>
+<td>向き (°)</td>
+<td>揺れる向き。0 で左右、90 で上下</td>
+</tr>
+<tr>
+<td>周期 (秒)</td>
+<td>1 往復にかかる秒数</td>
+</tr>
+<tr>
+<td>位相 (%)</td>
+<td>揺れ始めのずれ。ピンごとにずらすと、なびいて見えます</td>
+</tr>
+</tbody>
+</table>
+<p>固定ピンは位置と大きさだけを使います。</p>
+<h3 id="_9">まとめて変える<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<p>複数のピンを選ぶと、欄で変えた値が <strong>選択中のピンすべて</strong> に入ります。</p>
+<ul>
+<li><strong>Shift / ⌘ クリック</strong> で、ピンを選択に足したり外したりできます。</li>
+<li><strong>すべて選択</strong>（⌘A）・<strong>揺れピンだけ</strong>・<strong>選択解除</strong> のボタンもあります。</li>
+<li>値がばらばらな欄は空欄（「混在」）になります。そのまま触らなければ、それぞれの値が残ります。</li>
+<li><strong>位相を順にずらす</strong> を押すと、選択中の揺れピンの位相が上から順に少しずつずれます。毛先へ向かって波が伝わるような、なびく動きになります。</li>
+<li>選択中のピンはドラッグでまとめて動かせ、Delete キーでまとめて消せます。</li>
+</ul>
+<h3 id="_10">カットでの強さ<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h3>
+<p>揺れピンを置いたキャラは、どのカットでも揺れます。カットごとの強さは、キャラ配置タブの <strong>髪・衣装の揺れ（揺れピン）</strong> → <strong>揺れの強さ (%)</strong> で変えます。</p>
+<ul>
+<li><strong>100%</strong> でキャラ詳細の設定どおり、<strong>0%</strong> で止まります。300% まで強くできます。</li>
+<li>揺れピンの無いキャラには効きません。</li>
+</ul>
+<h2 id="_11">困ったとき<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>伸び縮みしない</strong> — 揺らし方が「範囲を伸び縮みさせる」になっているか、振幅が 0 より大きいか、BPM が取れているか（手入力で 0 になっていないか）を確認してください。</li>
+<li><strong>顔まで伸びる</strong> — 伸縮範囲の <strong>上端（首）を指定する</strong> をオンにして、首のあたりに置いてください。</li>
+<li><strong>腕や体まで揺れる</strong> — 揺れピンの円が腕や体にかかっています。ピンを小さくするか、揺れてほしくない所に固定ピンを置いてください。</li>
+<li><strong>揺れが大きすぎて絵が崩れる</strong> — 振れ幅を下げるか、カットの揺れの強さを下げてください。</li>
+<li><strong>キャラ詳細で変えたのにプレビューが変わらない</strong> — キャラ詳細の <strong>保存</strong> を押したか確認してください。編集画面の「反映して閉じる」だけでは保存されません。</li>
+</ul>
+<h2 id="_12">設定の保存先<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
+<p>変形の場所はキャラ定義（<code>character_manifest.json</code> の <code>deform</code>）に保存され、配布用の <code>import_manifest.yml</code> にも書き出されます。PSD を取り込み直しても消えません。カットごとの値は、シナリオのキャラ設定（<code>bob.target</code> / <code>sway.strength</code>）に入ります。詳しくは <a href="../../technical/scenario-format/#character-deform">シナリオデータ仕様</a> を参照してください。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="フッター" >
+        
+          
+          <a href="../singing-lipsync/" class="md-footer__link md-footer__link--prev" aria-label="前: 歌・デュエットの口パク">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                前
+              </span>
+              <div class="md-ellipsis">
+                歌・デュエットの口パク
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../export-video/" class="md-footer__link md-footer__link--next" aria-label="次: PNG &#x2f; 動画 &#x2f; 字幕を書き出す">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                次
+              </span>
+              <div class="md-ellipsis">
+                PNG / 動画 / 字幕を書き出す
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.footer","navigation.indexes","navigation.sections","navigation.path","navigation.tracking","search.highlight","toc.follow"],"search":"../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"コピーしました","clipboard.copy":"クリップボードへコピー","search.result.more.one":"このページ内にもう1件見つかりました","search.result.more.other":"このページ内にあと#件見つかりました","search.result.none":"何も見つかりませんでした","search.result.one":"1件見つかりました","search.result.other":"#件見つかりました","search.result.placeholder":"検索キーワードを入力してください","search.result.term.missing":"検索に含まれない","select.version":"バージョン切り替え"},"version":null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.63456bd9.min.js"></script>
+      
+    
+  </body>
+</html>

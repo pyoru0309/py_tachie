@@ -90,7 +90,7 @@
 | `soundEffects` | 効果音配列。`{ id, src, startFrame, durationFrame, loop, fadeInSec, fadeOutSec, audioOffsetSec, volume, linkedCutId }` を持つ。詳細は下記 |
 | `videoLayers` | 動画レイヤー配列。短いクリップ (タイトル / トランジション / 解説動画) を任意区間に置く。下記参照 |
 | `bpm` | 任意。テロップやモーションの拍合わせに使用 |
-| `breath` / `bpmBob` | 体の揺れ。`breath = { amplitudePx, periodSec }`、`bpmBob = { amplitudePx, style, hold, rate, bpmSource, onlyWhileSinging }` (各項目はキャラの `bob` と同じ意味。`bpmSource: "manual"` のテンポは `bpm`) |
+| `breath` / `bpmBob` | 体の揺れ。`breath = { amplitudePx, periodSec }`、`bpmBob = { amplitudePx, style, hold, rate, bpmSource, onlyWhileSinging, target }` (各項目はキャラの `bob` と同じ意味。`bpmSource: "manual"` のテンポは `bpm`) |
 | `cuts` | カット配列 |
 | `telops` | テロップ配列 (カットと独立) |
 | `laneCounts` | 任意。タイムラインの段 (レーン) 数を種別ごとに保持する表示用設定 `{ telop, soundEffect, videoLayer }`。各項目の `lane` と対で使う |
@@ -284,7 +284,8 @@ MIDI の時刻はそのトラックの音源ファイルの時刻 (トリム・�
 | `character.x`, `character.y` | 配置座標 |
 | `character.scale` | 拡大率 |
 | `motion` | per-character モーション (2026-05 改修)。`{ "type": "shake_x"\|"shake_y"\|"zoom"\|"move", "settings": { ... } }` 形式。未設定 (= キーが無いか `null`) なら「動かない」。旧 cut 単位の `motionType` / `motionSettings` は読込時に話者キャラの `motion` へ自動 migration されます |
-| `bob` | per-character の BPM 同期上下ゆれ (2026-06 追加)。`{ "bpm", "amplitudePx", "style", "hold", "rate", "bpmSource", "onlyWhileSinging" }`。`style` = `wave` (既定・常時サイン波) / `bounce` / `hop` / `kick` / `nod` (溜め → 拍で動く)、`hold` = 溜め (0〜0.95)、`rate` = 2 / 1 / 0.5 / 0.25 (BPM に掛ける倍率)、`bpmSource` = `manual` / `midi` (BGM の歌唱判定 MIDI のテンポマップ)、`onlyWhileSinging` = 声が出ているときだけ揺らす。振幅 0、または `manual` で BPM 0 / 未設定 (`null`) なら無効。`motion` とは独立に加算されるため、移動・拡大と併用できる。位相はシーン内通算秒で計算し、カットを跨いで連続する |
+| `bob` | per-character の BPM 同期上下ゆれ (2026-06 追加)。`{ "bpm", "amplitudePx", "style", "hold", "rate", "bpmSource", "onlyWhileSinging" }`。`style` = `wave` (既定・常時サイン波) / `bounce` / `hop` / `kick` / `nod` (溜め → 拍で動く)、`hold` = 溜め (0〜0.95)、`rate` = 2 / 1 / 0.5 / 0.25 (BPM に掛ける倍率)、`bpmSource` = `manual` / `midi` (BGM の歌唱判定 MIDI のテンポマップ)、`onlyWhileSinging` = 声が出ているときだけ揺らす、`target` = `position` (既定・全身の位置) / `stretch` (キャラ定義の伸縮範囲を伸び縮み。振幅は範囲の上端が動く px)。振幅 0、または `manual` で BPM 0 / 未設定 (`null`) なら無効。`motion` とは独立に加算されるため、移動・拡大と併用できる。位相はシーン内通算秒で計算し、カットを跨いで連続する |
+| `sway` | 揺れピンの強さ `{ "strength": 0〜3 }`。未設定 (`null`) はキャラ定義どおり (= 1)、`0` で止める。揺れピンはキャラ定義の `deform.pins` ([キャラクター定義の変形](#character-deform)) |
 | `crop` | マルチキャラレイアウト用の矩形クリップ `{ x, y, width, height }` (1920×1080 絶対座標)。`null` / 未設定なら全画面表示 |
 | `layoutSlot` | マルチキャラレイアウトのスロット index (0 始まり)。 編集ダイアログ再開時の表示順を保つために保存 |
 
@@ -334,6 +335,39 @@ X/Y はキャラ基準位置からの相対オフセット、拡大率はキャ�
 | `voice.emotion` | VOICEPEAK の感情既定値。VOICEVOX には emotion 概念が無いので空欄 |
 
 紐付けは編集画面の「キャラ管理」ダイアログから設定します。詳細は [音声合成 (VOICEVOX / VOICEPEAK) を使う](../tutorials/voice-synthesis.md) を参照してください。
+
+## キャラクター定義の変形 (deform) {#character-deform}
+
+キャラクター定義のルート直下には、体の変形 (どこを動かすか) を表す `deform` が任意で入ります。編集はキャラ管理ダイアログの「変形を編集…」から行います ([体の一部を動かす](../tutorials/character-deform.md))。設定が無いキャラは `deform` 自体を持ちません。
+
+```json
+{
+  "deform": {
+    "stretch": { "anchorY": 0.55, "topY": 0.18, "volume": 0.5 },
+    "pins": [
+      { "id": "pin_1", "kind": "sway", "x": 0.22, "y": 0.3, "radius": 0.07,
+        "amount": 0.15, "angleDeg": 0, "periodSec": 2.0, "phase": 0.0 },
+      { "id": "pin_2", "kind": "fixed", "x": 0.5, "y": 0.13, "radius": 0.1,
+        "amount": 0.15, "angleDeg": 0, "periodSec": 2.0, "phase": 0.0 }
+    ]
+  }
+}
+```
+
+| 項目 | 説明 |
+| --- | --- |
+| `stretch.anchorY` | 伸縮の基準線 (腰)。レイヤー高さに対する比率 0〜1 (上端 0)。これより下は動かない。既定 1 (= 足元) |
+| `stretch.topY` | 伸縮の上端 (首)。これより上は形を保って平行移動する。`null` = 上端なし (頭頂まで伸縮) |
+| `stretch.volume` | 体積の保持 0〜1。伸びたとき横を細く、縮んだとき横を太くする度合い |
+| `pins[].kind` | `sway` (揺れピン) / `fixed` (固定ピン = 周りの揺れを打ち消す) |
+| `pins[].x`, `pins[].y` | ピンの位置。レイヤー幅・高さに対する比率 (左上 0) |
+| `pins[].radius` | 影響する円の半径。レイヤー高さに対する比率 |
+| `pins[].amount` | 振れ幅。半径に対する比率 0〜0.4 |
+| `pins[].angleDeg` | 揺れる向き (度)。0 = 左右、90 = 上下 |
+| `pins[].periodSec` | 1 往復の秒数 |
+| `pins[].phase` | 位相 0〜1 |
+
+ピンは最大 16 本です。比率で持つので、カットごとの位置・拡大率が変わっても同じ場所を指します。カット側の量は、キャラ設定の `bob.target` (伸縮) と `sway.strength` (揺れピンの強さ) で決まります。
 
 ## テキストスタイル
 
