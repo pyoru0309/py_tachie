@@ -405,6 +405,8 @@ export function normalizeCutCharacters(data) {
       // 移植済みのため、ここでは透過的に保持するだけで OK。
       motion: _validateMotionFromServer(item.motion),
       bob: _validateBobFromServer(item.bob),
+      // 揺れピンの強さ ({strength})。null = キャラ定義どおり (100%)。
+      sway: _validateSwayFromServer(item.sway),
     };
   });
 }
@@ -416,6 +418,11 @@ function _validateMotionFromServer(raw) {
   if (!["shake_x", "shake_y", "zoom", "move"].includes(type)) return null;
   const settings = (raw.settings && typeof raw.settings === "object") ? { ...raw.settings } : {};
   return { type, settings };
+}
+
+function _validateSwayFromServer(raw) {
+  const strength = Number(raw?.strength);
+  return Number.isFinite(strength) ? { strength: Math.max(0, Math.min(3, strength)) } : null;
 }
 
 function _validateBobFromServer(raw) {
@@ -480,7 +487,22 @@ export function updateSelectedCharacterFromControls() {
     motion: _collectMotionForCharacterFromControls(),
     // BPM 上下ゆれ (bob)。motion とは独立。bpm/振幅どちらか 0 なら null。
     bob: _collectBobForCharacterFromControls(),
+    sway: _collectSwayForCharacterFromControls(),
   });
+}
+
+// 100% (= キャラ定義どおり) は null にしてデータを増やさない。
+function _collectSwayForCharacterFromControls() {
+  const raw = elements.characterSwayStrength?.value;
+  const pctValue = raw === "" || raw == null ? 100 : Number(raw);
+  if (!Number.isFinite(pctValue) || Math.abs(pctValue - 100) < 1e-6) return null;
+  return { strength: Math.max(0, Math.min(300, pctValue)) / 100 };
+}
+
+function _applySwayToControls(sway) {
+  if (!elements.characterSwayStrength) return;
+  const strength = Number(sway?.strength);
+  elements.characterSwayStrength.value = String(Math.round((Number.isFinite(strength) ? strength : 1) * 100));
 }
 
 function _collectMotionForCharacterFromControls() {
@@ -503,6 +525,7 @@ function _collectBobForCharacterFromControls() {
     hold: Math.max(0, Math.min(95, Number(elements.characterBobHold?.value) || 0)) / 100,
     rate: Number(elements.characterBobRate?.value) || 1,
     onlyWhileSinging: !!elements.characterBobOnlyWhileSinging?.checked,
+    target: elements.characterBobTarget?.value === "stretch" ? "stretch" : "position",
   };
 }
 
@@ -524,6 +547,7 @@ function _applyBobToControls(bob) {
   if (elements.characterBobAmplitude) elements.characterBobAmplitude.value = String(Number(bob?.amplitudePx) || 0);
   if (elements.characterBobBpmSource) elements.characterBobBpmSource.value = bob?.bpmSource === "midi" ? "midi" : "manual";
   if (elements.characterBobStyle) elements.characterBobStyle.value = bob?.style || "wave";
+  if (elements.characterBobTarget) elements.characterBobTarget.value = bob?.target === "stretch" ? "stretch" : "position";
   if (elements.characterBobHold) {
     const hold = bob?.hold == null ? 0.7 : Number(bob.hold);
     elements.characterBobHold.value = String(Math.round(hold * 100));
@@ -577,6 +601,7 @@ export function loadCharacterIntoControls(character) {
     deps.applyCutMotionSettingsToControls(null);
     deps.syncMotionParamsVisibility();
     _applyBobToControls(null);
+    _applySwayToControls(null);
     fillCharacterDefinitionAddSelect();
     deps.fillExpressionPresets("");
     deps.fillPlacementPresets("");
@@ -618,6 +643,7 @@ export function loadCharacterIntoControls(character) {
   deps.syncMotionParamsVisibility();
   // BPM 上下ゆれ。未設定キャラは 0 (= 無効) 表示。
   _applyBobToControls(character.bob);
+  _applySwayToControls(character.sway);
   // 表情プリセットセレクタを (character.characterId に紐付く) 最新候補で再構築する。
   // これをやらないと、loadCut 経路で character は表示されているのに preset セレクタが
   // 「なし」のまま残るバグが出る (project 初期化時の fillAssetControls は state.

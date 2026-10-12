@@ -224,6 +224,7 @@ state.timeline = {
 };
 state.timelineWaveform = null;        // { src, trimStartSec, msResolution, durationSec, peaks }
 state.timelineWaveformLoading = false;
+state.timelineWaveformLoadingKey = null;
 state.timelineWaveformToken = 0;
 
 export function timelineEffectiveDurationSec() {
@@ -544,8 +545,8 @@ function drawTimelineWaveform(ctx, view) {
       ctx.fillStyle = palette.fgFaint;
       ctx.font = "10px sans-serif";
       ctx.textBaseline = "middle";
-      const lipBgm = (activeSceneResolved()?.bgmTracks || []).find((b) => b && b.useForLipSync && b.src);
-      ctx.fillText(lipBgm ? "（波形を読み込めませんでした）" : "（口パク用 BGM 未指定）", scrollLeft + 8, midY);
+      const waveBgm = timelineWaveformTrack(activeSceneResolved());
+      ctx.fillText(waveBgm ? "（波形を読み込めませんでした）" : "（口パク用 BGM 未指定）", scrollLeft + 8, midY);
     }
     ctx.restore();
     return;
@@ -1384,9 +1385,17 @@ export function seekPlayheadToEnd() {
   seekPlayheadToSec(timelineEffectiveDurationSec());
 }
 
+// 波形レーンに出すトラック。「音量メーターに反映する」トラックがあればそれを、
+// 無ければ従来どおり最初の口パク入力を表示する (歌詞テロップ作成時にボーカル /
+// オケなどを切り替えて見られるように、メーターの選択に連動させる)。
+function timelineWaveformTrack(scene) {
+  const tracks = (scene?.bgmTracks || []).filter((b) => b && b.src);
+  return tracks.find((b) => b.showInMeter) || tracks.find((b) => b.useForLipSync) || null;
+}
+
 export async function ensureTimelineWaveform() {
   const scene = activeSceneResolved();
-  const lipBgm = (scene?.bgmTracks || []).find((b) => b && b.useForLipSync && b.src);
+  const lipBgm = timelineWaveformTrack(scene);
   if (!lipBgm) {
     if (state.timelineWaveform) {
       state.timelineWaveform = null;
@@ -1398,10 +1407,12 @@ export async function ensureTimelineWaveform() {
   const trimStart = Math.max(0, Number(lipBgm.trimStartSec) || 0);
   const cur = state.timelineWaveform;
   if (cur && cur.src === src && cur.trimStartSec === trimStart) return cur;
-  if (state.timelineWaveformLoading) return null;
+  // 同じ音源を解析中なら待つ。別の音源に切り替わったら token を進めて古い解析を捨てる。
+  if (state.timelineWaveformLoading && state.timelineWaveformLoadingKey === `${src}|${trimStart}`) return null;
   const Ctx = window.AudioContext || window.webkitAudioContext;
   if (!Ctx) return null;
   state.timelineWaveformLoading = true;
+  state.timelineWaveformLoadingKey = `${src}|${trimStart}`;
   const token = ++state.timelineWaveformToken;
   drawTimeline();
   try {
@@ -1460,7 +1471,7 @@ export async function ensureTimelineWaveform() {
     return result;
   } catch (error) {
     console.warn("waveform decode failed", error);
-    state.timelineWaveform = null;
+    if (token === state.timelineWaveformToken) state.timelineWaveform = null;
     return null;
   } finally {
     if (token === state.timelineWaveformToken) {

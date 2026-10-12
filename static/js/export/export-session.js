@@ -40,7 +40,7 @@ import { createReadback } from "./pbo-readback.js";
 import { createH264FrameEncoder, computeBitrate, selectH264Config } from "./webcodecs-encoder.js";
 import { FrameSender } from "./frame-sender.js";
 import { computeMouthKeyByChar, shapeIndexForTime } from "/static/js/lipsync.js";
-import { computeBobDyByChar } from "/static/js/body-bob.js";
+import { computeBobByChar } from "/static/js/body-bob.js";
 
 const FONT_READY_TIMEOUT_MS = 5000;
 const PROJECT_FPS = 24;
@@ -113,7 +113,7 @@ function computeIdleMotionOffset(idleMotion, timelineSec) {
     }
   }
   // BPM ボブ (bpmBob) はキャラごとに計算する (口パク連動・MIDI 自動 BPM があるため)。
-  // → body-bob.js computeBobDyByChar / _computeExportSceneState の bobDyByChar。
+  // → body-bob.js computeBobByChar / _computeExportSceneState の bobDyByChar・bobStretchByChar。
   return { dx: 0, dy };
 }
 
@@ -488,7 +488,7 @@ function _computeExportSceneState(rd, f, { withLipSync = true } = {}) {
   // 体の揺れ (シーンの BPM ボブ + キャラの bob)。「口パクのときだけ」は、その時刻に
   // 声が出ていたか (MIDI 口形 / キャラ別ボーカル / 話者音声の levels) で判定する。
   const silence = Number(rd.lipSyncCfg?.silenceThreshold ?? 0.08);
-  const bobDyByChar = computeBobDyByChar({
+  const { dyByChar: bobDyByChar, stretchByChar: bobStretchByChar } = computeBobByChar({
     characters: rd.layerData.characters,
     sceneBob: rd.idleMotion?.bpmBob,
     sceneBpm: rd.idleMotion?.bpm,
@@ -519,6 +519,7 @@ function _computeExportSceneState(rd, f, { withLipSync = true } = {}) {
     idleDx: idle.dx,
     idleDy: idle.dy,
     bobDyByChar,
+    bobStretchByChar,
     motionOffsetByChar,
     elapsedSec: localElapsedSec,
     animationFps: 12,

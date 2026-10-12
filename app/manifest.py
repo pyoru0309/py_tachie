@@ -12,6 +12,7 @@ from .assets import (
     scan_project_assets,
     valid_manifest_items,
 )
+from .character_deform import normalize_character_deform
 from .config import default_config
 from .paths import ASSETS_DIR, DEFAULT_PROJECT_ID
 from .utils import (
@@ -300,6 +301,8 @@ def character_definition_from_asset_manifest(
         "readOnly": origin == "common",
         "assetRoot": relative_to_root(character_dir),
         "color": color,
+        # キャラ変形の場所 (伸縮範囲 / 揺れピン)。scene-bundle がキャラごとに載せる。
+        "deform": normalize_character_deform(character_manifest.get("deform")),
         "backHairs": items("backHairs"),
         "bases": bases,
         "cheeks": items("cheeks"),

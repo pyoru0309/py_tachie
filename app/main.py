@@ -3081,6 +3081,15 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
             None,
         ) or {"characterId": ""}
         layers_meta = animation_layers(manifest, char_state)
+        _char_def_id = str(char_state.get("characterId") or "")
+        char_deform = next(
+            (
+                item.get("deform") or {}
+                for item in (manifest.get("characters") or [])
+                if isinstance(item, dict) and str(item.get("id") or "") == _char_def_id
+            ),
+            {},
+        )
         # blink_eligible=False (= カット選択 eye が blinkOpen フラグなし) のときは
         # half/closed を焼かず None にする (skip baking)。eye_open は常に「カット
         # 選択の目」(= state["eye"]) をそのまま texture 化する。
@@ -3313,6 +3322,11 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
                 # BPM 上下ゆれ (bob) ({bpm, amplitudePx})。motion とは独立。
                 # scene-builder の update() が sceneSec から sin で dy を計算する。
                 "bob": getattr(character_request, "bob", None),
+                # キャラ変形の場所 (キャラ定義 deform、伸縮範囲 / 揺れピン)。
+                # scene-builder が体の揺れの「範囲の伸縮」に使う。
+                "deform": char_deform,
+                # 揺れピンの強さ (カット側、None = キャラ定義どおり)。
+                "sway": getattr(character_request, "sway", None),
             }
         )
 

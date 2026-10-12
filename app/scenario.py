@@ -6,6 +6,7 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
+from .character_deform import normalize_character_deform, normalize_character_sway
 from .timecode import PROJECT_FPS, sec_to_frames
 from .utils import ProjectContext, current_project, write_project_file
 
@@ -65,6 +66,8 @@ def apply_import_manifest_yaml_to_character(
         }
     if parsed_yaml.get("color"):
         manifest["color"] = str(parsed_yaml["color"])
+    if parsed_yaml.get("deform"):
+        manifest["deform"] = normalize_character_deform(parsed_yaml["deform"])
 
     # manifest を更新内容で書き戻す
     manifest_path = character_dir / "character_manifest.json"
@@ -287,6 +290,8 @@ def refresh_import_manifest_for_character(character_dir: Path, manifest: dict[st
         }
     # color は空文字でも出す (透過ミラー)。
     yaml_data["color"] = str(manifest.get("color") or "")
+    # キャラ変形の場所 (伸縮範囲 / 揺れピン)。PSD 再インポートで消えないように持ち回す。
+    yaml_data["deform"] = normalize_character_deform(manifest.get("deform"))
 
     (character_dir / IMPORT_YAML_FILENAME).write_text(
         serialize_psd_importer_yaml(yaml_data), encoding="utf-8"
@@ -1203,6 +1208,8 @@ def normalize_character_state(item: dict[str, Any], manifest: dict[str, Any], in
     normalized["motion"] = _normalize_character_motion(item.get("motion"))
     # BPM 上下ゆれ (bob)。motion とは独立した per-character エフェクト。
     normalized["bob"] = _normalize_character_bob(item.get("bob"))
+    # 揺れピンの強さ (キャラ定義 deform.pins をこのカットでどれだけ揺らすか)。
+    normalized["sway"] = normalize_character_sway(item.get("sway"))
 
     if is_orphan:
         # 孤児はバリデーション対象外。frontIds と eyeAboveBangs / flipX の型だけ整える。
@@ -1710,6 +1717,8 @@ def _normalize_bob_pattern(raw: dict[str, Any]) -> dict[str, Any]:
     - bpmSource: manual (キャラ = bob.bpm、シーン = scene.bpm) / midi (BGM の歌唱判定
       MIDI のテンポマップから自動)
     - onlyWhileSinging: 口パク (音声 / MIDI) で声が出ている周期だけ揺らす
+    - target: position (全身の位置) / stretch (キャラ定義の伸縮範囲を伸び縮み。
+      dev_docs/plans/character-deform.md)
     """
     style = str(raw.get("style") or "wave")
     try:
@@ -1726,6 +1735,7 @@ def _normalize_bob_pattern(raw: dict[str, Any]) -> dict[str, Any]:
         "rate": rate if rate in _BOB_RATES else 1.0,
         "bpmSource": "midi" if raw.get("bpmSource") == "midi" else "manual",
         "onlyWhileSinging": bool(raw.get("onlyWhileSinging") or False),
+        "target": "stretch" if raw.get("target") == "stretch" else "position",
     }
 
 

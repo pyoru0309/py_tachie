@@ -436,6 +436,7 @@ API としては `POST /api/dev/visualizer/preview` が本体です。本番の 
 | `bokeh_gradient` | ぼかし円とグラデーション | 2 色グラデ + 浮遊するボケ円 + スターダスト | 音声なしの装飾系。`ShaderMaterial` 1 plane で大きなボケ円を vec4 uniform 配列に、`InstancedMesh` で小さな星粒を per-instance `aInstAlpha` に分けて描画 |
 | `falling_particles` | 降りそそぐパーティクル (星屑 / 雪 / 雨) | 星屑 / 雪 / 雨が一定方向に降る (浮遊も可) | `uShape` 分岐で 1 InstancedMesh から 3 形状を描画、`((t*v + phase*span) mod span)` で wrap、雨は plane を `angle` で回転 |
 | `led_grid` | LED グリッド | BPM に合わせて光るドットマトリクス | フルスクリーン fragment shader で `floor(uv * grid)` セル分割 + ハッシュ関数で per-cell color / pulse 決定。`ctx.sceneBpm` を読みつつ `params.bpm > 0` で上書き |
+| `laser_beams` | レーザー光線 | 固定光源 (2 列まで) から扇形のビームが BPM に合わせて振れる / 交差する / 面になる | 光源ごとの扇 (向き・開き・面らしさ・色) を JS で毎フレーム求めて vec4 uniform 配列に流し、fragment shader は「光源から見た角度 → 扇の中の最寄りビーム → 垂直距離」で O(光源数) に描く。フレーズ (数拍) ごとにパターンをシードのハッシュで選び、変わり目は 1 拍で補間。`AdditiveBlending` の例 |
 | `glow_shapes` | 光る図形 (角丸四角 / 円 / 三角 / 星) | ネオン輪郭の図形が一定方向に流れる + 背景パターン | SDF (`sdRoundedBox` / `sdCircle` / `sdEquilateralTriangle` / `sdStar5`) を `vShapeId` で分岐、per-instance に色・線幅をバラつかせる例。背景模様 (水玉 / 格子 / 横線 / 縦線) も同梱 |
 | `wave_ribbons` | ウェーブリボン (ジオメトリック背景) | 半透明の斜めリボンがゆっくり波打つ「光のサテン」風背景 | vec4 uniform 配列で最大 16 本のリボンを 1 fragment shader で順次 `over` 合成。位相だけ `phase0 + speed*t` で更新する低 CPU パターン |
 

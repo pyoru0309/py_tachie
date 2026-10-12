@@ -615,6 +615,13 @@
             </div>
             <div class="inline-fields">
               <label>
+                揺らし方
+                <select id="characterBobTargetSelect" title="範囲 = キャラ詳細で決めた伸縮範囲 (腰より上 など)。未設定なら足元を基準に全身">
+                  <option value="position">全身の位置を動かす</option>
+                  <option value="stretch">範囲を伸び縮みさせる</option>
+                </select>
+              </label>
+              <label>
                 動き
                 <select id="characterBobStyleSelect">
                   <option value="wave">波（常に揺れる）</option>
@@ -642,7 +649,15 @@
               <input id="characterBobOnlyWhileSingingInput" type="checkbox" />
               <span>口パクのときだけ体を揺らす（音声 / MIDI）</span>
             </label>
-            <p class="asset-hint">編集中のキャラを、BPM のビートに合わせて上下にゆらします（bob = 浮き沈み）。振幅が 0、または BPM が取れないときは無効です。「跳ねる」系は 1 周期のうち「溜め」の割合だけ静止し、拍で跳ねます（リズムを取っているような動き。なめらか＝ふわっと、ジャンプ＝放物線、キック＝素早く上がってゆっくり戻る）。「MIDI から自動検出」は BGM の歌唱判定 MIDI のテンポ（途中のテンポ変更も）に合わせ、リズムの倍率も掛かります（例: 180→220 を半分にすると 90→110）。動作モーションと併用できます。位相はシーン全体で連続します。</p>
+            <p class="asset-hint">編集中のキャラを、BPM のビートに合わせて上下にゆらします（bob = 浮き沈み）。「範囲を伸び縮みさせる」はキャラ詳細の「体の伸縮範囲」だけを縦に伸縮させ、振幅は範囲の上端が動く量になります。振幅が 0、または BPM が取れないときは無効です。「跳ねる」系は 1 周期のうち「溜め」の割合だけ静止し、拍で跳ねます（リズムを取っているような動き。なめらか＝ふわっと、ジャンプ＝放物線、キック＝素早く上がってゆっくり戻る）。「MIDI から自動検出」は BGM の歌唱判定 MIDI のテンポ（途中のテンポ変更も）に合わせ、リズムの倍率も掛かります（例: 180→220 を半分にすると 90→110）。動作モーションと併用できます。位相はシーン全体で連続します。</p>
+            <h3 class="motion-subhead">髪・衣装の揺れ（揺れピン）</h3>
+            <div class="inline-fields">
+              <label>
+                揺れの強さ (%)
+                <input id="characterSwayStrengthInput" type="number" min="0" max="300" step="10" value="100" />
+              </label>
+            </div>
+            <p class="asset-hint">キャラ詳細の「揺れピン」で決めた場所（髪・衣装など）を揺らします。100% でキャラ詳細どおり、0% で止まります。揺れピンの無いキャラには効きません。揺れはシーン全体で連続します。</p>
           </div>
 
           <div class="panel-section">
@@ -1534,6 +1549,13 @@
                 BPMボブ振幅 (px)
                 <input id="sceneBpmBobAmplitudeInput" type="number" min="0" max="40" step="1" />
               </label>
+              <label>
+                BPMボブの揺らし方
+                <select id="sceneBpmBobTargetSelect" title="範囲 = キャラ詳細で決めた伸縮範囲 (腰より上 など)。未設定のキャラは足元を基準に全身">
+                  <option value="position">全身の位置を動かす</option>
+                  <option value="stretch">範囲を伸び縮みさせる</option>
+                </select>
+              </label>
             </div>
             <div class="inline-fields">
               <label>
@@ -1571,7 +1593,7 @@
               <input id="sceneBpmBobOnlyWhileSingingInput" type="checkbox" />
               <span>口パクのときだけ体を揺らす（音声 / MIDI。キャラごとに判定）</span>
             </label>
-            <p class="asset-hint">BPMボブは「基本」タブの BPM（または BGM の歌唱判定 MIDI のテンポ）に合わせて全キャラを揺らします。「跳ねる」系は「溜め」の割合だけ静止し、拍で跳ねます。「MIDI から自動検出」はシーンの BGM に歌唱判定 MIDI があるときに選べます。</p>
+            <p class="asset-hint">BPMボブは「基本」タブの BPM（または BGM の歌唱判定 MIDI のテンポ）に合わせて全キャラを揺らします。「範囲を伸び縮みさせる」は各キャラの「体の伸縮範囲」（キャラ詳細）だけを縦に伸縮させます。「跳ねる」系は「溜め」の割合だけ静止し、拍で跳ねます。「MIDI から自動検出」はシーンの BGM に歌唱判定 MIDI があるときに選べます。</p>
           </section>
 
           <section class="form-tab-panel hidden" data-scene-tab-panel="video">
@@ -2276,6 +2298,14 @@
               </label>
             </div>
           </fieldset>
+          <fieldset class="character-detail-voice character-detail-deform">
+            <legend>体の変形（伸縮範囲・揺れピン）</legend>
+            <p id="characterDeformSummary" class="character-deform-summary">未設定</p>
+            <button id="openCharacterDeformButton" type="button" class="ghost-button">
+              <span class="msym button-icon" aria-hidden="true">open_in_full</span>
+              <span>変形を編集…</span>
+            </button>
+          </fieldset>
           <div id="characterManagerMeta" class="asset-path-display">未選択</div>
         </div>
         <div class="dialog-actions">
@@ -2290,6 +2320,173 @@
           <button id="closeCharacterManagerButton" type="button">
             <span class="msym button-icon" aria-hidden="true">close</span>
             <span>閉じる</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="characterDeformDialog" class="settings-dialog character-deform-dialog">
+      <form method="dialog" class="settings-panel character-deform-root">
+        <div class="dialog-header">
+          <div>
+            <h2 id="characterDeformHeading">体の変形</h2>
+            <p>伸縮範囲（体の揺れ「範囲を伸び縮みさせる」用）と、髪・衣装の揺れピンを編集します。「反映して閉じる」のあと、キャラ詳細の「保存」で確定します。</p>
+          </div>
+        </div>
+        <div class="character-deform-layout">
+          <div class="character-deform-view">
+            <div class="character-deform-viewbar">
+              <div class="character-deform-modes" role="group" aria-label="編集する変形">
+                <button type="button" class="ghost-button" data-deform-mode="stretch">
+                  <span class="msym button-icon" aria-hidden="true">height</span>
+                  <span>伸縮範囲</span>
+                </button>
+                <button type="button" class="ghost-button" data-deform-mode="pins">
+                  <span class="msym button-icon" aria-hidden="true">push_pin</span>
+                  <span>揺れピン</span>
+                </button>
+              </div>
+              <div class="character-deform-zoom" role="group" aria-label="表示の拡大縮小">
+                <button id="characterDeformZoomOutButton" type="button" class="ghost-button icon-only" title="縮小">
+                  <span class="msym button-icon" aria-hidden="true">zoom_out</span>
+                </button>
+                <span id="characterDeformZoomLabel" class="character-deform-zoom-label">100%</span>
+                <button id="characterDeformZoomInButton" type="button" class="ghost-button icon-only" title="拡大">
+                  <span class="msym button-icon" aria-hidden="true">zoom_in</span>
+                </button>
+                <button id="characterDeformZoomFitButton" type="button" class="ghost-button" title="絵全体が収まる大きさに戻す">
+                  <span class="msym button-icon" aria-hidden="true">fit_screen</span>
+                  <span>全体表示</span>
+                </button>
+              </div>
+              <button id="characterDeformPlayButton" type="button" class="ghost-button">
+                <span class="msym button-icon" aria-hidden="true">play_arrow</span>
+                <span data-label>試しに動かす</span>
+              </button>
+            </div>
+            <div id="characterDeformStage" class="character-deform-stage" tabindex="0">
+              <canvas id="characterDeformGlCanvas"></canvas>
+              <canvas id="characterDeformCanvas" class="character-deform-overlay"></canvas>
+            </div>
+            <p class="asset-hint character-deform-view-hint">ピンチ / Ctrl(⌘)+ホイールで拡大縮小、2 本指スクロール / スペース+ドラッグ / 中ボタンドラッグで表示を移動。Delete キーで選択中のピンを消します。</p>
+          </div>
+          <aside class="character-deform-side">
+                <div class="character-deform-panel" data-deform-panel="stretch">
+                  <p class="asset-hint">体の揺れを「範囲を伸び縮みさせる」にしたとき、どこを伸縮させるかを決めます。絵の上の線をドラッグしてください。基準線より下は動かず、上端より上は形を保ったまま一緒に動きます。</p>
+                  <label>
+                    基準線（腰）(%)
+                    <input id="characterDeformAnchorInput" type="number" min="0" max="100" step="0.5" />
+                  </label>
+                  <label class="checkbox-row">
+                    <input id="characterDeformTopEnabledInput" type="checkbox" />
+                    <span>上端（首）を指定する</span>
+                  </label>
+                  <label>
+                    上端（首）(%)
+                    <input id="characterDeformTopInput" type="number" min="0" max="100" step="0.5" />
+                  </label>
+                  <label>
+                    体積の保持 (%)
+                    <input id="characterDeformVolumeInput" type="number" min="0" max="100" step="5" title="伸びたとき横を細く、縮んだとき横を太くする度合い。0 なら横幅は変えない" />
+                  </label>
+                  <div class="character-deform-buttons">
+                    <button id="characterDeformResetButton" type="button" class="ghost-button" title="足元を基準に全身を伸縮する既定に戻す">
+                      <span class="msym button-icon" aria-hidden="true">restart_alt</span>
+                      <span>既定に戻す</span>
+                    </button>
+                  </div>
+                  <p class="asset-hint">% は絵の上端からの位置です。未設定のときは足元を基準に全身が伸縮します。「試しに動かす」は範囲を確かめるための動きで、実際の揺れの大きさは体の揺れの振幅で決まります。</p>
+                </div>
+                <div class="character-deform-panel" data-deform-panel="pins" hidden>
+                  <p class="asset-hint">髪や衣装にピンを置くと、その周りがふわふわ揺れます。何も無い所をクリックで追加、ピンをドラッグで移動、選択中のピンの右端のつまみで大きさを変えます。顔や体に「固定」ピンを置くと、そこは揺れません。</p>
+                  <div class="character-deform-pin-add">
+                    <label>
+                      クリックで追加するピン
+                      <select id="characterDeformPinAddKindSelect">
+                        <option value="sway">揺れピン</option>
+                        <option value="fixed">固定ピン</option>
+                      </select>
+                    </label>
+                    <span id="characterDeformPinCount" class="character-deform-pin-count">ピン 0 / 16</span>
+                  </div>
+                  <div class="character-deform-buttons">
+                    <button id="characterDeformPinSelectAllButton" type="button" class="ghost-button" title="すべてのピンを選択して、値をまとめて変える">
+                      <span class="msym button-icon" aria-hidden="true">select_all</span>
+                      <span>すべて選択</span>
+                    </button>
+                    <button id="characterDeformPinSelectSwayButton" type="button" class="ghost-button" title="揺れピンだけを選択">
+                      <span class="msym button-icon" aria-hidden="true">waves</span>
+                      <span>揺れピンだけ</span>
+                    </button>
+                    <button id="characterDeformPinSelectNoneButton" type="button" class="ghost-button">
+                      <span class="msym button-icon" aria-hidden="true">deselect</span>
+                      <span>選択解除</span>
+                    </button>
+                  </div>
+                  <fieldset id="characterDeformPinFields" class="character-deform-pin-fields" disabled>
+                    <legend id="characterDeformPinSelectionLabel">選択中のピン</legend>
+                    <div class="inline-fields">
+                      <label>
+                        種類
+                        <select id="characterDeformPinKindSelect">
+                          <option value="sway">揺れ</option>
+                          <option value="fixed">固定</option>
+                        </select>
+                      </label>
+                      <label>
+                        大きさ (%)
+                        <input id="characterDeformPinRadiusInput" type="number" min="1" max="60" step="0.5" title="影響する半径。絵の高さに対する %" />
+                      </label>
+                    </div>
+                    <div class="inline-fields">
+                      <label>
+                        振れ幅 (%)
+                        <input id="characterDeformPinAmountInput" type="number" min="0" max="40" step="1" title="円の半径に対する %。大きすぎると絵が崩れるので 40% まで" />
+                      </label>
+                      <label>
+                        向き (°)
+                        <input id="characterDeformPinAngleInput" type="number" min="-180" max="180" step="5" title="0 = 左右、90 = 上下" />
+                      </label>
+                    </div>
+                    <div class="inline-fields">
+                      <label>
+                        周期 (秒)
+                        <input id="characterDeformPinPeriodInput" type="number" min="0.2" max="20" step="0.1" title="1 往復にかかる秒数" />
+                      </label>
+                      <label>
+                        位相 (%)
+                        <input id="characterDeformPinPhaseInput" type="number" min="0" max="100" step="5" title="揺れ始めのずれ。ピンごとにずらすとなびいて見える" />
+                      </label>
+                    </div>
+                    <p class="asset-hint">複数選択中は、変えた欄の値が選択中のピンすべてに入ります（空欄 = 値がばらばら）。Shift / ⌘ クリックで選択に足したり外したりできます。</p>
+                    <div class="character-deform-buttons">
+                      <button id="characterDeformPinSpreadPhaseButton" type="button" class="ghost-button" title="選択中のピンの位相を、上から順に少しずつずらす (なびいて見える)">
+                        <span class="msym button-icon" aria-hidden="true">stacked_line_chart</span>
+                        <span>位相を順にずらす</span>
+                      </button>
+                      <button id="characterDeformPinDeleteButton" type="button" class="ghost-button">
+                        <span class="msym button-icon" aria-hidden="true">delete</span>
+                        <span>選択中を消す</span>
+                      </button>
+                    </div>
+                  </fieldset>
+                  <div class="character-deform-buttons">
+                    <button id="characterDeformPinClearButton" type="button" class="ghost-button">
+                      <span class="msym button-icon" aria-hidden="true">layers_clear</span>
+                      <span>すべて消す</span>
+                    </button>
+                  </div>
+                  <p class="asset-hint">「試しに動かす」は実際の振れ幅で揺らします。カットごとの強さはキャラの「髪・衣装の揺れの強さ」で変えられます。</p>
+                </div>
+          </aside>
+        </div>
+        <div class="dialog-actions">
+          <button id="cancelCharacterDeformButton" type="button">
+            <span class="msym button-icon" aria-hidden="true">close</span>
+            <span>キャンセル</span>
+          </button>
+          <button id="applyCharacterDeformButton" class="primary-button" type="button">
+            <span class="msym button-icon" aria-hidden="true">check</span>
+            <span>反映して閉じる</span>
           </button>
         </div>
       </form>

@@ -20,18 +20,22 @@
 // (= 未指定) はクリップしない。
 // =============================================================================
 import * as THREE from "three";
+import { CHAR_DEFORM_GLSL, createDeformUniforms } from "./char-deform.js";
 
 const VERT_SHADER = /* glsl */ `
   varying vec2 vUv;
   varying vec2 vWorldXY;
+  ${CHAR_DEFORM_GLSL}
   void main() {
     vUv = uv;
+    // 部分伸縮などのキャラ変形 (char-deform.js)。uDeformOn=0 なら素通し。
+    vec3 pos = vec3(charDeform(position.xy), position.z);
     // modelMatrix は per-mesh の world 変換 (group.position + mesh.position +
     // flipX 等の scale)。projection / view ではなく modelMatrix だけ通せば
     // world 座標が取れる。
-    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vec4 wp = modelMatrix * vec4(pos, 1.0);
     vWorldXY = wp.xy;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
   }
 `;
 
@@ -89,6 +93,7 @@ export function createCharacterMaterial(texture, colorFilter) {
       // motion "move" の opacity 補間。1.0 = 完全に見える、0.0 = 透明。
       // 通常は 1.0 で固定、scene-builder の per-frame update で書き換える。
       uAlphaMul: { value: 1.0 },
+      ...createDeformUniforms(),
     },
     vertexShader: VERT_SHADER,
     fragmentShader: FRAG_SHADER,

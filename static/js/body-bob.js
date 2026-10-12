@@ -21,6 +21,11 @@
 // しかなく、12fps のコマ打ちでは 1 コマで終わって「一瞬浮くだけ」に見えるため。
 // preview は実時間、書き出しは出力フレームの時刻を渡す。
 //
+// 揺らし方 (target):
+//   position … 従来どおり全身の位置を上下に動かす (dy)
+//   stretch  … キャラ定義の伸縮範囲 (腰より上 など) を縦に伸び縮みさせる (stretchDy)。
+//              振幅は「伸縮範囲の上端が何 px 動くか」。描画は renderer/effects/char-deform.js
+//
 // 口パクのときだけ揺らす (onlyWhileSinging):
 //   周期 c で揺らすかは「直前の周期 c-1 か、周期 c の頭で声が出ていたか」で周期の頭に
 //   決める。途中で切り替えないので、波でも跳ねでも動きが途切れて飛ぶことがない
@@ -29,6 +34,7 @@
 export const BOB_STYLES = ["wave", "bounce", "hop", "kick", "nod"];
 export const BOB_RATES = [2, 1, 0.5, 0.25];
 export const DEFAULT_BOB_HOLD = 0.7;
+export const BOB_TARGETS = ["position", "stretch"];
 
 function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
@@ -55,6 +61,7 @@ export function normalizeBob(raw, { requireBpm = false } = {}) {
     bpmSource,
     bpm,
     onlyWhileSinging: !!raw.onlyWhileSinging,
+    target: raw.target === "stretch" ? "stretch" : "position",
   };
 }
 
@@ -153,21 +160,24 @@ export function createStreamingVoiceGate() {
   };
 }
 
-// 1 フレームぶんの { [charId]: dy }。シーンの揺れ (全員) + キャラの揺れ を合算する。
+// 1 フレームぶんの { dyByChar, stretchByChar }。シーンの揺れ (全員) + キャラの揺れ を
+// 揺らし方 (target) ごとに合算する。
 //   characters: layerData.characters ({ id, bob })
 //   sceneBob: idleMotion.bpmBob、sceneBpm: idleMotion.bpm
 //   beatMaps: layerData.beatMaps ({ scene, byChar })
 //   isVoiced(charId, cycle, cycleAt, layer): onlyWhileSinging の判定 (呼び出し側が実装)。
 //     layer は "scene" / "own" (周期の長さが違うので、判定を覚えるときは層ごとに分ける)
 //   voicedAtLocal(charId, t) を渡せば isVoiced の代わりに cycleIsVoiced で判定する。
-export function computeBobDyByChar({
+export function computeBobByChar({
   characters, sceneBob, sceneBpm, beatMaps, localSec, sceneSec, isVoiced, voicedAtLocal,
 }) {
-  const out = {};
+  const dyByChar = {};
+  const stretchByChar = {};
   const scene = normalizeBob(sceneBob);
   for (const char of characters || []) {
     if (!char?.id) continue;
     let dy = 0;
+    let stretch = 0;
     const layers = [];
     if (scene) layers.push({ layer: "scene", bob: scene, bpm: Number(sceneBpm) || 0, beatMap: beatMaps?.scene });
     const own = normalizeBob(char.bob, { requireBpm: true });
@@ -194,9 +204,17 @@ export function computeBobDyByChar({
             : false);
         if (!voiced) continue;
       }
-      dy += bobShapeOffset(bob, pos - cycle);
+      const offset = bobShapeOffset(bob, pos - cycle);
+      if (bob.target === "stretch") stretch += offset;
+      else dy += offset;
     }
-    out[char.id] = dy;
+    dyByChar[char.id] = dy;
+    stretchByChar[char.id] = stretch;
   }
-  return out;
+  return { dyByChar, stretchByChar };
+}
+
+// 位置の揺れ (dy) だけ欲しい呼び出し元向け。
+export function computeBobDyByChar(args) {
+  return computeBobByChar(args).dyByChar;
 }

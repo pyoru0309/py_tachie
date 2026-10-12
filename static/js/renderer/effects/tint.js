@@ -9,19 +9,23 @@
 // (SrcAlpha + OneMinusSrcAlpha) と整合する。
 // =============================================================================
 import * as THREE from "three";
+import { CHAR_DEFORM_GLSL, createDeformUniforms, createDeformablePlaneGeometry } from "./char-deform.js";
 
 const VERT_SHADER = /* glsl */ `
   varying vec2 vUv;
   varying vec2 vWorldXY;
+  ${CHAR_DEFORM_GLSL}
   void main() {
     vUv = uv;
+    // 部分伸縮などのキャラ変形 (char-deform.js)。uDeformOn=0 なら素通し。
+    vec3 pos = vec3(charDeform(position.xy), position.z);
     // character-material と同じく、world 座標 (modelMatrix * position) を
     // varying で渡して fragment で矩形クリップ (uClipRect) に使う。
     // glow/shadow plane はキャラ group 配下なので modelMatrix に group の中心
     // 位置 + flipX scale + shadow offset が含まれる。
-    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vec4 wp = modelMatrix * vec4(pos, 1.0);
     vWorldXY = wp.xy;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
   }
 `;
 
@@ -65,6 +69,8 @@ export function createTintMaterial(initialColor = "#ffffff") {
       uColor: { value: color },
       uOpacity: { value: 0 },
       uClipRect: { value: new THREE.Vector4(0, 0, 0, 0) },
+      // キャラ本体と同じ変形を光彩・影にも掛ける (char-deform.js)。
+      ...createDeformUniforms(),
     },
     vertexShader: VERT_SHADER,
     fragmentShader: FRAG_SHADER,
@@ -79,9 +85,10 @@ export function createTintMaterial(initialColor = "#ffffff") {
   });
 }
 
-export function createTintPlane(width, height) {
+// withPins: キャラに揺れピンがあるとき横も格子化する (char-deform.js)。
+export function createTintPlane(width, height, withPins = false) {
   const material = createTintMaterial();
-  const geometry = new THREE.PlaneGeometry(width, height);
+  const geometry = createDeformablePlaneGeometry(width, height, withPins);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.frustumCulled = false;
   mesh.visible = false;

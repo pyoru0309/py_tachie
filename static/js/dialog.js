@@ -293,6 +293,7 @@ export function fillSceneDialog() {
   if (elements.sceneBpmBobAmplitude)
     elements.sceneBpmBobAmplitude.value = Number(bpmBob.amplitudePx ?? 0);
   if (elements.sceneBpmBobStyle) elements.sceneBpmBobStyle.value = bpmBob.style || "wave";
+  if (elements.sceneBpmBobTarget) elements.sceneBpmBobTarget.value = bpmBob.target === "stretch" ? "stretch" : "position";
   if (elements.sceneBpmBobHold)
     elements.sceneBpmBobHold.value = String(Math.round((bpmBob.hold == null ? 0.7 : Number(bpmBob.hold)) * 100));
   if (elements.sceneBpmBobRate) elements.sceneBpmBobRate.value = String(Number(bpmBob.rate) || 1);
@@ -693,6 +694,7 @@ export function applySceneFieldsFromDialog() {
     rate: Number(elements.sceneBpmBobRate?.value) || 1,
     bpmSource: elements.sceneBpmBobBpmSource?.value === "midi" ? "midi" : "manual",
     onlyWhileSinging: !!elements.sceneBpmBobOnlyWhileSinging?.checked,
+    target: elements.sceneBpmBobTarget?.value === "stretch" ? "stretch" : "position",
   };
   // F5a: ビジュアライザ設定の書き戻し
   if (!scene.visualizer || typeof scene.visualizer !== "object") scene.visualizer = {};
@@ -866,6 +868,8 @@ export function renderSceneBgmList() {
         other.showInMeter = idx === index ? !!meterInput.checked : false;
       });
       renderSceneBgmList();
+      // タイムラインの波形レーンもメーター対象のトラックに追従させる。
+      renderTelopTrack();
       deps.scheduleScenarioSave();
       recordHistory();
     });
@@ -1152,6 +1156,7 @@ export async function applyCharacterToAllCuts() {
       rate: Number(character.bob?.rate) || 1,
       bpmSource: character.bob?.bpmSource === "midi" ? "midi" : "manual",
       onlyWhileSinging: !!character.bob?.onlyWhileSinging,
+      target: character.bob?.target === "stretch" ? "stretch" : "position",
     },
     x: Number(character.character?.x ?? 0),
     y: Number(character.character?.y ?? 0),

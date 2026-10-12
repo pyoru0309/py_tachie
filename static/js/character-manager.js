@@ -7,7 +7,7 @@ import { elements } from "./elements.js";
 import { showToast } from "./toast.js";
 import { fillSelect, clamp, normalizeColorValue } from "./utils.js";
 import { attachScenarioCutsAlias } from "./scenario.js";
-import { renderPreview } from "./playback.js";
+import { renderPreview, invalidateRendererCachesForConfigChange } from "./playback.js";
 import { renderCutList } from "./scenario-actions.js";
 import {
   selectedCharacter,
@@ -17,6 +17,7 @@ import {
   accentColorFallback,
 } from "./character.js";
 import { loadProjects } from "./project.js";
+import { loadCharacterDeformEditor, collectCharacterDeform } from "./character-deform-editor.js";
 import {
   ttsAvailable,
   ttsNarratorList,
@@ -267,6 +268,7 @@ export function loadCharacterManagerForm(character) {
   elements.deleteCharacterManagerButton.disabled = !hasAssetRoot || character.origin !== "project";
   populateVoiceSelectorsForManager(character.voice || { id: "", emotion: "" });
   applyColorToManagerForm(character.color || "");
+  loadCharacterDeformEditor(character);
 }
 
 function applyColorToManagerForm(colorValue) {
@@ -425,6 +427,7 @@ export async function saveCharacterManager() {
       removeWhite: elements.characterManagerRemoveWhite.checked,
       voice: voicePersist,
       color: colorValue,
+      deform: collectCharacterDeform(),
     }),
   });
   if (!response.ok) {
@@ -436,7 +439,9 @@ export async function saveCharacterManager() {
     deps.fillAssetControls();
     deps.fillConfigForm();
     renderCutList();
-    renderPreview();
+    // 伸縮範囲 (deform) は scene-bundle のキャラ payload に載るが、bundle の token は
+    // カット payload しか覆っていないので、取り置きを捨ててから描き直す。
+    invalidateRendererCachesForConfigChange().then(() => renderPreview());
     // 編集中カットの「声」「感情」セレクタを最新の紐付けで同期し直す
     deps.syncDialogueVoiceFromSpeaker();
   }

@@ -11,6 +11,7 @@ from typing import Any
 import yaml
 from PIL import Image
 
+from .character_deform import normalize_character_deform
 from .log_setup import app_logger
 from .paths import CACHE_DIR
 from .utils import relative_to_root, slugify_project_id, resolve_root_rel
@@ -578,6 +579,8 @@ def parse_psd_importer_yaml(text: str) -> dict[str, Any]:
         "removeWhite": raw.get("removeWhite") if isinstance(raw.get("removeWhite"), bool) else None,
         "voice": dict(raw.get("voice") or {}) if isinstance(raw.get("voice"), dict) else {},
         "color": str(raw.get("color") or ""),
+        # キャラ変形の場所 (伸縮範囲 / 揺れピン)。app/character_deform.py
+        "deform": normalize_character_deform(raw.get("deform")),
     }
 
     for key, value in raw.items():
@@ -650,6 +653,10 @@ def serialize_psd_importer_yaml(data: dict[str, Any]) -> str:
             out["voice"] = voice_out
     if "color" in data:
         out["color"] = str(data.get("color") or "")
+    # キャラ変形は設定があるときだけ書き出す (無いキャラの YAML を冗長にしない)。
+    deform = normalize_character_deform(data.get("deform"))
+    if deform:
+        out["deform"] = deform
 
     label_for_category = {
         "back_hair": "後ろ髪",
@@ -1229,6 +1236,8 @@ def _merge_psd_import_yaml(
             dst["color"] = str(src["color"])
         if isinstance(src.get("removeWhite"), bool):
             dst["removeWhite"] = bool(src["removeWhite"])
+        if src.get("deform"):
+            dst["deform"] = normalize_character_deform(src["deform"])
         if isinstance(src.get("expressionPresets"), list):
             dst["expressionPresets"] = [dict(item) for item in src["expressionPresets"] if isinstance(item, dict)]
         if isinstance(src.get("hairstylePresets"), list):

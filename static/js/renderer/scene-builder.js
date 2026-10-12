@@ -32,6 +32,14 @@ import { createCoverPass } from "./effects/cover.js";
 import { createTintPlane, setTint } from "./effects/tint.js";
 import { createCharacterMaterial } from "./effects/character-material.js";
 import {
+  createDeformablePlaneGeometry,
+  resolveStretchRegion,
+  applyStretchToMaterials,
+  resolveSwayPins,
+  applySwayPinsToMaterial,
+  applySwayTimeToMaterials,
+} from "./effects/char-deform.js";
+import {
   createDialogueCanvasTexture,
   drawDialogueOnCanvas,
   drawDialogueBoxFillOnCanvas,
@@ -264,8 +272,10 @@ function makeCharPlane(width, height, texture, renderOrder) {
 }
 
 // ShaderMaterial 版 (メイン scene のキャラ表示用)。色フィルタ uniform を持つ。
-function makeCharPlaneShader(width, height, texture, renderOrder, colorFilter) {
-  const geometry = new THREE.PlaneGeometry(width, height);
+// 板は格子化しておく (部分伸縮 / 揺れピンの頂点変形用、char-deform.js)。
+// withPins = 揺れピンのあるキャラ (横も割る)。
+function makeCharPlaneShader(width, height, texture, renderOrder, colorFilter, withPins = false) {
+  const geometry = createDeformablePlaneGeometry(width, height, withPins);
   const material = createCharacterMaterial(texture, colorFilter);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.set(0, 0, 0);
@@ -1117,14 +1127,21 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
   // 使うので無関係)。char.colorFilter は scene-bundle が per-character payload に
   // raw 値を乗せる。enabled=false / 未指定なら uniform 0 で no-op。
   const cf = char.colorFilter;
-  const underMesh = makeCharPlaneShader(w, h, underTex, baseOrder + ORDER_CHAR_UNDER_OFFSET, cf);
-  const eyeMesh = makeCharPlaneShader(w, h, eyeTextures.open || null, baseOrder + ORDER_CHAR_EYE_OFFSET, cf);
+  // 揺れピン (キャラ定義 deform.pins)。あるキャラだけ板を横にも格子化する。
+  const swayPins = resolveSwayPins(char.deform?.pins, w, h);
+  const withPins = !!swayPins;
+  const underMesh = makeCharPlaneShader(w, h, underTex, baseOrder + ORDER_CHAR_UNDER_OFFSET, cf, withPins);
+  const eyeMesh = makeCharPlaneShader(w, h, eyeTextures.open || null, baseOrder + ORDER_CHAR_EYE_OFFSET, cf, withPins);
   // 初期表示は default (= カット選択の口)。再生開始まで「閉じ口」が一瞬出るのを防ぐ。
   const mouthMesh = makeCharPlaneShader(
     w, h, mouthTextures.default || mouthTextures.closed || null,
-    baseOrder + ORDER_CHAR_MOUTH_OFFSET, cf,
+    baseOrder + ORDER_CHAR_MOUTH_OFFSET, cf, withPins,
   );
-  const overMesh = makeCharPlaneShader(w, h, overTex, baseOrder + ORDER_CHAR_OVER_OFFSET, cf);
+  const overMesh = makeCharPlaneShader(w, h, overTex, baseOrder + ORDER_CHAR_OVER_OFFSET, cf, withPins);
+  // 本体の板は左右反転 Group の内側なので、ピンはそのまま当てる。
+  for (const mesh of [underMesh, eyeMesh, mouthMesh, overMesh]) {
+    applySwayPinsToMaterial(mesh.material, swayPins);
+  }
 
   if (underMesh.visible) bodyGroup.add(underMesh);
   if (eyeMesh.visible) bodyGroup.add(eyeMesh);
@@ -1173,7 +1190,9 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
 
     let glowPlane = null;
     if (glowCfg) {
-      glowPlane = createTintPlane(silhouette.width, silhouette.height);
+      glowPlane = createTintPlane(silhouette.width, silhouette.height, withPins);
+      // 光彩・影の板は反転 Group の外 (中身の silhouette は反転済み) なので x を反転して当てる。
+      applySwayPinsToMaterial(glowPlane.material, swayPins, { flipX });
       // v1 と同じく glow はキャラの「下」に置いて発光感を出す (周囲だけ見える)。
       glowPlane.renderOrder = baseOrder - 1;
       glowPlane.position.set(0, 0, 0);
@@ -1181,7 +1200,8 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
     }
     let shadowPlane = null;
     if (shadowCfg) {
-      shadowPlane = createTintPlane(silhouette.width, silhouette.height);
+      shadowPlane = createTintPlane(silhouette.width, silhouette.height, withPins);
+      applySwayPinsToMaterial(shadowPlane.material, swayPins, { flipX });
       shadowPlane.renderOrder = baseOrder - 2;
       const ox = Number(shadowCfg.offsetX) || 0;
       const oy = Number(shadowCfg.offsetY) || 0;
@@ -1229,7 +1249,23 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
     // BPM 同期の上下ゆれ (bob)。motion とは独立した per-character エフェクトで、
     // update() 内で sceneSec から sin 波の Y オフセットを計算して dy に加算する。
     bob: _normalizeBob(char.bob),
+    // 部分伸縮の範囲 (キャラ定義 deform.stretch、未定義なら全身)。h は表示サイズ。
+    stretchRegion: resolveStretchRegion(char.deform?.stretch, h),
+    // 変形を流し込む material (本体 4 枚 + 光彩 / 影)。
+    deformMaterials: [underMesh, eyeMesh, mouthMesh, overMesh, effects?.glowPlane, effects?.shadowPlane]
+      .map((mesh) => mesh?.material)
+      .filter(Boolean),
+    lastStretchKey: "0|1",
+    // 揺れピン。update() でシーン通算秒と強さ (カット側 sway.strength、未設定 = 1) を流す。
+    hasSwayPins: withPins,
+    swayStrength: _normalizeSwayStrength(char.sway),
   };
+}
+
+// カット側の揺れピンの強さ。未設定 = 1 (キャラ定義どおり)、0 = 止める、最大 3。
+function _normalizeSwayStrength(raw) {
+  const v = Number(raw?.strength);
+  return Number.isFinite(v) ? Math.max(0, Math.min(3, v)) : 1;
 }
 
 // BPM 上下ゆれパラメータの検証。bpm / amplitudePx がともに正のときだけ有効。
@@ -1426,6 +1462,9 @@ export async function buildScene(
     // (static/js/body-bob.js) で計算済みの値。指定があれば下の従来計算 (キャラ bob の
     // 常時サイン波) は使わない。
     bobDyByChar = null,
+    // bobStretchByChar: { [charId]: stretchDy }。体の揺れの「範囲の伸縮」分 (px、+ が下 =
+    // 縮む)。キャラ定義の伸縮範囲 (stretchRegion) を頂点シェーダーで伸び縮みさせる。
+    bobStretchByChar = null,
     // M-2: per-character motion offset { [charId]: { dx, dy, scale? } }。
     // 指定があれば shake / move / zoom はこちらを優先。指定なしのキャラは
     // 旧 scene global の shakeDx/Dy (= speaker のみ) を fallback。
@@ -1642,6 +1681,20 @@ export async function buildScene(
       }
       if (charInstance.group.rotation.z !== motionRotRad) {
         charInstance.group.rotation.z = motionRotRad;
+      }
+      // 部分伸縮 (体の揺れの「範囲の伸縮」)。値が変わったときだけ uniform を書く。
+      const stretchDy = Number(bobStretchByChar?.[charInstance.id]) || 0;
+      const stretchKey = `${stretchDy}|${motionScale}`;
+      if (stretchKey !== charInstance.lastStretchKey) {
+        charInstance.lastStretchKey = stretchKey;
+        applyStretchToMaterials(charInstance.deformMaterials, charInstance.stretchRegion, stretchDy, motionScale);
+      }
+      // 揺れピン: 時間はシーン通算秒 (量子化前の経過秒があればそちら)。カットを跨いでも
+      // 揺れが途切れず、書き出しでも同じ時刻の形になる。
+      if (charInstance.hasSwayPins) {
+        const swayLocal = (rawElapsedSec != null && Number.isFinite(Number(rawElapsedSec)))
+          ? Number(rawElapsedSec) : (Number(elapsedSec) || 0);
+        applySwayTimeToMaterials(charInstance.deformMaterials, cutStartSec + swayLocal, charInstance.swayStrength);
       }
       // move motion: 各 mesh material の uAlphaMul uniform に opacity を流し込む。
       // ShaderMaterial uniform を直接書き換え (= 再 compile 不要)。

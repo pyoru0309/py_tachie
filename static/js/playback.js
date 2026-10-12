@@ -12,7 +12,7 @@ import { captureAndUploadThumbnail } from "./thumbnail.js";
 import { createPreviewScheduler, PRIORITY } from "./preview-scheduler.js";
 import { setCutPrerenderStatus } from "./prerender.js";
 import { computeMouthKeyByChar, shapeIndexForTime } from "./lipsync.js";
-import { computeBobDyByChar, createStreamingVoiceGate, cycleIsVoiced } from "./body-bob.js";
+import { computeBobByChar, createStreamingVoiceGate, cycleIsVoiced } from "./body-bob.js";
 
 // =============================================================================
 // v2 (WebGL + three.js) renderer
@@ -2125,11 +2125,11 @@ function midiVoicedAtLocal(layerData, charId, t) {
   return !!ch && ch !== "-";
 }
 
-// 体の揺れ (シーンの BPM ボブ + キャラの bob) の { [charId]: dy }。body-bob.js 参照。
+// 体の揺れ (シーンの BPM ボブ + キャラの bob) の { dyByChar, stretchByChar }。body-bob.js 参照。
 // isVoiced 未指定 (停止中・トランジション延長) は MIDI 口形だけで「口パクのときだけ」を
 // 判定する (音量は実時間でしか取れないため、停止中は揺らさない)。
 function computePreviewBobDy(layerData, idleMotion, localSec, sceneSec, isVoiced = null) {
-  return computeBobDyByChar({
+  return computeBobByChar({
     characters: layerData?.characters,
     sceneBob: idleMotion?.bpmBob,
     sceneBpm: idleMotion?.bpm,
@@ -2311,7 +2311,7 @@ async function renderPreviewV2(cut, requestId) {
     ? computeIdleMotionOffset(idleMotion, cutStart + quantized)
     : { dx: 0, dy: 0 };
   // 体の揺れはキャラアニメ fps でコマ打ちしない (跳ねる区間が短いと 1 コマで終わるため)。
-  const bobDyByChar = computePreviewBobDy(layerData, idleMotion, previewSec, cutStart + previewSec);
+  const { dyByChar: bobDyByChar, stretchByChar: bobStretchByChar } = computePreviewBobDy(layerData, idleMotion, previewSec, cutStart + previewSec);
 
   const motionOffsetByChar = computePerCharacterMotionOffsets(layerData.characters, quantized);
   const sceneState = {
@@ -2324,6 +2324,7 @@ async function renderPreviewV2(cut, requestId) {
     idleDx: idleOffset.dx,
     idleDy: idleOffset.dy,
     bobDyByChar,
+    bobStretchByChar,
     motionOffsetByChar,
     elapsedSec: quantized,
     // テロップ可視判定用: 量子化前の cut-local 秒。selectTelop で playhead を
@@ -2961,7 +2962,7 @@ function _computeCutSceneState(ctx, cutLocalSec, { mouthVolume = null } = {}) {
   const idleOffset = ctx.idleMotion
     ? computeIdleMotionOffset(ctx.idleMotion, ctx.timelineOffsetSec + quantized)
     : { dx: 0, dy: 0 };
-  const bobDyByChar = computePreviewBobDy(
+  const { dyByChar: bobDyByChar, stretchByChar: bobStretchByChar } = computePreviewBobDy(
     ctx.layerData, ctx.idleMotion, cutLocalSec, ctx.timelineOffsetSec + cutLocalSec,
   );
   const motionOffsetByChar = computePerCharacterMotionOffsets(ctx.layerData.characters, quantized);
@@ -2975,6 +2976,7 @@ function _computeCutSceneState(ctx, cutLocalSec, { mouthVolume = null } = {}) {
     idleDx: idleOffset.dx,
     idleDy: idleOffset.dy,
     bobDyByChar,
+    bobStretchByChar,
     motionOffsetByChar,
     elapsedSec: quantized,
     rawElapsedSec: cutLocalSec,
@@ -3415,7 +3417,7 @@ export async function playLiveCutV2(cut, _options = {}) {
         // 話者音声の今の音量を見て、周期ごとに判定を固定する (bobVoiceGate)。
         const silenceLevel = Number(lipSync?.silenceThreshold ?? 0.08);
         // 体の揺れはコマ打ちしない実時間 (clamped) で計算する (書き出しと同じ)。
-        const bobDyByChar = computePreviewBobDy(
+        const { dyByChar: bobDyByChar, stretchByChar: bobStretchByChar } = computePreviewBobDy(
           layerData, idleMotion, clamped, timelineOffsetSec + clamped,
           (charId, cycle, cycleAt, layer) => {
             const entry = layerData.lipSyncByChar?.[charId];
@@ -3455,6 +3457,7 @@ export async function playLiveCutV2(cut, _options = {}) {
           idleDx: idleOffset.dx,
           idleDy: idleOffset.dy,
           bobDyByChar,
+          bobStretchByChar,
           motionOffsetByChar,
           elapsedSec: quantized,
           // 再生中も telop の出入りは量子化していない実時間で判定する。

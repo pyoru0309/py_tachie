@@ -13,6 +13,7 @@ from fastapi import UploadFile
 
 from .assets import is_valid_image_file, safe_asset_filename, uploaded_category_path
 from .log_setup import app_logger
+from .character_deform import normalize_character_deform
 from .manifest import scan_character_manifest
 from .paths import ASSETS_DIR, PROJECT_ROOT
 
@@ -92,6 +93,14 @@ def update_character_manifest_payload(payload: dict[str, Any], ctx: ProjectConte
     if "color" in payload:
         raw_color = str(payload.get("color") or "").strip().lower()
         manifest["color"] = raw_color if re.fullmatch(r"#[0-9a-f]{6}", raw_color) else ""
+
+    # キャラ変形の場所 (伸縮範囲 / 揺れピン)。payload に無ければ既存値を保つ。
+    if "deform" in payload:
+        deform = normalize_character_deform(payload.get("deform"))
+        if deform:
+            manifest["deform"] = deform
+        else:
+            manifest.pop("deform", None)
 
     manifest_path = character_dir / "character_manifest.json"
     with manifest_path.open("w", encoding="utf-8") as handle:

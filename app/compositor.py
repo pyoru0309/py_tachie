@@ -20,6 +20,7 @@ from typing import Any
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 
+from .character_deform import normalize_character_sway
 from .assets import asset_url
 
 
@@ -64,6 +65,8 @@ class CharacterRequest:
     motion: dict[str, Any] | None = None
     # BPM 上下ゆれ (bob) ({bpm, amplitudePx})。motion とは独立。None なら無効。
     bob: dict[str, Any] | None = None
+    # 揺れピンの強さ ({strength})。None = キャラ定義どおり。app/character_deform.py
+    sway: dict[str, Any] | None = None
 
 
 @dataclass
@@ -1015,6 +1018,7 @@ def character_request_from_payload(payload: dict[str, Any], fallback: dict[str, 
         layout_slot=layout_slot_cfg,
         motion=motion_cfg,
         bob=bob_cfg,
+        sway=normalize_character_sway(payload.get("sway")),
     )
 
 
