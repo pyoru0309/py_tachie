@@ -304,14 +304,23 @@ function _applyCropToCharacterMeshes(meshes, crop) {
 }
 
 // 背景 plane の矩形 (拡大率 + 表示位置) を求める。
-//   scale = 1.0 / x,y 未指定 → 従来通り 1920x1080 全面 (cover フィット)。
+//   plane は「画面 (1920x1080) をちょうど覆う、画像と同じ縦横比の大きさ」× 拡大率。
+//   16:9 の画像は 1920x1080、4:3 のような縦長寄りの画像は 1920x1440 (横を合わせて縦が
+//   はみ出す)、横長の画像は縦を合わせて横がはみ出す。はみ出した分は Y / X で見せる位置を
+//   選べる (以前は 16:9 へ切り抜いてから plane に貼っていたので、ずらすと透明が覗いた)。
 //   scale > 1 で「あらかじめ大きめに敷く」= ケンバーンズのズームアウト用の余白。
-//   x / y は plane 左上の絶対座標 (0,0 = 画面左上)。未指定なら拡大後サイズで中央寄せ。
-function _backgroundPlaneRect(background) {
+//   x / y は plane 左上の絶対座標 (0,0 = 画面左上)。未指定なら拡大後サイズで中央寄せ
+//   (= 従来の中央切り抜きと同じ見た目)。
+//   srcAspect = 画像の 横/縦。分からないとき (動画トラック・読み込み前) は 16:9。
+function _backgroundPlaneRect(background, srcAspect = CANVAS_WIDTH / CANVAS_HEIGHT) {
   const rawScale = Number(background?.scale);
   const scale = (Number.isFinite(rawScale) && rawScale > 0) ? Math.min(4, Math.max(0.05, rawScale)) : 1;
-  const width = Math.max(1, Math.round(CANVAS_WIDTH * scale));
-  const height = Math.max(1, Math.round(CANVAS_HEIGHT * scale));
+  const screenAspect = CANVAS_WIDTH / CANVAS_HEIGHT;
+  const aspect = (Number.isFinite(srcAspect) && srcAspect > 0) ? srcAspect : screenAspect;
+  const coverW = aspect >= screenAspect ? CANVAS_HEIGHT * aspect : CANVAS_WIDTH;
+  const coverH = aspect >= screenAspect ? CANVAS_HEIGHT : CANVAS_WIDTH / aspect;
+  const width = Math.max(1, Math.round(coverW * scale));
+  const height = Math.max(1, Math.round(coverH * scale));
   const rawX = Number(background?.x);
   const rawY = Number(background?.y);
   return {
@@ -338,7 +347,8 @@ async function buildBackground(scene, world, layerData, urls, renderer, videoPro
   //   - colorMesh: 色 plane (opacity>0 のときのみ)
   //   - mesh:      画像 / video plane (画像 or videoTrack があるときのみ)
   const result = { mesh: null, colorMesh: null, bgBlur: null, bgCover: null };
-  const rect = _backgroundPlaneRect(layerData.background);
+  // 動画トラックは従来どおり 16:9 の矩形。画像は読み込んだあと縦横比で求め直す。
+  let rect = _backgroundPlaneRect(layerData.background);
 
   // 1) 単色塗りつぶし (常に最下層、画像と共存)
   const colorOpacity = Math.max(0, Math.min(1, Number(layerData.background?.colorOpacity) || 0));
@@ -393,18 +403,23 @@ async function buildBackground(scene, world, layerData, urls, renderer, videoPro
   const img = texture.image;
   const srcW = (img && (img.naturalWidth || img.videoWidth || img.width)) || 0;
   const srcH = (img && (img.naturalHeight || img.videoHeight || img.height)) || 0;
+  if (srcW > 0 && srcH > 0) rect = _backgroundPlaneRect(layerData.background, srcW / srcH);
   if (renderer && srcW > 0 && srcH > 0) {
-    // 拡大率 > 1 のときは cover RT も同じ比率で解像度を上げる (等倍 RT を後から
-    // 引き伸ばすとボケるため)。上限は 2 倍 (3840x2160) — それ以上は VRAM に見合わない。
-    const coverW = Math.max(1, Math.min(CANVAS_WIDTH * 2, rect.width));
-    const coverH = Math.max(1, Math.round(coverW * (CANVAS_HEIGHT / CANVAS_WIDTH)));
+    // RT は plane と同じ縦横比 (= 画像と同じなので cover は切り抜かず縮小・拡大だけ)。
+    // 拡大率 > 1 のときは RT も同じ比率で解像度を上げる (等倍 RT を後から引き伸ばすと
+    // ボケるため)。上限は長辺 3840 — それ以上は VRAM に見合わない。
+    const fitDown = Math.min(1, (CANVAS_WIDTH * 2) / Math.max(rect.width, rect.height));
+    const coverW = Math.max(1, Math.round(rect.width * fitDown));
+    const coverH = Math.max(1, Math.round(rect.height * fitDown));
     result.bgCover = createCoverPass(coverW, coverH);
     const coveredTex = result.bgCover.apply(renderer, texture, srcW, srcH);
     if (blurPx > 0) {
-      // blur 量は「1920 幅の画面で何 px」の意味なので、RT 解像度に合わせて換算する。
+      // blur 量は「拡大率 1 の背景 (画面を覆う大きさ) の上で何 px」の意味なので、
+      // RT 解像度に合わせて換算する (16:9 なら従来どおり coverW / 1920 × … = 拡大率倍)。
       result.bgBlur = createBlurPass(coverW, coverH);
+      const rtPxPerBasePx = (coverW * rect.scale) / rect.width;
       displayTexture = result.bgBlur.pass.apply(
-        renderer, coveredTex, bgBlurArg * (coverW / CANVAS_WIDTH),
+        renderer, coveredTex, bgBlurArg * rtPxPerBasePx,
       );
     } else {
       displayTexture = coveredTex;
