@@ -575,6 +575,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#edit-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プリセットを編集する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_3" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1168,6 +1179,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#edit-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プリセットを編集する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_3" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1326,7 +1348,7 @@
 <h2 id="_1">動画書き出しダイアログ<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>ヘッダーの <code>エクスポート ▼</code> → <code>動画</code> を押すと書き出しダイアログが開きます。</p>
 <ul>
-<li><strong>プリセット</strong>: 内蔵プリセットから選びます。表は次節に。</li>
+<li><strong>プリセット</strong>: 全体設定の「動画書き出しプリセット」から選びます。最初は内蔵の 7 種 (表は次節) が入っていて、全体設定で中身を変えたり増やしたりできます (<a href="#edit-presets">プリセットを編集する</a>)。</li>
 <li><strong>エンコーダ</strong>: HW エンコーダ (NVENC / VideoToolbox) が利用可能な環境では alternate として選択肢に並びます。利用不可なものは disabled で表示されます。</li>
 <li><strong>FPS</strong>: <code>8</code> / <code>12</code> / <code>24</code> のいずれか。プロジェクト fps は 24 固定で、書き出し fps はそれと独立に選べます。</li>
 <li><strong>音声を含める</strong>: 既定 ON。OFF にすると映像のみのファイル (mux 工程を skip) で出力します。透過素材をカット単位で書き出して動画編集ソフトに取り込むときに、音声トラック無しの方が便利な場合に使います。ダイアログを経由しない (= 全体設定の「動画書き出しにフォーマットを指定」が OFF の) クイック書き出し経路では常に音声が含まれます。</li>
@@ -1342,61 +1364,76 @@
 <p><code>書き出し</code> を押すと、サーバ側のバックグラウンドスレッドでフレーム生成 → ffmpeg でのエンコード → 結合が走ります。
 進捗はカット単位 + フレーム単位で UI に表示され、完了後に <code>projects/&lt;project_id&gt;/outputs/</code> 直下にファイルが置かれます。</p>
 <h2 id="_2">内蔵プリセット<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<p>全体設定に書き出しプリセットをまだ持っていないときは、次の 7 種が既定値として入ります。
+| プリセット | 拡張子 | 想定用途 | HW alternate |
+| --- | --- | --- | --- |
+| MP4 (H.264) 標準 | <code>.mp4</code> | 配信プレビュー / 共有 | NVENC, VideoToolbox |
+| MP4 (H.264) 高画質 | <code>.mp4</code> | 配信前マスタ | NVENC (-cq 19), VideoToolbox |
+| MP4 (H.265) 高効率 | <code>.mp4</code> | サイズ重視 | HEVC NVENC, HEVC VideoToolbox |
+| ProRes 422 Proxy (mov) | <code>.mov</code> | 編集ソフト取り込み (軽量) | — |
+| ProRes 422 HQ (mov) | <code>.mov</code> | 視覚ロスレスの編集中間 | — |
+| ProRes 4444 (mov, アルファ対応) | <code>.mov</code> | アルファ付き透過素材 | — |
+| QuickTime PNG (mov, アルファ対応・完全可逆) | <code>.mov</code> | 完全可逆 + アルファ。容量大 | — |</p>
+<p>ProRes 4444 / QuickTime PNG は背景なし (<code>videoTrack</code> も <code>background</code> も未設定) のシーンを透過動画として書き出せます。完全可逆かつアルファ対応で編集ソフトの互換性が高いのは QuickTime PNG (PNG コーデック on QuickTime) です（ファイルサイズは大きめ）。</p>
+<h2 id="edit-presets">プリセットを編集する<a class="headerlink" href="#edit-presets" title="Permanent link">&para;</a></h2>
+<p>全体設定の <strong>動画書き出し</strong> タブで、プリセットの一覧を編集できます。変更はダイアログ下の <strong>保存</strong> で確定し、保存せずに閉じると元に戻ります。</p>
+<ul>
+<li>各プリセットの右側のボタンで <strong>編集</strong>（鉛筆）・<strong>複製</strong>・<strong>削除</strong> ができます。最後の 1 つは消せません。</li>
+<li><strong>新しいプリセット</strong> で H.264 標準をひな形にしたプリセットを足し、<strong>すべて既定に戻す</strong> で内蔵の 7 種に戻します。</li>
+<li>名前の横の印は、<code>既定</code>（内蔵のまま）/ <code>既定から変更</code>（内蔵プリセットを変えたもの。編集欄の <strong>このプリセットを既定に戻す</strong> で戻せる）/ <code>追加</code>（自分で足したもの）です。</li>
+<li>左のラジオで選んだものが、書き出しダイアログで最初に選ばれるプリセットになります。</li>
+</ul>
 <table>
 <thead>
 <tr>
-<th>プリセット</th>
-<th>拡張子</th>
-<th>想定用途</th>
-<th>HW alternate</th>
+<th>編集できる項目</th>
+<th>説明</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>MP4 (H.264) 標準</td>
-<td><code>.mp4</code></td>
-<td>配信プレビュー / 共有</td>
-<td>NVENC, VideoToolbox</td>
+<td>名前 / 説明</td>
+<td>書き出しダイアログの一覧に出る名前と説明</td>
 </tr>
 <tr>
-<td>MP4 (H.264) 高画質</td>
-<td><code>.mp4</code></td>
-<td>配信前マスタ</td>
-<td>NVENC (-cq 19), VideoToolbox</td>
+<td>映像コーデック</td>
+<td>H.264（libx264）/ H.265（libx265）/ ProRes（prores_ks）/ PNG。変えると、そのコーデックの標準的な設定（形式・引数・ピクセル形式・ハードウェアエンコーダ）が入る</td>
 </tr>
 <tr>
-<td>MP4 (H.265) 高効率</td>
-<td><code>.mp4</code></td>
-<td>サイズ重視</td>
-<td>HEVC NVENC, HEVC VideoToolbox</td>
+<td>形式（拡張子）</td>
+<td><code>.mp4</code> / <code>.mov</code>。ProRes と PNG は <code>.mov</code> のみ</td>
 </tr>
 <tr>
-<td>ProRes 422 Proxy (mov)</td>
-<td><code>.mov</code></td>
-<td>編集ソフト取り込み (軽量)</td>
-<td>—</td>
+<td>エンコーダの引数</td>
+<td>ffmpeg にそのまま渡す引数 (例: <code>-preset medium -crf 20</code>)。H.264 / H.265 の画質は CRF（小さいほど高画質・大きいファイル）で決まる</td>
 </tr>
 <tr>
-<td>ProRes 422 HQ (mov)</td>
-<td><code>.mov</code></td>
-<td>視覚ロスレスの編集中間</td>
-<td>—</td>
+<td>ピクセル形式 / 色空間</td>
+<td>例: <code>yuv420p</code>（MP4）、<code>yuv422p10le</code>（ProRes）、<code>yuva444p10le</code>（ProRes 4444 の透過）、<code>rgba</code>（PNG）</td>
 </tr>
 <tr>
-<td>ProRes 4444 (mov, アルファ対応)</td>
-<td><code>.mov</code></td>
-<td>アルファ付き透過素材</td>
-<td>—</td>
+<td>FPS</td>
+<td>書き出しダイアログで最初に選ばれる FPS（8 / 12 / 24）</td>
 </tr>
 <tr>
-<td>QuickTime PNG (mov, アルファ対応・完全可逆)</td>
-<td><code>.mov</code></td>
-<td>完全可逆 + アルファ。容量大</td>
-<td>—</td>
+<td>音声コーデック / ビットレート</td>
+<td>AAC（128〜320k）/ リニア PCM 16bit・24bit（<code>.mov</code> のみ）</td>
+</tr>
+<tr>
+<td>コンテナの引数</td>
+<td>例: <code>-movflags +faststart</code>（MP4 を Web で再生しやすくする）</td>
+</tr>
+<tr>
+<td>透過（アルファ）</td>
+<td>ProRes / PNG のみ。背景を描かずに透過付きで書き出す</td>
 </tr>
 </tbody>
 </table>
-<p>ProRes 4444 / QuickTime PNG は背景なし (<code>videoTrack</code> も <code>background</code> も未設定) のシーンを透過動画として書き出せます。完全可逆かつアルファ対応で編集ソフトの互換性が高いのは QuickTime PNG (PNG コーデック on QuickTime) です（ファイルサイズは大きめ）。</p>
+<p>ハードウェアエンコーダ（NVENC / VideoToolbox）は H.264 / H.265 のプリセットに付き、書き出しダイアログの「エンコーダ」で選べます（引数の編集はできません）。</p>
+<div class="admonition warning">
+<p class="admonition-title">引数は ffmpeg にそのまま渡されます</p>
+<p>エンコーダ・コンテナの引数は確認せずに ffmpeg へ渡すため、誤った値だと書き出しが失敗します。分からない項目は変えずにおき、困ったら <strong>このプリセットを既定に戻す</strong> を使ってください。</p>
+</div>
 <h2 id="_3">ハードウェアエンコーダの選び方<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <p>立ち絵システムは起動時に <code>ffmpeg -encoders</code> を解析し、利用可能なエンコーダ集合を全体設定にキャッシュします (ffmpeg を差し替えたら設定 → 全体設定の <code>ffmpeg のパス</code> を再保存することでキャッシュが更新されます)。</p>
 <ul>

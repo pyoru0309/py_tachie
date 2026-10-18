@@ -92,6 +92,106 @@ def _normalize_pin(raw: dict[str, Any], index: int) -> dict[str, Any] | None:
     }
 
 
+_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def normalize_character_aura(raw: Any) -> dict[str, Any] | None:
+    """カットのキャラ設定のオーラ (dev_docs/plans/character-aura.md)。無効 / 未設定は None。
+
+    描画は static/js/renderer/effects/aura.js (normalizeAura と同じ範囲に揃える)。
+    """
+    if not isinstance(raw, dict) or not raw.get("enabled"):
+        return None
+
+    def color(value: Any, fallback: str) -> str:
+        text = str(value or "").strip()
+        return text.lower() if _COLOR_RE.fullmatch(text) else fallback
+
+    return {
+        "enabled": True,
+        "style": raw.get("style") if raw.get("style") in ("glow", "spike") else "flame",
+        "color": color(raw.get("color"), "#ffe14a"),
+        "color2": color(raw.get("color2"), "#ff9d1a"),
+        "size": _number(raw.get("size"), 40.0, 4.0, 300.0, 1),
+        # 体との間隔 (px)。0 = 体のすぐ外から
+        "margin": _number(raw.get("margin"), 0.0, 0.0, 400.0, 1),
+        "rise": _number(raw.get("rise"), 1.5, 0.0, 6.0, 2),
+        # 伸ばす向き: 0 = 真上 / 1 = 体の輪郭の外向き (法線方向)
+        "outward": _number(raw.get("outward"), 0.0, 0.0, 1.0, 2),
+        # 鋭い筋の本数の倍率 (小さいほど少なく太い)
+        "density": _number(raw.get("density"), 1.0, 0.2, 3.0, 2),
+        # 集中線: 箇所の数 (0 = 出さない) と色
+        "lineCount": int(_number(raw.get("lineCount"), 0, 0, 8, 0)),
+        "lineColor": color(raw.get("lineColor"), "#000000"),
+        "intensity": _number(raw.get("intensity"), 1.0, 0.0, 3.0, 2),
+        "speed": _number(raw.get("speed"), 1.0, 0.0, 20.0, 2),
+        "detail": _number(raw.get("detail"), 0.5, 0.0, 1.0, 2),
+        "front": _number(raw.get("front"), 0.15, 0.0, 1.0, 2),
+        "when": "speaking" if raw.get("when") == "speaking" else "always",
+        "fadeSec": _number(raw.get("fadeSec"), 0.3, 0.0, 5.0, 2),
+    }
+
+
+def _when(raw: dict[str, Any]) -> str:
+    return "speaking" if raw.get("when") == "speaking" else "always"
+
+
+def _gap_from_frequency(raw: dict[str, Any]) -> float:
+    try:
+        freq = float(raw.get("frequency") or 0)
+        duration = float(raw.get("duration") or 0.25)
+    except (TypeError, ValueError):
+        return 0.15
+    return max(0.0, 1.0 / freq - duration) if freq > 0 else 0.15
+
+
+def normalize_character_lightning(raw: Any) -> dict[str, Any] | None:
+    """カットのキャラ設定の雷 (キャラの特殊効果 Phase B)。無効 / 未設定は None。
+
+    描画は static/js/renderer/effects/char-sparks.js (normalizeLightning と同じ範囲)。
+    """
+    if not isinstance(raw, dict) or not raw.get("enabled"):
+        return None
+    color = str(raw.get("color") or "").strip()
+    return {
+        "enabled": True,
+        "color": color.lower() if _COLOR_RE.fullmatch(color) else "#7fd4ff",
+        "count": int(_number(raw.get("count"), 6, 1, 60, 0)),
+        "length": _number(raw.get("length"), 220.0, 20.0, 1200.0, 1),
+        "width": _number(raw.get("width"), 8.0, 0.5, 40.0, 2),
+        "duration": _number(raw.get("duration"), 0.3, 0.03, 2.0, 3),
+        # 次に光るまでの間 (秒)。旧データの「光る頻度」(frequency) は 1/frequency - duration に読み替え
+        "gap": _number(raw.get("gap"), _gap_from_frequency(raw), 0.0, 5.0, 3),
+        "shape": raw.get("shape") if raw.get("shape") in ("hug", "mix") else "outward",
+        # 体との間隔 (px)
+        "margin": _number(raw.get("margin"), 0.0, 0.0, 400.0, 1),
+        "branches": int(_number(raw.get("branches"), 2, 0, 4, 0)),
+        "jitter": _number(raw.get("jitter"), 0.5, 0.0, 1.0, 2),
+        "front": _number(raw.get("front"), 0.5, 0.0, 1.0, 2),
+        "when": _when(raw),
+        "fadeSec": _number(raw.get("fadeSec"), 0.3, 0.0, 5.0, 2),
+    }
+
+
+def normalize_character_streaks(raw: Any) -> dict[str, Any] | None:
+    """カットのキャラ設定の光の筋 (キャラの特殊効果 Phase B)。無効 / 未設定は None。"""
+    if not isinstance(raw, dict) or not raw.get("enabled"):
+        return None
+    color = str(raw.get("color") or "").strip()
+    return {
+        "enabled": True,
+        "color": color.lower() if _COLOR_RE.fullmatch(color) else "#ffe14a",
+        "count": int(_number(raw.get("count"), 16, 1, 60, 0)),
+        "length": _number(raw.get("length"), 160.0, 10.0, 1200.0, 1),
+        "width": _number(raw.get("width"), 6.0, 1.0, 60.0, 1),
+        "speed": _number(raw.get("speed"), 900.0, 20.0, 6000.0, 0),
+        "spread": _number(raw.get("spread"), 1.1, 0.2, 3.0, 2),
+        "front": _number(raw.get("front"), 0.3, 0.0, 1.0, 2),
+        "when": _when(raw),
+        "fadeSec": _number(raw.get("fadeSec"), 0.3, 0.0, 5.0, 2),
+    }
+
+
 def normalize_character_sway(raw: Any) -> dict[str, Any] | None:
     """カット側の揺れピンの強さ。未設定 (None) = キャラ定義どおり (1.0)。0 = 止める。"""
     if not isinstance(raw, dict):

@@ -20,7 +20,12 @@ from typing import Any
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 
-from .character_deform import normalize_character_sway
+from .character_deform import (
+    normalize_character_aura,
+    normalize_character_lightning,
+    normalize_character_streaks,
+    normalize_character_sway,
+)
 from .assets import asset_url
 
 
@@ -67,6 +72,11 @@ class CharacterRequest:
     bob: dict[str, Any] | None = None
     # 揺れピンの強さ ({strength})。None = キャラ定義どおり。app/character_deform.py
     sway: dict[str, Any] | None = None
+    # オーラ (キャラの特殊効果)。None = 無し。app/character_deform.py
+    aura: dict[str, Any] | None = None
+    # 雷・光の筋 (キャラの特殊効果 Phase B)。None = 無し。
+    lightning: dict[str, Any] | None = None
+    streaks: dict[str, Any] | None = None
 
 
 @dataclass
@@ -1019,6 +1029,9 @@ def character_request_from_payload(payload: dict[str, Any], fallback: dict[str, 
         motion=motion_cfg,
         bob=bob_cfg,
         sway=normalize_character_sway(payload.get("sway")),
+        aura=normalize_character_aura(payload.get("aura")),
+        lightning=normalize_character_lightning(payload.get("lightning")),
+        streaks=normalize_character_streaks(payload.get("streaks")),
     )
 
 

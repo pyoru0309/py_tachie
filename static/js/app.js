@@ -67,6 +67,7 @@ import {
   saveCurrentSceneLayerPreset,
   deleteCurrentSceneLayerPreset,
 } from "./scene-layer-presets.js";
+import { bindEffectPresets, loadEffectPresets } from "./effect-presets.js";
 import { bindMotionPivotPicker, exitMotionPivotPicking } from "./motion-pivot-picker.js";
 import { bindPreviewInteractions } from "./preview-interactions.js";
 import {
@@ -121,6 +122,7 @@ import {
   deleteCharacter,
   moveCharacter,
   replaceCharacterAcrossAllCuts,
+  syncEffectFadeInputs,
 } from "./character.js";
 import {
   bindPlayback,
@@ -1111,6 +1113,7 @@ function bindControls() {
   bindDialogueVoice();
   bindPlacementPresets({ handleEditorChanged });
   bindSceneLayerPresets({ handleEditorChanged });
+  bindEffectPresets({ handleEditorChanged });
   bindSceneOps({
     scheduleScenarioSave,
     renderPreview,
@@ -1193,6 +1196,47 @@ function bindControls() {
     elements.characterBobStyle,
     elements.characterBobTarget,
     elements.characterSwayStrength,
+    elements.characterAuraEnabled,
+    elements.characterAuraStyle,
+    elements.characterAuraWhen,
+    elements.characterAuraFade,
+    elements.characterAuraColor,
+    elements.characterAuraColor2,
+    elements.characterAuraSize,
+    elements.characterAuraMargin,
+    elements.characterAuraRise,
+    elements.characterAuraOutward,
+    elements.characterAuraDensity,
+    elements.characterAuraLineCount,
+    elements.characterAuraLineColor,
+    elements.characterLightningMargin,
+    elements.characterAuraIntensity,
+    elements.characterAuraSpeed,
+    elements.characterAuraDetail,
+    elements.characterAuraFront,
+    elements.characterLightningEnabled,
+    elements.characterLightningWhen,
+    elements.characterLightningFade,
+    elements.characterLightningColor,
+    elements.characterLightningCount,
+    elements.characterLightningLength,
+    elements.characterLightningWidth,
+    elements.characterLightningGap,
+    elements.characterLightningShape,
+    elements.characterLightningDuration,
+    elements.characterLightningBranches,
+    elements.characterLightningJitter,
+    elements.characterLightningFront,
+    elements.characterStreaksEnabled,
+    elements.characterStreaksWhen,
+    elements.characterStreaksFade,
+    elements.characterStreaksColor,
+    elements.characterStreaksCount,
+    elements.characterStreaksLength,
+    elements.characterStreaksWidth,
+    elements.characterStreaksSpeed,
+    elements.characterStreaksSpread,
+    elements.characterStreaksFront,
     elements.characterBobHold,
     elements.characterBobRate,
     elements.characterBobOnlyWhileSinging,
@@ -1803,12 +1847,22 @@ function bindControls() {
   // シナリオへ反映する。差し替えた input は elements[<valueKey>] に再代入して、
   // scenario-actions の同期コード (setColorInputWithSwatch 等) が新ノードを参照する
   // ようにする。
+  // キャラの特殊効果: 「出すとき」が「いつも」なら「声が止まってから消えるまで」は使わないので無効化。
+  for (const el of [elements.characterAuraWhen, elements.characterLightningWhen, elements.characterStreaksWhen]) {
+    el?.addEventListener("change", syncEffectFadeInputs);
+  }
+
   const COLOR_SWATCH_KEYS = [
     ["cutTextColor", "cutTextColorValue", "#ffffff"],
     ["cutTextOutlineColor", "cutTextOutlineColorValue", "#666666"],
     ["characterColorFilterColor", "characterColorFilterColorValue", "#ffe8f9"],
     ["characterGlowColor", "characterGlowColorValue", "#ffffff"],
     ["characterDropShadowColor", "characterDropShadowColorValue", "#000000"],
+    ["characterAuraColor", "characterAuraColorValue", "#ffe14a"],
+    ["characterAuraColor2", "characterAuraColor2Value", "#ff9d1a"],
+    ["characterAuraLineColor", "characterAuraLineColorValue", "#000000"],
+    ["characterLightningColor", "characterLightningColorValue", "#7fd4ff"],
+    ["characterStreaksColor", "characterStreaksColorValue", "#ffe14a"],
     ["cutDialogueGlowColor", "cutDialogueGlowColorValue", "#ffffff"],
     ["cutDialogueDropShadowColor", "cutDialogueDropShadowColorValue", "#000000"],
     ["backgroundColor", "backgroundColorValue", "#000000"],
@@ -1969,6 +2023,8 @@ function bindControls() {
 }
 
 async function init() {
+  // 効果プリセットはプロジェクトに依存しないので、起動時に 1 回だけ読む。
+  loadEffectPresets();
   // ui-state は他の取得と並行して投げるが、init の早い段階で結果が必要なので
   // 先に dispatch して後で await する。
   const uiStatePromise = fetch("/api/ui-state")

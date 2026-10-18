@@ -11,6 +11,11 @@ import { loadProjectLocations, renderProjectLocationSettings } from "./project-l
 import { applyExportOptionsPresetUI, updateEncoderEngineHintFromPreset } from "./export-ui.js";
 import { fetchTtsState, refreshTtsCatalog } from "./tts.js";
 import {
+  renderVideoPresetList,
+  resetVideoPresetEditor,
+  collectVideoPresetsForSave,
+} from "./video-preset-editor.js";
+import {
   SHORTCUT_ACTIONS,
   SHORTCUT_CATEGORIES,
   defaultShortcuts,
@@ -75,58 +80,9 @@ async function refreshCurrentVersion() {
   }
 }
 
-function buildPresetItem(preset, selectedId, name, onChange) {
-  const label = document.createElement("label");
-  const unavailable = preset.available === false;
-  label.className = `preset-item${preset.id === selectedId ? " selected" : ""}${unavailable ? " disabled" : ""}`;
-  const radio = document.createElement("input");
-  radio.type = "radio";
-  radio.name = name;
-  radio.value = preset.id;
-  radio.disabled = unavailable;
-  if (preset.id === selectedId) radio.checked = true;
-  radio.addEventListener("change", () => onChange(preset.id));
-
-  const body = document.createElement("div");
-  body.className = "preset-item-body";
-  const nameEl = document.createElement("div");
-  nameEl.className = "preset-item-name";
-  nameEl.textContent = preset.name;
-  if (preset.builtIn) {
-    const badge = document.createElement("span");
-    badge.className = "badge readonly";
-    badge.textContent = "標準";
-    nameEl.append(badge);
-  }
-  if (unavailable) {
-    const badge = document.createElement("span");
-    badge.className = "badge";
-    badge.textContent = "未対応";
-    nameEl.append(badge);
-  }
-  const descEl = document.createElement("div");
-  descEl.className = "preset-item-description";
-  descEl.textContent = preset.description || "";
-  const metaEl = document.createElement("div");
-  metaEl.className = "preset-item-meta";
-  const audioPart = preset.audioBitrate ? `${preset.audioCodec}/${preset.audioBitrate}` : preset.audioCodec || "";
-  metaEl.textContent = `${preset.extension || ""} · ${preset.videoCodec || ""}${preset.pixFmt ? ` · ${preset.pixFmt}` : ""} · ${preset.fps || 30}fps · ${audioPart}`;
-  body.append(nameEl, descEl, metaEl);
-  if (unavailable && preset.unavailableReason) {
-    const reasonEl = document.createElement("div");
-    reasonEl.className = "preset-item-warning";
-    reasonEl.textContent = preset.unavailableReason;
-    body.append(reasonEl);
-  }
-  label.append(radio, body);
-  return label;
-}
-
 function renderGlobalSettings() {
   const data = state.globalConfig;
   if (!data || !elements.globalVideoPresetList) return;
-  const selectedId = data.config.videoExport.defaultPresetId;
-  elements.globalVideoPresetList.innerHTML = "";
   if (elements.ffmpegStatusBanner) {
     const ffmpeg = data.ffmpeg || {};
     if (ffmpeg.available === false) {
@@ -140,23 +96,8 @@ function renderGlobalSettings() {
       elements.ffmpegStatusBanner.textContent = "";
     }
   }
-  for (const preset of data.builtInVideoPresets || []) {
-    elements.globalVideoPresetList.append(
-      buildPresetItem(preset, selectedId, "videoPreset", (id) => {
-        state.globalConfig.config.videoExport.defaultPresetId = id;
-        renderGlobalSettings();
-      }),
-    );
-  }
-  const customs = data.customVideoPresets || data.config.videoExport.customPresets || [];
-  for (const preset of customs) {
-    elements.globalVideoPresetList.append(
-      buildPresetItem(preset, selectedId, "videoPreset", (id) => {
-        state.globalConfig.config.videoExport.defaultPresetId = id;
-        renderGlobalSettings();
-      }),
-    );
-  }
+  // 書き出しプリセット (一覧 + 編集欄)。video-preset-editor.js
+  renderVideoPresetList();
   if (elements.globalHistorySizeInput) {
     elements.globalHistorySizeInput.value =
       data.config.editorHistorySize ?? 50;
@@ -970,6 +911,7 @@ export async function openGlobalSettings() {
     return;
   }
   activateGlobalTab("video");
+  resetVideoPresetEditor();
   try {
     await fetchTtsState();
   } catch (error) {
@@ -1001,7 +943,8 @@ async function saveGlobalSettings() {
   const payload = {
     videoExport: {
       defaultPresetId: cfg.videoExport.defaultPresetId,
-      customPresets: cfg.videoExport.customPresets || [],
+      // 書き出しプリセットの一覧 (全体設定で編集したもの)。サーバで正規化される。
+      presets: collectVideoPresetsForSave(),
       monoToStereo: elements.globalMonoToStereoInput
         ? elements.globalMonoToStereoInput.checked
         : cfg.videoExport.monoToStereo !== false,
@@ -1159,6 +1102,13 @@ export function bindGlobalSettings(injectedDeps) {
   elements.closeGlobalSettingsButton?.addEventListener("click", () => {
     elements.globalSettingsDialog?.close();
   });
+  // 保存せずに閉じたときに、書きかけのプリセット編集などが書き出しダイアログへ
+  // 漏れないよう、閉じたら保存済みの全体設定を取り直す。
+  elements.globalSettingsDialog?.addEventListener("close", () => {
+    fetchGlobalConfig()
+      .then((data) => { state.globalConfig = data; })
+      .catch((error) => console.warn("全体設定の再取得に失敗", error));
+  });
   elements.saveGlobalSettingsButton?.addEventListener("click", () => {
     saveGlobalSettings();
   });
@@ -1170,7 +1120,15 @@ export function bindGlobalSettings(injectedDeps) {
       const data = await response.json();
       if (state.globalConfig) {
         state.globalConfig.ffmpeg = data.ffmpeg;
-        state.globalConfig.builtInVideoPresets = data.builtInVideoPresets;
+        // 対応状況だけを取り込む (編集中の値は残す)。保存済みと同じ id・コーデックのものに限る。
+        const fresh = new Map((data.videoPresets || []).map((p) => [p.id, p]));
+        for (const preset of state.globalConfig.videoPresets || []) {
+          const f = fresh.get(preset.id);
+          if (!f || f.videoCodec !== preset.videoCodec || f.audioCodec !== preset.audioCodec) continue;
+          preset.available = f.available;
+          preset.unavailableReason = f.unavailableReason;
+          if (Array.isArray(f.alternateEncoders)) preset.alternateEncoders = f.alternateEncoders;
+        }
       }
       renderGlobalSettings();
       showToast(
@@ -1227,9 +1185,7 @@ export function bindGlobalSettings(injectedDeps) {
   elements.exportOptionsPresetSelect?.addEventListener("change", applyExportOptionsPresetUI);
   elements.exportOptionsEncoderEngineSelect?.addEventListener("change", () => {
     // 現在の preset を取り直して hint を更新
-    const presets = (state.globalConfig?.builtInVideoPresets || []).concat(
-      state.globalConfig?.customVideoPresets || state.globalConfig?.config?.videoExport?.customPresets || [],
-    );
+    const presets = state.globalConfig?.videoPresets || [];
     const preset = presets.find((p) => p.id === elements.exportOptionsPresetSelect?.value);
     if (preset && elements.exportOptionsEncoderEngineSelect) {
       updateEncoderEngineHintFromPreset(preset, elements.exportOptionsEncoderEngineSelect.value);

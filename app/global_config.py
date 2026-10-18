@@ -4,8 +4,10 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import re
+import shlex
 import shutil
 import subprocess
 import unicodedata
@@ -180,12 +182,162 @@ BUILTIN_VIDEO_PRESETS: list[dict[str, Any]] = [
     },
 ]
 
+# ---------------------------------------------------------------------------
+# 動画書き出しプリセット (全体設定で編集できる)
+#
+# 全体設定 `videoExport.presets` に一覧を丸ごと持つ。全体設定にまだ無いとき
+# (初回 / 旧バージョンの設定ファイル) は BUILTIN_VIDEO_PRESETS を既定値として入れ、
+# 旧 `customPresets` があれば後ろに引き継ぐ。書き出し (v2_export) は
+# resolve_video_preset(id) でここから引くので、編集はそのまま書き出しに効く。
+# 形式・コーデックは v2 書き出しが扱える範囲 (static/js/export-ui.js
+# V2_SUPPORTED_PRESET_CODECS) に限る。
+# ---------------------------------------------------------------------------
+
+VIDEO_PRESET_EXTENSIONS = (".mp4", ".mov")
+VIDEO_PRESET_CODECS = ("libx264", "libx265", "prores_ks", "png")
+VIDEO_PRESET_AUDIO_CODECS = ("aac", "pcm_s16le", "pcm_s24le")
+VIDEO_PRESET_FPS = (8, 12, 24)
+_ALPHA_CODECS = ("prores_ks", "png")
+_MOV_ONLY_CODECS = ("prores_ks", "png")
+# HW エンコーダ (alternateEncoders) はコーデックの系統が合うものだけ残す。
+_ALTERNATE_PREFIX_BY_CODEC = {"libx264": "h264_", "libx265": "hevc_"}
+_PIX_FMT_RE = re.compile(r"^[a-z0-9_]{1,32}$")
+_BITRATE_RE = re.compile(r"^\d{2,4}k$")
+_PRESET_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def default_video_presets() -> list[dict[str, Any]]:
+    """内蔵の既定プリセット (編集用のコピー)。"""
+    out = []
+    for preset in BUILTIN_VIDEO_PRESETS:
+        item = copy.deepcopy(preset)
+        item.pop("builtIn", None)
+        out.append(item)
+    return out
+
+
+def _arg_list(value: Any) -> list[str]:
+    """ffmpeg 引数列。配列でも「-preset medium -crf 20」のような文字列でも受け取る。"""
+    if isinstance(value, str):
+        try:
+            return [token for token in shlex.split(value) if token]
+        except ValueError:
+            return [token for token in value.split() if token]
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item).strip()][:64]
+    return []
+
+
+def _default_alternates_for_codec(codec: str) -> list[dict[str, Any]]:
+    for preset in BUILTIN_VIDEO_PRESETS:
+        if preset.get("videoCodec") == codec and preset.get("alternateEncoders"):
+            return copy.deepcopy(preset["alternateEncoders"])
+    return []
+
+
+def normalize_video_preset(raw: Any, index: int = 0) -> dict[str, Any] | None:
+    """全体設定に保存する 1 プリセット。不正な値は既定に寄せる。"""
+    if not isinstance(raw, dict):
+        return None
+    preset_id = str(raw.get("id") or "").strip()
+    if not _PRESET_ID_RE.fullmatch(preset_id):
+        preset_id = f"custom_{index + 1}"
+    extension = str(raw.get("extension") or ".mp4").strip().lower()
+    if not extension.startswith("."):
+        extension = "." + extension
+    if extension not in VIDEO_PRESET_EXTENSIONS:
+        extension = ".mp4"
+    codec = str(raw.get("videoCodec") or "libx264").strip()
+    if codec not in VIDEO_PRESET_CODECS:
+        codec = "libx264"
+    if codec in _MOV_ONLY_CODECS:
+        extension = ".mov"  # ProRes / PNG は mov でしか書き出せない
+    try:
+        fps = int(raw.get("fps") or 24)
+    except (TypeError, ValueError):
+        fps = 24
+    if fps not in VIDEO_PRESET_FPS:
+        fps = 24
+    pix_fmt = str(raw.get("pixFmt") or "").strip().lower()
+    if pix_fmt and not _PIX_FMT_RE.fullmatch(pix_fmt):
+        pix_fmt = ""
+    color_space = str(raw.get("colorSpace") or "").strip().lower()
+    if color_space not in ("", "bt709", "bt601", "bt2020"):
+        color_space = "bt709"
+    audio_codec = str(raw.get("audioCodec") or "aac").strip()
+    if audio_codec not in VIDEO_PRESET_AUDIO_CODECS or (audio_codec != "aac" and extension != ".mov"):
+        # リニア PCM は mov のみ (mp4 は多くのソフトが読めない)
+        audio_codec = "aac"
+    audio_bitrate = str(raw.get("audioBitrate") or "").strip().lower()
+    if audio_codec == "aac":
+        if not _BITRATE_RE.fullmatch(audio_bitrate):
+            audio_bitrate = "192k"
+    else:
+        audio_bitrate = ""
+    name = str(raw.get("name") or "").strip()[:80] or preset_id
+    preset: dict[str, Any] = {
+        "id": preset_id,
+        "name": name,
+        "description": str(raw.get("description") or "").strip()[:200],
+        "extension": extension,
+        "fps": fps,
+        "videoCodec": codec,
+        "videoArgs": _arg_list(raw.get("videoArgs")),
+        "pixFmt": pix_fmt,
+        "colorSpace": color_space,
+        "audioCodec": audio_codec,
+        "audioBitrate": audio_bitrate,
+        "containerArgs": _arg_list(raw.get("containerArgs")),
+    }
+    # 透過は ProRes / PNG のときだけ
+    if raw.get("alpha") and codec in _ALPHA_CODECS:
+        preset["alpha"] = True
+    prefix = _ALTERNATE_PREFIX_BY_CODEC.get(codec)
+    if prefix:
+        alternates = [
+            {
+                "id": str(alt.get("id")),
+                "name": str(alt.get("name") or alt.get("id")),
+                "description": str(alt.get("description") or ""),
+                "videoArgs": _arg_list(alt.get("videoArgs")),
+            }
+            for alt in (raw.get("alternateEncoders") or [])
+            if isinstance(alt, dict) and str(alt.get("id") or "").startswith(prefix)
+        ]
+        if "alternateEncoders" not in raw:
+            alternates = _default_alternates_for_codec(codec)
+        if alternates:
+            preset["alternateEncoders"] = alternates
+    return preset
+
+
+def normalize_video_presets(raw_list: Any) -> list[dict[str, Any]]:
+    """プリセット一覧。id の重複は後ろを振り直す。空なら既定の一覧。"""
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, raw in enumerate(raw_list if isinstance(raw_list, list) else []):
+        preset = normalize_video_preset(raw, index)
+        if not preset:
+            continue
+        base_id = preset["id"]
+        suffix = 2
+        while preset["id"] in seen:
+            preset["id"] = f"{base_id}_{suffix}"
+            suffix += 1
+        seen.add(preset["id"])
+        out.append(preset)
+        if len(out) >= 64:
+            break
+    return out or default_video_presets()
+
+
 def default_global_config() -> dict[str, Any]:
     return {
         "version": 1,
         "videoExport": {
             "defaultPresetId": "mp4_h264_standard",
-            "customPresets": [],
+            # 書き出しプリセットの一覧 (全体設定で編集できる)。既定は内蔵プリセット。
+            "presets": default_video_presets(),
             "monoToStereo": True,
             "promptBeforeExport": False,
             # WebSocket backpressure threshold (MB)。GL → RGBA → WS → ffmpeg の経路で
@@ -365,8 +517,14 @@ def load_global_config() -> dict[str, Any]:
     video = data.get("videoExport") if isinstance(data.get("videoExport"), dict) else {}
     if isinstance(video.get("defaultPresetId"), str) and video.get("defaultPresetId"):
         config["videoExport"]["defaultPresetId"] = video["defaultPresetId"]
-    if isinstance(video.get("customPresets"), list):
-        config["videoExport"]["customPresets"] = video["customPresets"]
+    if isinstance(video.get("presets"), list) and video["presets"]:
+        config["videoExport"]["presets"] = normalize_video_presets(video["presets"])
+    elif isinstance(video.get("customPresets"), list) and video["customPresets"]:
+        # 旧形式: 内蔵 (固定) + customPresets → 既定の一覧の後ろに引き継ぐ
+        config["videoExport"]["presets"] = normalize_video_presets(
+            [*default_video_presets(), *video["customPresets"]]
+        )
+    _ensure_default_preset_id(config)
     if "monoToStereo" in video:
         config["videoExport"]["monoToStereo"] = bool(video["monoToStereo"])
     if "promptBeforeExport" in video:
@@ -482,8 +640,10 @@ def save_global_config(payload: dict[str, Any]) -> dict[str, Any]:
             ve = config.setdefault("videoExport", {})
             if isinstance(ve_in.get("defaultPresetId"), str) and ve_in["defaultPresetId"]:
                 ve["defaultPresetId"] = ve_in["defaultPresetId"]
-            if isinstance(ve_in.get("customPresets"), list):
-                ve["customPresets"] = ve_in["customPresets"]
+            if isinstance(ve_in.get("presets"), list):
+                ve["presets"] = normalize_video_presets(ve_in["presets"])
+            ve.pop("customPresets", None)
+            _ensure_default_preset_id(config)
             if "monoToStereo" in ve_in:
                 ve["monoToStereo"] = bool(ve_in["monoToStereo"])
             if "promptBeforeExport" in ve_in:
@@ -650,10 +810,19 @@ def save_global_config(payload: dict[str, Any]) -> dict[str, Any]:
     return config
 
 
+def _ensure_default_preset_id(config: dict[str, Any]) -> None:
+    """既定のプリセット id が一覧に無ければ先頭にする (削除・既定に戻した後など)。"""
+    ve = config.setdefault("videoExport", {})
+    presets = ve.get("presets") or []
+    ids = [p.get("id") for p in presets if isinstance(p, dict)]
+    if ids and ve.get("defaultPresetId") not in ids:
+        ve["defaultPresetId"] = ids[0]
+
+
 def all_video_presets(config: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     config = config or load_global_config()
-    customs = config.get("videoExport", {}).get("customPresets", []) or []
-    return [*BUILTIN_VIDEO_PRESETS, *[p for p in customs if isinstance(p, dict)]]
+    presets = config.get("videoExport", {}).get("presets") or []
+    return [p for p in presets if isinstance(p, dict)] or default_video_presets()
 
 
 def current_projects_dir() -> Path:
@@ -792,10 +961,11 @@ def resolve_video_preset(
 ) -> dict[str, Any]:
     config = config or load_global_config()
     target_id = preset_id or config.get("videoExport", {}).get("defaultPresetId") or "mp4_h264_standard"
-    for preset in all_video_presets(config):
+    presets = all_video_presets(config)
+    for preset in presets:
         if preset.get("id") == target_id:
             return preset
-    return BUILTIN_VIDEO_PRESETS[0]
+    return presets[0]
 
 
 def initialize_ffmpeg_path_default() -> None:

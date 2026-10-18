@@ -6,7 +6,13 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
-from .character_deform import normalize_character_deform, normalize_character_sway
+from .character_deform import (
+    normalize_character_aura,
+    normalize_character_deform,
+    normalize_character_lightning,
+    normalize_character_streaks,
+    normalize_character_sway,
+)
 from .timecode import PROJECT_FPS, sec_to_frames
 from .utils import ProjectContext, current_project, write_project_file
 
@@ -1210,6 +1216,11 @@ def normalize_character_state(item: dict[str, Any], manifest: dict[str, Any], in
     normalized["bob"] = _normalize_character_bob(item.get("bob"))
     # 揺れピンの強さ (キャラ定義 deform.pins をこのカットでどれだけ揺らすか)。
     normalized["sway"] = normalize_character_sway(item.get("sway"))
+    # オーラ (キャラの特殊効果)。無効なら None。
+    normalized["aura"] = normalize_character_aura(item.get("aura"))
+    # 雷・光の筋 (キャラの特殊効果 Phase B)。無効なら None。
+    normalized["lightning"] = normalize_character_lightning(item.get("lightning"))
+    normalized["streaks"] = normalize_character_streaks(item.get("streaks"))
 
     if is_orphan:
         # 孤児はバリデーション対象外。frontIds と eyeAboveBangs / flipX の型だけ整える。

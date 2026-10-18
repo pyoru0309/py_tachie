@@ -1,12 +1,13 @@
 import { state } from "./state.js";
 import { elements } from "./elements.js";
-import { option, fillSelect, clamp } from "./utils.js";
+import { option, fillSelect, clamp, normalizeColorValue } from "./utils.js";
 import { showToast } from "./toast.js";
 import { recordHistory } from "./history.js";
 import { secToFrames } from "./timecode.js";
-import { synthesizeBatchItem } from "./scenario-actions.js";
+import { synthesizeBatchItem, setSwatchDisplay } from "./scenario-actions.js";
 import { promptBulkApply } from "./dialog.js";
 import { activeSceneResolved } from "./scenario.js";
+import { syncEffectPresetSelections } from "./effect-presets.js";
 
 let deps = {
   handleEditorChanged: () => {},
@@ -407,6 +408,11 @@ export function normalizeCutCharacters(data) {
       bob: _validateBobFromServer(item.bob),
       // 揺れピンの強さ ({strength})。null = キャラ定義どおり (100%)。
       sway: _validateSwayFromServer(item.sway),
+      // オーラ (キャラの特殊効果)。null = 無し。正規化はサーバの normalize_character_aura。
+      aura: item.aura && typeof item.aura === "object" && item.aura.enabled ? { ...item.aura } : null,
+      // 雷・光の筋 (キャラの特殊効果 Phase B)。null = 無し。
+      lightning: item.lightning && typeof item.lightning === "object" && item.lightning.enabled ? { ...item.lightning } : null,
+      streaks: item.streaks && typeof item.streaks === "object" && item.streaks.enabled ? { ...item.streaks } : null,
     };
   });
 }
@@ -488,7 +494,239 @@ export function updateSelectedCharacterFromControls() {
     // BPM 上下ゆれ (bob)。motion とは独立。bpm/振幅どちらか 0 なら null。
     bob: _collectBobForCharacterFromControls(),
     sway: _collectSwayForCharacterFromControls(),
+    aura: _collectAuraForCharacterFromControls(),
+    lightning: _collectSparkEffectFromControls("lightning"),
+    streaks: _collectSparkEffectFromControls("streaks"),
   });
+}
+
+// オーラ。OFF なら null (= 無し)。数値の範囲はサーバ / effects/aura.js でも揃える。
+function _collectAuraForCharacterFromControls(force = false) {
+  if (!force && !elements.characterAuraEnabled?.checked) return null;
+  const num = (el, fallback, lo, hi) => {
+    const v = Number(el?.value);
+    return Number.isFinite(v) && el?.value !== "" ? Math.max(lo, Math.min(hi, v)) : fallback;
+  };
+  return {
+    enabled: true,
+    style: ["glow", "spike"].includes(elements.characterAuraStyle?.value) ? elements.characterAuraStyle.value : "flame",
+    when: elements.characterAuraWhen?.value === "speaking" ? "speaking" : "always",
+    fadeSec: num(elements.characterAuraFade, 0.3, 0, 5),
+    color: elements.characterAuraColor?.value || "#ffe14a",
+    color2: elements.characterAuraColor2?.value || "#ff9d1a",
+    size: num(elements.characterAuraSize, 40, 4, 300),
+    margin: num(elements.characterAuraMargin, 0, 0, 400),
+    rise: num(elements.characterAuraRise, 1.5, 0, 6),
+    outward: num(elements.characterAuraOutward, 0, 0, 100) / 100,
+    density: num(elements.characterAuraDensity, 1, 0.2, 3),
+    lineCount: Math.round(num(elements.characterAuraLineCount, 0, 0, 8)),
+    lineColor: elements.characterAuraLineColor?.value || "#000000",
+    intensity: num(elements.characterAuraIntensity, 1, 0, 3),
+    speed: num(elements.characterAuraSpeed, 1, 0, 20),
+    detail: num(elements.characterAuraDetail, 50, 0, 100) / 100,
+    front: num(elements.characterAuraFront, 15, 0, 100) / 100,
+  };
+}
+
+// 雷・光の筋 (キャラの特殊効果 Phase B) の設定欄。項目は欄の id と既定値の表で持つ
+// (範囲の正規化はサーバ normalize_character_lightning / _streaks と effects/char-sparks.js)。
+const SPARK_EFFECT_FIELDS = {
+  "lightning": {
+    "prefix": "Lightning",
+    "color": "#7fd4ff",
+    "fields": [
+      {
+        "key": "count",
+        "el": "characterLightningCount",
+        "def": 6,
+        "pct": false
+      },
+      {
+        "key": "length",
+        "el": "characterLightningLength",
+        "def": 220,
+        "pct": false
+      },
+      {
+        "key": "width",
+        "el": "characterLightningWidth",
+        "def": 8,
+        "pct": false
+      },
+      {
+        "key": "gap",
+        "el": "characterLightningGap",
+        "def": 0.15,
+        "pct": false
+      },
+      {
+        "key": "duration",
+        "el": "characterLightningDuration",
+        "def": 0.3,
+        "pct": false
+      },
+      {
+        "key": "branches",
+        "el": "characterLightningBranches",
+        "def": 2,
+        "pct": false
+      },
+      {
+        "key": "jitter",
+        "el": "characterLightningJitter",
+        "def": 0.5,
+        "pct": true
+      },
+      {
+        "key": "front",
+        "el": "characterLightningFront",
+        "def": 0.5,
+        "pct": true
+      }
+    ]
+  },
+  "streaks": {
+    "prefix": "Streaks",
+    "color": "#ffe14a",
+    "fields": [
+      {
+        "key": "count",
+        "el": "characterStreaksCount",
+        "def": 16,
+        "pct": false
+      },
+      {
+        "key": "length",
+        "el": "characterStreaksLength",
+        "def": 160,
+        "pct": false
+      },
+      {
+        "key": "width",
+        "el": "characterStreaksWidth",
+        "def": 6,
+        "pct": false
+      },
+      {
+        "key": "speed",
+        "el": "characterStreaksSpeed",
+        "def": 900,
+        "pct": false
+      },
+      {
+        "key": "spread",
+        "el": "characterStreaksSpread",
+        "def": 1.1,
+        "pct": false
+      },
+      {
+        "key": "front",
+        "el": "characterStreaksFront",
+        "def": 0.3,
+        "pct": true
+      }
+    ]
+  }
+};
+
+function _collectSparkEffectFromControls(kind, force = false) {
+  const spec = SPARK_EFFECT_FIELDS[kind];
+  if (!force && !elements[`character${spec.prefix}Enabled`]?.checked) return null;
+  const out = {
+    enabled: true,
+    when: elements[`character${spec.prefix}When`]?.value === "speaking" ? "speaking" : "always",
+    fadeSec: Math.max(0, Math.min(5, Number(elements[`character${spec.prefix}Fade`]?.value) || 0)),
+    color: elements[`character${spec.prefix}Color`]?.value || spec.color,
+  };
+  if (kind === "lightning") {
+    const shape = elements.characterLightningShape?.value;
+    out.shape = shape === "hug" || shape === "mix" ? shape : "outward";
+    const margin = Number(elements.characterLightningMargin?.value);
+    out.margin = Number.isFinite(margin) ? Math.max(0, Math.min(400, margin)) : 0;
+  }
+  for (const f of spec.fields) {
+    const el = elements[f.el];
+    const v = Number(el?.value);
+    out[f.key] = el && el.value !== "" && Number.isFinite(v) ? (f.pct ? v / 100 : v) : f.def;
+  }
+  return out;
+}
+
+function _applySparkEffectToControls(kind, raw) {
+  const spec = SPARK_EFFECT_FIELDS[kind];
+  const fx = raw && raw.enabled ? raw : null;
+  const el = (name) => elements[`character${spec.prefix}${name}`];
+  if (el("Enabled")) el("Enabled").checked = !!fx;
+  if (el("When")) el("When").value = fx?.when === "speaking" ? "speaking" : "always";
+  if (el("Fade")) el("Fade").value = String(fx?.fadeSec ?? 0.3);
+  const c = normalizeColorValue(fx?.color || spec.color, spec.color);
+  if (el("Color")) el("Color").value = c;
+  setSwatchDisplay(el("ColorValue"), c);
+  for (const f of spec.fields) {
+    let v = fx?.[f.key] ?? f.def;
+    // 旧データ (光る頻度 frequency) は「次に光るまでの間」に読み替える
+    if (kind === "lightning" && f.key === "gap" && fx && fx.gap == null && Number(fx.frequency) > 0) {
+      v = Math.max(0, Math.round((1 / Number(fx.frequency) - Number(fx.duration ?? 0.25)) * 100) / 100);
+    }
+    if (elements[f.el]) elements[f.el].value = String(f.pct ? Math.round(v * 100) : v);
+  }
+  if (kind === "lightning" && elements.characterLightningShape) {
+    elements.characterLightningShape.value = fx?.shape === "hug" || fx?.shape === "mix" ? fx.shape : "outward";
+  }
+  if (kind === "lightning" && elements.characterLightningMargin) {
+    elements.characterLightningMargin.value = String(fx?.margin ?? 0);
+  }
+  syncEffectFadeInputs();
+}
+
+// 効果プリセット (effect-presets.js) 用: 欄の値を ON/OFF に関係なく読み出す / 流し込む。
+export function collectEffectControls(kind) {
+  return kind === "aura" ? _collectAuraForCharacterFromControls(true) : _collectSparkEffectFromControls(kind, true);
+}
+
+export function applyEffectControls(kind, values) {
+  const v = values ? { ...values, enabled: true } : null;
+  if (kind === "aura") _applyAuraToControls(v);
+  else _applySparkEffectToControls(kind, v);
+}
+
+// 「声が止まってから消えるまで」は「口パクしているときだけ」のときだけ使うので、
+// 「いつも」のときは入力できないようにする (オーラ / 雷 / 光の筋)。
+export function syncEffectFadeInputs() {
+  for (const prefix of ["Aura", "Lightning", "Streaks"]) {
+    const fade = elements[`character${prefix}Fade`];
+    const when = elements[`character${prefix}When`];
+    if (fade && when) fade.disabled = when.value !== "speaking";
+  }
+}
+
+function _applyAuraToControls(aura) {
+  const a = aura && aura.enabled ? aura : null;
+  const set = (el, value) => { if (el) el.value = String(value); };
+  if (elements.characterAuraEnabled) elements.characterAuraEnabled.checked = !!a;
+  set(elements.characterAuraStyle, ["glow", "spike"].includes(a?.style) ? a.style : "flame");
+  set(elements.characterAuraWhen, a?.when === "speaking" ? "speaking" : "always");
+  set(elements.characterAuraFade, a?.fadeSec ?? 0.3);
+  const color = normalizeColorValue(a?.color || "#ffe14a", "#ffe14a");
+  const color2 = normalizeColorValue(a?.color2 || "#ff9d1a", "#ff9d1a");
+  if (elements.characterAuraColor) elements.characterAuraColor.value = color;
+  setSwatchDisplay(elements.characterAuraColorValue, color);
+  if (elements.characterAuraColor2) elements.characterAuraColor2.value = color2;
+  setSwatchDisplay(elements.characterAuraColor2Value, color2);
+  set(elements.characterAuraSize, a?.size ?? 40);
+  set(elements.characterAuraMargin, a?.margin ?? 0);
+  set(elements.characterAuraRise, a?.rise ?? 1.5);
+  set(elements.characterAuraOutward, Math.round((a?.outward ?? 0) * 100));
+  set(elements.characterAuraDensity, a?.density ?? 1);
+  set(elements.characterAuraLineCount, a?.lineCount ?? 0);
+  const lineColor = normalizeColorValue(a?.lineColor || "#000000", "#000000");
+  if (elements.characterAuraLineColor) elements.characterAuraLineColor.value = lineColor;
+  setSwatchDisplay(elements.characterAuraLineColorValue, lineColor);
+  set(elements.characterAuraIntensity, a?.intensity ?? 1);
+  set(elements.characterAuraSpeed, a?.speed ?? 1);
+  set(elements.characterAuraDetail, Math.round((a?.detail ?? 0.5) * 100));
+  set(elements.characterAuraFront, Math.round((a?.front ?? 0.15) * 100));
+  syncEffectFadeInputs();
 }
 
 // 100% (= キャラ定義どおり) は null にしてデータを増やさない。
@@ -602,6 +840,10 @@ export function loadCharacterIntoControls(character) {
     deps.syncMotionParamsVisibility();
     _applyBobToControls(null);
     _applySwayToControls(null);
+    _applyAuraToControls(null);
+    _applySparkEffectToControls("lightning", null);
+    _applySparkEffectToControls("streaks", null);
+    syncEffectPresetSelections();
     fillCharacterDefinitionAddSelect();
     deps.fillExpressionPresets("");
     deps.fillPlacementPresets("");
@@ -644,6 +886,10 @@ export function loadCharacterIntoControls(character) {
   // BPM 上下ゆれ。未設定キャラは 0 (= 無効) 表示。
   _applyBobToControls(character.bob);
   _applySwayToControls(character.sway);
+  _applyAuraToControls(character.aura);
+  _applySparkEffectToControls("lightning", character.lightning);
+  _applySparkEffectToControls("streaks", character.streaks);
+  syncEffectPresetSelections();
   // 表情プリセットセレクタを (character.characterId に紐付く) 最新候補で再構築する。
   // これをやらないと、loadCut 経路で character は表示されているのに preset セレクタが
   // 「なし」のまま残るバグが出る (project 初期化時の fillAssetControls は state.

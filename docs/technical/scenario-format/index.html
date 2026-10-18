@@ -2044,6 +2044,18 @@
 <td>揺れピンの強さ <code>{ "strength": 0〜3 }</code>。未設定 (<code>null</code>) はキャラ定義どおり (= 1)、<code>0</code> で止める。揺れピンはキャラ定義の <code>deform.pins</code> (<a href="#character-deform">キャラクター定義の変形</a>)</td>
 </tr>
 <tr>
+<td><code>aura</code></td>
+<td>オーラ (キャラの特殊効果、2026-10 追加)。<code>{ "enabled": true, "style": "flame"\|"spike"\|"glow", "color", "color2", "size", "margin", "rise", "intensity", "speed", "detail", "front", "when": "always"\|"speaking", "fadeSec" }</code>。<code>size</code> = 広がる幅 (px、4〜300)、<code>margin</code> = 体との間隔 (px、0〜400。この内側には描かない)、<code>rise</code> = 炎・筋が伸びる量 (size の倍率、0〜6)、<code>outward</code> = 外へ広がる割合 (0 = 平行に真上 〜 1 = 体の中心から放射状)、<code>density</code> = 鋭い筋の本数の倍率 (0.2〜3)、<code>lineCount</code> / <code>lineColor</code> = 集中線の箇所の数 (0〜8) と色、<code>intensity</code> = 明るさ (0〜3)、<code>speed</code> = 速さ (0〜20)、<code>detail</code> = ゆらぎの細かさ (0〜1)、<code>front</code> = キャラの前に重ねる量 (0〜1)、<code>when: "speaking"</code> = 口パクしているときだけ (消えるまで <code>fadeSec</code> 秒)。無効 / 未設定は <code>null</code></td>
+</tr>
+<tr>
+<td><code>lightning</code></td>
+<td>雷 (キャラの特殊効果、2026-10 追加)。<code>{ "enabled": true, "color", "shape": "outward"\|"hug"\|"mix", "margin" (体との間隔 px), "count" (1〜60), "length" (px), "width" (px、0.5〜40), "duration" (1 本が光る秒), "gap" (次に光るまでの間の秒。旧 "frequency" (回/秒) は 1/frequency − duration に読み替え), "branches" (0〜4), "jitter" (0〜1), "front" (0〜1 = キャラの前に出る割合), "when", "fadeSec" }</code>。無効 / 未設定は <code>null</code></td>
+</tr>
+<tr>
+<td><code>streaks</code></td>
+<td>光の筋 (キャラの特殊効果、2026-10 追加)。<code>{ "enabled": true, "color", "count" (1〜60), "length" (px), "width" (px), "speed" (px/秒), "spread" (キャラの幅に対する倍率), "front" (0〜1), "when", "fadeSec" }</code>。無効 / 未設定は <code>null</code></td>
+</tr>
+<tr>
 <td><code>crop</code></td>
 <td>マルチキャラレイアウト用の矩形クリップ <code>{ x, y, width, height }</code> (1920×1080 絶対座標)。<code>null</code> / 未設定なら全画面表示</td>
 </tr>

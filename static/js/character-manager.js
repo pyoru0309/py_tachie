@@ -17,6 +17,7 @@ import {
   accentColorFallback,
 } from "./character.js";
 import { loadProjects } from "./project.js";
+import { resolvePresetSaveTarget } from "./preset-save-target.js";
 import { loadCharacterDeformEditor, collectCharacterDeform } from "./character-deform-editor.js";
 import {
   ttsAvailable,
@@ -156,9 +157,8 @@ export function updatePresetButtons() {
   elements.presetName.disabled = !hasCharacter;
 }
 
-export function currentPreset() {
+export function currentPreset(id = elements.expressionPreset.value || `preset_${Date.now()}`, name = null) {
   const character = selectedCharacter();
-  const id = elements.expressionPreset.value || `preset_${Date.now()}`;
   const characterId = character?.characterId || "";
   // 既存 preset があれば isDefault を引継ぐ。アセット由来でも編集すれば project
   // 上書きとして保存されるが、デフォルト指定はアセット側の定義をそのまま尊重する。
@@ -167,7 +167,7 @@ export function currentPreset() {
   );
   return {
     id,
-    name: elements.presetName.value.trim() || "新規表情",
+    name: name ?? (elements.presetName.value.trim() || "新規表情"),
     characterId,
     cheekId: elements.cheek.value,
     eyeId: elements.eye.value,
@@ -195,7 +195,19 @@ export async function saveCurrentPreset() {
     showToast("登場キャラを追加してから表情プリセットを保存してください", "error");
     return;
   }
-  const preset = currentPreset();
+  // 保存先: 名前そのまま = 選択中を上書き / 名前を変えた = 別名で新規 (preset-save-target.js)。
+  // 名前の重なりは同じキャラの表情プリセットの中だけで見る。
+  const characterId = selectedCharacter().characterId || "";
+  const target = await resolvePresetSaveTarget({
+    presets: (state.manifest.expressionPresets || []).filter((item) => (item.characterId || "") === characterId),
+    selectedId: elements.expressionPreset.value || "",
+    name: elements.presetName.value,
+    fallbackName: "新規表情",
+    newId: () => `preset_${Date.now()}`,
+    label: "表情",
+  });
+  if (!target) return;
+  const preset = currentPreset(target.id, target.name);
   const presets = [...(state.manifest.expressionPresets || [])];
   const index = presets.findIndex((item) => item.id === preset.id && item.characterId === preset.characterId);
   if (index >= 0) {
@@ -206,7 +218,9 @@ export async function saveCurrentPreset() {
   await saveExpressionPresets(presets);
   fillExpressionPresets(preset.id);
   elements.expressionPreset.value = preset.id;
-  showToast("表情プリセットを保存しました");
+  showToast(target.existing
+    ? `表情プリセット「${preset.name}」を上書きしました`
+    : `表情プリセット「${preset.name}」を新しく保存しました`);
 }
 
 export async function deleteCurrentPreset() {

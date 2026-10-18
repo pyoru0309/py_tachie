@@ -28,6 +28,7 @@ import { recordHistory } from "./history.js";
 import { renderPreview } from "./playback.js";
 import { markThumbnailDirty } from "./thumbnail.js";
 import { promptConfirm } from "./dialog.js";
+import { resolvePresetSaveTarget } from "./preset-save-target.js";
 
 let deps = {
   handleEditorChanged: () => {},
@@ -158,10 +159,18 @@ export async function saveCurrentPlacementPreset() {
     return;
   }
   const characterId = character.characterId || "";
-  const name = (elements.placementPresetName?.value || "").trim() || "新規配置";
-  // 選択中プリセットがあれば上書き、無ければ新規 ID を発行する。
-  const selectedId = elements.placementPreset?.value || "";
-  const id = selectedId || `placement_${Date.now()}`;
+  // 保存先: 名前そのまま = 選択中を上書き / 名前を変えた = 別名で新規 (preset-save-target.js)。
+  // 名前の重なりは同じキャラのプリセットの中だけで見る。
+  const target = await resolvePresetSaveTarget({
+    presets: placementPresetsForCharacter(characterId),
+    selectedId: elements.placementPreset?.value || "",
+    name: elements.placementPresetName?.value,
+    fallbackName: "新規配置",
+    newId: () => `placement_${Date.now()}`,
+    label: "配置",
+  });
+  if (!target) return;
+  const { id, name } = target;
   const preset = {
     id,
     name,
@@ -220,8 +229,10 @@ export async function saveCurrentPlacementPreset() {
   );
   fillPlacementPresets(persisted?.id || preset.id);
   showToast(propagate
-    ? `配置プリセットを保存し、${targetCutIds.size} カットに反映しました`
-    : "配置プリセットを保存しました");
+    ? `配置プリセット「${name}」を上書きし、${targetCutIds.size} カットに反映しました`
+    : oldPreset
+      ? `配置プリセット「${name}」を上書きしました`
+      : `配置プリセット「${name}」を新しく保存しました`);
 }
 
 export async function deleteCurrentPlacementPreset() {

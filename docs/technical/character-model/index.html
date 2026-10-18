@@ -1977,6 +1977,7 @@
 <p>髪型プリセットの追加・編集・削除は <strong>アセット管理ダイアログ専用</strong> です。カット編集側からは選択しかできません。配布アセットでも同じ定義が使えるよう、アセット側で完結させる設計です。</p>
 <h2 id="expression-presets">表情プリセット (expression preset)<a class="headerlink" href="#expression-presets" title="Permanent link">&para;</a></h2>
 <p>頬・目・口の組み合わせを名前付きで保存する仕組みです。アセット側 (<code>assets/characters/&lt;id&gt;/expression_presets.json</code>) と プロジェクト側 (<code>projects/&lt;project_id&gt;/expression_presets.json</code>) の <strong>2 段マージ</strong> で動きます。</p>
+<p>編集画面の「プリセット保存」は、選んだプリセットと <strong>同じ名前のまま</strong> なら <strong>上書き</strong>、<strong>名前を変えると別のプリセットとして新規作成</strong>（元のプリセットはそのまま）、<code>なし</code> なら <strong>新規作成</strong> です。すでにある別のプリセットと同じ名前を付けたときは、上書きしてよいか確認が出ます。</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">[</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="p">{</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;smile&quot;</span><span class="p">,</span>
@@ -2071,7 +2072,7 @@
 <ul>
 <li>セレクタには <strong>編集中キャラの <code>characterId</code> に紐づくプリセットだけ</strong> が並びます (<code>名前（X 100 / Y 12 / ×0.9）</code> の形式)。</li>
 <li>選ぶとその場で X / Y / 拡大率 が入力欄とカットへ反映されます。</li>
-<li><code>配置プリセット保存</code> は、セレクタで既存プリセットを選んでいれば <strong>上書き</strong>、<code>なし</code> を選んでいれば <strong>新規作成</strong> です。</li>
+<li><code>配置プリセット保存</code> は、選んだプリセットと <strong>同じ名前のまま</strong> 保存すると <strong>上書き</strong>、<strong>名前を変えて</strong> 保存すると <strong>別のプリセットとして新規作成</strong>（元のプリセットはそのまま）、<code>なし</code> で保存すると <strong>新規作成</strong> です。すでにある別のプリセットと同じ名前を付けたときは、上書きしてよいか確認が出ます。</li>
 <li>カットを移動したとき、現在の X / Y / 拡大率 と一致するプリセットがあれば自動で選択状態になります (どの立ち位置が当たっているか一目で分かります)。</li>
 </ul>
 <h2 id="_14">白背景素材を使う場合<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>

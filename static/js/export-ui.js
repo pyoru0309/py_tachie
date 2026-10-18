@@ -63,13 +63,9 @@ function _pickDefaultHwEngine(alternates) {
   return "";
 }
 
+// 書き出しプリセットの一覧 (全体設定 videoExport.presets、ffmpeg 対応状況付き)。
 function allPresets() {
-  const builtIn = state.globalConfig?.builtInVideoPresets || [];
-  const customs =
-    state.globalConfig?.customVideoPresets
-    || state.globalConfig?.config?.videoExport?.customPresets
-    || [];
-  return [...builtIn, ...customs];
+  return state.globalConfig?.videoPresets || [];
 }
 
 export function findPreset(id) {

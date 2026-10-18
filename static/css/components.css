@@ -1315,7 +1315,82 @@ dialog::backdrop {
 .preset-list-actions {
   margin-top: 10px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 4px 12px;
+}
+
+/* 全体設定: 動画書き出しプリセットの編集 (video-preset-editor.js) */
+.preset-item.has-actions {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.preset-item.editing {
+  box-shadow: 0 0 0 2px var(--accent) inset;
+}
+
+.preset-item-actions {
+  display: flex;
+  gap: 2px;
+  align-self: center;
+}
+
+.preset-item-actions button {
+  flex-shrink: 0;
+  padding: 4px 6px;
+  min-height: 28px;
+}
+
+.preset-item-name .badge.modified {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.video-preset-editor {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  display: grid;
+  gap: 10px;
+}
+
+.video-preset-editor[hidden] {
+  display: none;
+}
+
+.video-preset-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.video-preset-editor-header h4 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.video-preset-editor-header button {
+  flex-shrink: 0;
+}
+
+.video-preset-editor-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.video-preset-editor-grid .video-preset-wide {
+  grid-column: 1 / -1;
+}
+
+.video-preset-editor-grid input[type="text"] {
+  font-family: var(--font-mono);
+}
+
+.video-preset-editor-grid #videoPresetNameInput,
+.video-preset-editor-grid #videoPresetDescriptionInput {
+  font-family: inherit;
 }
 
 .font-scan-list {

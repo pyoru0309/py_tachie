@@ -378,7 +378,7 @@
               </label>
             </div>
             <div class="button-row">
-              <button id="savePlacementPresetButton" type="button" title="編集中のキャラの X / Y / 拡大率 を名前付きで保存します">
+              <button id="savePlacementPresetButton" type="button" title="編集中のキャラの X / Y / 拡大率 を名前付きで保存します（選択中のプリセットと同じ名前なら上書き、名前を変えると別のプリセットとして保存）">
                 <span class="msym button-icon" aria-hidden="true">bookmark_add</span>
                 <span>配置プリセット保存</span>
               </button>
@@ -438,7 +438,7 @@
               <input id="presetNameInput" type="text" placeholder="通常" />
             </label>
             <div class="button-row">
-              <button id="savePresetButton" type="button">
+              <button id="savePresetButton" type="button" title="編集中のキャラの表情を名前付きで保存します（選択中のプリセットと同じ名前なら上書き、名前を変えると別のプリセットとして保存）">
                 <span class="msym button-icon" aria-hidden="true">bookmark_add</span>
                 <span>プリセット保存</span>
               </button>
@@ -658,6 +658,292 @@
               </label>
             </div>
             <p class="asset-hint">キャラ詳細の「揺れピン」で決めた場所（髪・衣装など）を揺らします。100% でキャラ詳細どおり、0% で止まります。揺れピンの無いキャラには効きません。揺れはシーン全体で連続します。</p>
+            <h3 class="motion-subhead">オーラ</h3>
+            <label class="checkbox-row">
+              <input id="characterAuraEnabledInput" type="checkbox" />
+              <span>オーラを出す</span>
+            </label>
+            <div class="inline-fields">
+              <label>
+                オーラプリセット
+                <select id="characterAuraPresetSelect" title="選ぶと下の設定へ流し込み、オーラを出します。どのキャラ・シーン・プロジェクトでも共通です"></select>
+              </label>
+              <label>
+                プリセット名
+                <input id="characterAuraPresetNameInput" type="text" placeholder="オーラ1" />
+              </label>
+            </div>
+            <div class="button-row">
+              <button id="characterAuraPresetSaveButton" type="button" title="下のオーラの設定を名前付きで保存します（選択中のプリセットと同じ名前なら上書き、名前を変えると別のプリセットとして保存）。キャラ・シーン・プロジェクトをまたいで使えます">
+                <span class="msym button-icon" aria-hidden="true">bookmark_add</span>
+                <span>オーラプリセット保存</span>
+              </button>
+              <button id="characterAuraPresetDeleteButton" type="button">
+                <span class="msym button-icon" aria-hidden="true">delete</span>
+                <span>削除</span>
+              </button>
+            </div>
+            <div class="inline-fields">
+              <label>
+                見た目
+                <select id="characterAuraStyleSelect">
+                  <option value="flame">炎のように立ちのぼる</option>
+                  <option value="spike">鋭く立ちのぼる</option>
+                  <option value="glow">ふんわり発光</option>
+                </select>
+              </label>
+              <label>
+                出すとき
+                <select id="characterAuraWhenSelect">
+                  <option value="always">いつも</option>
+                  <option value="speaking">口パクしているときだけ</option>
+                </select>
+              </label>
+              <label>
+                声が止まってから消えるまで (秒)
+                <input id="characterAuraFadeInput" type="number" min="0" max="5" step="0.1" value="0.3"  title="「口パクしているときだけ」のとき、声が止まってから効果全体が消えるまでの時間（「いつも」のときは使いません）"/>
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                色（内側）
+                <span class="color-control">
+                  <input id="characterAuraColorInput" type="color" value="#ffe14a" />
+                  <span id="characterAuraColorValue" class="color-value">#ffe14a</span>
+                </span>
+              </label>
+              <label>
+                色（外側）
+                <span class="color-control">
+                  <input id="characterAuraColor2Input" type="color" value="#ff9d1a" />
+                  <span id="characterAuraColor2Value" class="color-value">#ff9d1a</span>
+                </span>
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                体との間隔 (px)
+                <input id="characterAuraMarginInput" type="number" min="0" max="400" step="5" value="0" title="体からこの距離までは何も描かず、その外側からオーラを出す" />
+              </label>
+              <label>
+                広がり (px)
+                <input id="characterAuraSizeInput" type="number" min="4" max="300" step="2" value="40" />
+              </label>
+              <label>
+                立ちのぼり (倍)
+                <input id="characterAuraRiseInput" type="number" min="0" max="6" step="0.1" value="1.5" title="炎・鋭い筋が伸びる量 (広がりに対する倍率)" />
+              </label>
+              <label>
+                外へ広がる割合 (%)
+                <input id="characterAuraOutwardInput" type="number" min="0" max="100" step="5" value="0" title="炎・鋭い筋の開き角。0 = 平行に真上 / 割合を上げるほど外へ開き / 100 = 体の中心から放射状に" />
+              </label>
+              <label>
+                筋の本数 (倍)
+                <input id="characterAuraDensityInput" type="number" min="0.2" max="3" step="0.1" value="1" title="「鋭く立ちのぼる」の筋の本数。下げると本数が減って 1 本 1 本が太くなる" />
+              </label>
+              <label>
+                明るさ
+                <input id="characterAuraIntensityInput" type="number" min="0" max="3" step="0.05" value="1" />
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                速さ (倍)
+                <input id="characterAuraSpeedInput" type="number" min="0" max="20" step="0.1" value="1" />
+              </label>
+              <label>
+                ゆらぎの細かさ (%)
+                <input id="characterAuraDetailInput" type="number" min="0" max="100" step="5" value="50" />
+              </label>
+              <label>
+                前にも重ねる (%)
+                <input id="characterAuraFrontInput" type="number" min="0" max="100" step="5" value="15" title="キャラの体の縁に、オーラを手前からも薄く重ねる量" />
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                集中線 (箇所)
+                <input id="characterAuraLineCountInput" type="number" min="0" max="8" step="1" value="0" title="オーラと同じ向きの細い線を、狭い範囲にまとめて出す箇所の数 (0 = 出さない)。場所は約 1/3 秒ごとに入れ替わる" />
+              </label>
+              <label>
+                集中線の色
+                <span class="color-control">
+                  <input id="characterAuraLineColorInput" type="color" value="#000000" />
+                  <span id="characterAuraLineColorValue" class="color-value">#000000</span>
+                </span>
+              </label>
+            </div>
+            <p class="asset-hint">編集中のキャラの周りにオーラを出します。体の輪郭から外へ広がり、「炎のように立ちのぼる」は上へゆらめき、「鋭く立ちのぼる」は細く尖った光の筋が伸び縮みし、「ふんわり発光」はゆっくり明滅します。「体との間隔」を入れると、体から少し離れたところからオーラが立ちのぼります。「外へ広がる割合」を上げるほど炎・筋が外へ開き、100% で体の中心から放射状になります。「集中線」は同じ向きの細い線を数か所にまとめて出し、黒や白で立体感を足せます。「口パクしているときだけ」は、体の揺れの「口パクのときだけ」と同じ判定（話者音声・キャラ別ボーカルの音量、または歌唱判定 MIDI）で出し入れします（停止中は確認しやすいよう常に表示します）。</p>
+            <h3 class="motion-subhead">雷</h3>
+            <label class="checkbox-row">
+              <input id="characterLightningEnabledInput" type="checkbox" />
+              <span>雷（スパーク）を出す</span>
+            </label>
+            <div class="inline-fields">
+              <label>
+                雷プリセット
+                <select id="characterLightningPresetSelect" title="選ぶと下の設定へ流し込み、雷を出します。どのキャラ・シーン・プロジェクトでも共通です"></select>
+              </label>
+              <label>
+                プリセット名
+                <input id="characterLightningPresetNameInput" type="text" placeholder="雷1" />
+              </label>
+            </div>
+            <div class="button-row">
+              <button id="characterLightningPresetSaveButton" type="button" title="下の雷の設定を名前付きで保存します（選択中のプリセットと同じ名前なら上書き、名前を変えると別のプリセットとして保存）。キャラ・シーン・プロジェクトをまたいで使えます">
+                <span class="msym button-icon" aria-hidden="true">bookmark_add</span>
+                <span>雷プリセット保存</span>
+              </button>
+              <button id="characterLightningPresetDeleteButton" type="button">
+                <span class="msym button-icon" aria-hidden="true">delete</span>
+                <span>削除</span>
+              </button>
+            </div>
+            <div class="inline-fields">
+              <label>
+                出すとき
+                <select id="characterLightningWhenSelect">
+                  <option value="always">いつも</option>
+                  <option value="speaking">口パクしているときだけ</option>
+                </select>
+              </label>
+              <label>
+                声が止まってから消えるまで (秒)
+                <input id="characterLightningFadeInput" type="number" min="0" max="5" step="0.1" value="0.3"  title="「口パクしているときだけ」のとき、声が止まってから効果全体が消えるまでの時間（「いつも」のときは使いません）"/>
+              </label>
+              <label>
+                色
+                <span class="color-control">
+                  <input id="characterLightningColorInput" type="color" value="#7fd4ff" />
+                  <span id="characterLightningColorValue" class="color-value">#7fd4ff</span>
+                </span>
+              </label>
+              <label>
+                形
+                <select id="characterLightningShapeSelect">
+                  <option value="outward">外へ伸びる</option>
+                  <option value="hug">体に沿って曲がる（くの字）</option>
+                  <option value="mix">まぜる</option>
+                </select>
+              </label>
+              <label>
+                体との間隔 (px)
+                <input id="characterLightningMarginInput" type="number" min="0" max="400" step="5" value="0" title="稲妻の始点 (くの字なら両端) を体の輪郭から外へ離す距離" />
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                本数
+                <input id="characterLightningCountInput" type="number" min="1" max="60" step="1" value="6" title="同時に光る稲妻の数のめやす" />
+              </label>
+              <label>
+                長さ (px)
+                <input id="characterLightningLengthInput" type="number" min="20" max="1200" step="10" value="220" />
+              </label>
+              <label>
+                太さ (px)
+                <input id="characterLightningWidthInput" type="number" min="0.5" max="40" step="0.5" value="8" />
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                次に光るまでの間 (秒)
+                <input id="characterLightningGapInput" type="number" min="0" max="5" step="0.05" value="0.15" title="1 本の稲妻が消えてから、次の稲妻が光るまでの平均の間。0 なら途切れず次々に光る" />
+              </label>
+              <label>
+                1 本が光る時間 (秒)
+                <input id="characterLightningDurationInput" type="number" min="0.03" max="2" step="0.01" value="0.3" title="稲妻 1 本が光っている時間 (光り始めに根元から伸び、最後にすっと消える)" />
+              </label>
+              <label>
+                枝分かれ
+                <input id="characterLightningBranchesInput" type="number" min="0" max="4" step="1" value="2" />
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                ギザギザ (%)
+                <input id="characterLightningJitterInput" type="number" min="0" max="100" step="5" value="50" />
+              </label>
+              <label>
+                前に出す割合 (%)
+                <input id="characterLightningFrontInput" type="number" min="0" max="100" step="5" value="50" title="キャラより手前に出る稲妻の割合 (残りは後ろ)" />
+              </label>
+            </div>
+            <p class="asset-hint">キャラの輪郭から外へ伸びる稲妻（または体に沿って「く」の字に曲がり、両端が体に向く稲妻）を、短い時間ずつ光らせます。本数は同時に光る数のめやすで、「1 本が光る時間」と「次に光るまでの間」の割合で実際に見える数が決まります。白い芯と色のにじみで描き、稲妻ごとにキャラの前か後ろに出ます。形は乱数で決まりますが、同じ設定なら書き出しでも同じ絵になります。</p>
+            <h3 class="motion-subhead">光の筋</h3>
+            <label class="checkbox-row">
+              <input id="characterStreaksEnabledInput" type="checkbox" />
+              <span>光の筋を出す</span>
+            </label>
+            <div class="inline-fields">
+              <label>
+                光の筋プリセット
+                <select id="characterStreaksPresetSelect" title="選ぶと下の設定へ流し込み、光の筋を出します。どのキャラ・シーン・プロジェクトでも共通です"></select>
+              </label>
+              <label>
+                プリセット名
+                <input id="characterStreaksPresetNameInput" type="text" placeholder="光の筋1" />
+              </label>
+            </div>
+            <div class="button-row">
+              <button id="characterStreaksPresetSaveButton" type="button" title="下の光の筋の設定を名前付きで保存します（選択中のプリセットと同じ名前なら上書き、名前を変えると別のプリセットとして保存）。キャラ・シーン・プロジェクトをまたいで使えます">
+                <span class="msym button-icon" aria-hidden="true">bookmark_add</span>
+                <span>光の筋プリセット保存</span>
+              </button>
+              <button id="characterStreaksPresetDeleteButton" type="button">
+                <span class="msym button-icon" aria-hidden="true">delete</span>
+                <span>削除</span>
+              </button>
+            </div>
+            <div class="inline-fields">
+              <label>
+                出すとき
+                <select id="characterStreaksWhenSelect">
+                  <option value="always">いつも</option>
+                  <option value="speaking">口パクしているときだけ</option>
+                </select>
+              </label>
+              <label>
+                声が止まってから消えるまで (秒)
+                <input id="characterStreaksFadeInput" type="number" min="0" max="5" step="0.1" value="0.3"  title="「口パクしているときだけ」のとき、声が止まってから効果全体が消えるまでの時間（「いつも」のときは使いません）"/>
+              </label>
+              <label>
+                色
+                <span class="color-control">
+                  <input id="characterStreaksColorInput" type="color" value="#ffe14a" />
+                  <span id="characterStreaksColorValue" class="color-value">#ffe14a</span>
+                </span>
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                本数
+                <input id="characterStreaksCountInput" type="number" min="1" max="60" step="1" value="16" />
+              </label>
+              <label>
+                長さ (px)
+                <input id="characterStreaksLengthInput" type="number" min="10" max="1200" step="10" value="160" />
+              </label>
+              <label>
+                太さ (px)
+                <input id="characterStreaksWidthInput" type="number" min="1" max="60" step="1" value="6" />
+              </label>
+            </div>
+            <div class="inline-fields">
+              <label>
+                速さ (px/秒)
+                <input id="characterStreaksSpeedInput" type="number" min="20" max="6000" step="50" value="900" title="上へ噴き上がる速さ" />
+              </label>
+              <label>
+                横の広がり (倍)
+                <input id="characterStreaksSpreadInput" type="number" min="0.2" max="3" step="0.1" value="1.1" title="キャラの幅に対する倍率" />
+              </label>
+              <label>
+                前に出す割合 (%)
+                <input id="characterStreaksFrontInput" type="number" min="0" max="100" step="5" value="30" title="キャラより手前に出る筋の割合 (残りは後ろ)" />
+              </label>
+            </div>
+            <p class="asset-hint">キャラの体の周りから、細長い光の筋が上へ噴き上がります（気が立ちのぼる表現）。オーラと組み合わせると効果的です。</p>
           </div>
 
           <div class="panel-section">
@@ -977,7 +1263,7 @@
               </label>
             </div>
             <div class="button-row">
-              <button id="saveForegroundPresetButton" type="button" title="編集中のカットの前景の画像 / X / Y / 拡大率 を名前付きで保存します（選択中のプリセットがあれば上書き）">
+              <button id="saveForegroundPresetButton" type="button" title="編集中のカットの前景の画像 / X / Y / 拡大率 を名前付きで保存します（選択中のプリセットと同じ名前なら上書き、名前を変えると別のプリセットとして保存）">
                 <span class="msym button-icon" aria-hidden="true">bookmark_add</span>
                 <span>前景プリセット保存</span>
               </button>
@@ -1046,7 +1332,7 @@
               </label>
             </div>
             <div class="button-row">
-              <button id="saveBackgroundPresetButton" type="button" title="編集中のカットの背景の画像 / X / Y / 拡大率 / ぼかし / 背景色 / 不透明度 を名前付きで保存します（選択中のプリセットがあれば上書き）">
+              <button id="saveBackgroundPresetButton" type="button" title="編集中のカットの背景の画像 / X / Y / 拡大率 / ぼかし / 背景色 / 不透明度 を名前付きで保存します（選択中のプリセットと同じ名前なら上書き、名前を変えると別のプリセットとして保存）">
                 <span class="msym button-icon" aria-hidden="true">bookmark_add</span>
                 <span>背景プリセット保存</span>
               </button>
@@ -2953,10 +3239,115 @@
           <div class="settings-content">
             <section class="settings-group" data-global-tab-panel="video">
               <h3>動画書き出しプリセット</h3>
-              <p class="asset-hint">「動画出力」で使用するプリセットを選択します（内蔵プリセットは固定設定）</p>
+              <p class="asset-hint">「動画出力」で使用するプリセットを選びます。各プリセットは「編集」で中身を変えられ、「複製」「新規」で増やせます。変更は下の「保存」で確定します。最初は内蔵の既定値が入っていて、「既定に戻す」でいつでも戻せます。</p>
               <div id="ffmpegStatusBanner" class="asset-warning" role="alert" hidden></div>
               <div id="globalVideoPresetList" class="preset-list"></div>
+              <div id="globalVideoPresetEditor" class="video-preset-editor" hidden>
+                <div class="video-preset-editor-header">
+                  <h4 id="videoPresetEditorTitle">プリセットを編集</h4>
+                  <button id="closeVideoPresetEditorButton" type="button" class="ghost-button" title="編集欄を閉じる（入力した内容はそのまま残ります）">
+                    <span class="msym button-icon" aria-hidden="true">expand_less</span>
+                    <span>閉じる</span>
+                  </button>
+                </div>
+                <div class="settings-grid video-preset-editor-grid">
+                  <label>
+                    名前
+                    <input id="videoPresetNameInput" type="text" maxlength="80" />
+                  </label>
+                  <label>
+                    説明
+                    <input id="videoPresetDescriptionInput" type="text" maxlength="200" />
+                  </label>
+                  <label>
+                    映像コーデック
+                    <select id="videoPresetCodecSelect">
+                      <option value="libx264">H.264（libx264）</option>
+                      <option value="libx265">H.265 / HEVC（libx265）</option>
+                      <option value="prores_ks">ProRes（prores_ks）</option>
+                      <option value="png">PNG（png、完全可逆）</option>
+                    </select>
+                  </label>
+                  <label>
+                    形式（拡張子）
+                    <select id="videoPresetExtensionSelect">
+                      <option value=".mp4">.mp4</option>
+                      <option value=".mov">.mov</option>
+                    </select>
+                  </label>
+                  <label class="video-preset-wide">
+                    エンコーダの引数
+                    <input id="videoPresetVideoArgsInput" type="text" spellcheck="false" placeholder="例: -preset medium -crf 20" />
+                  </label>
+                  <label>
+                    ピクセル形式
+                    <input id="videoPresetPixFmtInput" type="text" list="videoPresetPixFmtList" spellcheck="false" />
+                    <datalist id="videoPresetPixFmtList">
+                      <option value="yuv420p"></option>
+                      <option value="yuv422p10le"></option>
+                      <option value="yuva444p10le"></option>
+                      <option value="rgba"></option>
+                    </datalist>
+                  </label>
+                  <label>
+                    色空間
+                    <select id="videoPresetColorSpaceSelect">
+                      <option value="bt709">BT.709</option>
+                      <option value="">指定しない</option>
+                    </select>
+                  </label>
+                  <label>
+                    FPS
+                    <select id="videoPresetFpsSelect">
+                      <option value="24">24</option>
+                      <option value="12">12</option>
+                      <option value="8">8</option>
+                    </select>
+                  </label>
+                  <label>
+                    音声コーデック
+                    <select id="videoPresetAudioCodecSelect">
+                      <option value="aac">AAC</option>
+                      <option value="pcm_s16le">リニア PCM 16bit（.mov のみ）</option>
+                      <option value="pcm_s24le">リニア PCM 24bit（.mov のみ）</option>
+                    </select>
+                  </label>
+                  <label id="videoPresetAudioBitrateWrap">
+                    音声ビットレート
+                    <select id="videoPresetAudioBitrateSelect">
+                      <option value="128k">128k</option>
+                      <option value="192k">192k</option>
+                      <option value="256k">256k</option>
+                      <option value="320k">320k</option>
+                    </select>
+                  </label>
+                  <label class="video-preset-wide">
+                    コンテナの引数
+                    <input id="videoPresetContainerArgsInput" type="text" spellcheck="false" placeholder="例: -movflags +faststart" />
+                  </label>
+                </div>
+                <label class="checkbox-row">
+                  <input id="videoPresetAlphaInput" type="checkbox" />
+                  <span>透過（アルファ）付きで書き出す（ProRes / PNG のみ。背景を描かずに書き出します）</span>
+                </label>
+                <p id="videoPresetAlternatesText" class="asset-hint"></p>
+                <p class="asset-hint">映像コーデックを変えると、そのコーデックの標準的な設定（形式・引数・ピクセル形式・HW エンコーダ）が入ります。引数は ffmpeg にそのまま渡すので、分からない項目は変えずにおくのがおすすめです。H.264 / H.265 の画質は CRF（小さいほど高画質・大きいファイル）で決まります。</p>
+                <div class="button-row">
+                  <button id="resetVideoPresetButton" type="button" class="ghost-button" title="このプリセットを内蔵の既定値に戻します">
+                    <span class="msym button-icon" aria-hidden="true">restart_alt</span>
+                    <span>このプリセットを既定に戻す</span>
+                  </button>
+                </div>
+              </div>
               <div class="preset-list-actions">
+                <button type="button" id="addVideoPresetButton" class="link-button">
+                  <span class="msym button-icon" aria-hidden="true">add</span>
+                  <span>新しいプリセット</span>
+                </button>
+                <button type="button" id="resetAllVideoPresetsButton" class="link-button" title="プリセットの一覧を内蔵の既定値（7 種）に戻します">
+                  <span class="msym button-icon" aria-hidden="true">restart_alt</span>
+                  <span>すべて既定に戻す</span>
+                </button>
                 <button type="button" id="refreshFfmpegButton" class="link-button">
                   <span class="msym button-icon" aria-hidden="true">refresh</span>
                   <span>ffmpeg 対応状況を再検出</span>

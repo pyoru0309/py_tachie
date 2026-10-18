@@ -488,6 +488,18 @@ function _computeExportSceneState(rd, f, { withLipSync = true } = {}) {
   // 体の揺れ (シーンの BPM ボブ + キャラの bob)。「口パクのときだけ」は、その時刻に
   // 声が出ていたか (MIDI 口形 / キャラ別ボーカル / 話者音声の levels) で判定する。
   const silence = Number(rd.lipSyncCfg?.silenceThreshold ?? 0.08);
+  const voicedAtLocal = (charId, t) => {
+    const entry = rd.lipSyncByChar?.[charId];
+    if (entry?.kind === "midi") {
+      const ch = entry.shapes?.[Math.floor(t * 24 + 1e-6)];
+      return !!ch && ch !== "-";
+    }
+    const arr = entry?.kind === "level"
+      ? rd.levelsByChar?.[charId]
+      : (charId === rd.speakerId ? rd.levels : null);
+    const v = arr ? arr[Math.floor(t * rd.fps + 1e-6)] : null;
+    return v != null && v >= silence;
+  };
   const { dyByChar: bobDyByChar, stretchByChar: bobStretchByChar } = computeBobByChar({
     characters: rd.layerData.characters,
     sceneBob: rd.idleMotion?.bpmBob,
@@ -495,19 +507,14 @@ function _computeExportSceneState(rd, f, { withLipSync = true } = {}) {
     beatMaps: rd.layerData.beatMaps,
     localSec: localElapsedSec,
     sceneSec,
-    voicedAtLocal: (charId, t) => {
-      const entry = rd.lipSyncByChar?.[charId];
-      if (entry?.kind === "midi") {
-        const ch = entry.shapes?.[Math.floor(t * 24 + 1e-6)];
-        return !!ch && ch !== "-";
-      }
-      const arr = entry?.kind === "level"
-        ? rd.levelsByChar?.[charId]
-        : (charId === rd.speakerId ? rd.levels : null);
-      const v = arr ? arr[Math.floor(t * rd.fps + 1e-6)] : null;
-      return v != null && v >= silence;
-    },
+    voicedAtLocal,
   });
+  // キャラの特殊効果「口パクしているときだけ」: その時刻に声が出ていたか (体の揺れと同じ判定)。
+  // 出し入れのなめらかさ (fadeSec) は scene-builder がフレーム順に追従させる。
+  const effectVoicedByChar = {};
+  for (const ch of rd.layerData.characters || []) {
+    if (ch?.id && [ch.aura, ch.lightning, ch.streaks].some((fx) => fx?.enabled && fx.when === "speaking")) effectVoicedByChar[ch.id] = voicedAtLocal(ch.id, localElapsedSec);
+  }
   return {
     eyeKey: "open",
     eyeKeyByChar,
@@ -520,6 +527,7 @@ function _computeExportSceneState(rd, f, { withLipSync = true } = {}) {
     idleDy: idle.dy,
     bobDyByChar,
     bobStretchByChar,
+    effectVoicedByChar,
     motionOffsetByChar,
     elapsedSec: localElapsedSec,
     animationFps: 12,

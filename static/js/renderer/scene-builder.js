@@ -30,6 +30,23 @@ import {
 import { createBlurPass } from "./effects/gaussian-blur.js";
 import { createCoverPass } from "./effects/cover.js";
 import { createTintPlane, setTint } from "./effects/tint.js";
+import {
+  normalizeAura,
+  auraPadding,
+  auraBlurPx,
+  createAuraMeshes,
+  updateAuraMeshes,
+  setAuraField,
+} from "./effects/aura.js";
+import {
+  normalizeLightning,
+  normalizeStreaks,
+  extractOutline,
+  createCharSparks,
+  sparkMeshes,
+  updateCharSparks,
+  disposeCharSparks,
+} from "./effects/char-sparks.js";
 import { createCharacterMaterial } from "./effects/character-material.js";
 import {
   createDeformablePlaneGeometry,
@@ -1176,11 +1193,13 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
   let effects = null;
   const glowCfg = characterEffects?.glow?.enabled ? characterEffects.glow : null;
   const shadowCfg = characterEffects?.dropShadow?.enabled ? characterEffects.dropShadow : null;
-  if (glowCfg || shadowCfg) {
-    // padding は glow / shadow いずれかの blur 半径に追従して必要量を確保する。
-    const effectPadding = computeEffectPadding(
-      glowCfg?.blurPx,
-      shadowCfg?.blurPx,
+  // オーラ (キャラごと・カットごと、effects/aura.js)。光彩・影と同じ輪郭 RT を使う。
+  const auraCfg = normalizeAura(char.aura);
+  if (glowCfg || shadowCfg || auraCfg) {
+    // padding は glow / shadow の blur 半径とオーラの広がりに追従して必要量を確保する。
+    const effectPadding = Math.max(
+      computeEffectPadding(glowCfg?.blurPx, shadowCfg?.blurPx),
+      auraPadding(auraCfg),
     );
     const silhouette = createSilhouettePass(w, h, effectPadding);
     // silhouette scene 用の別 mesh (メイン Group とは別 parent が必要)。
@@ -1223,6 +1242,39 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
       shadowPlane.position.set(ox, oy, 0);
       group.add(shadowPlane);
     }
+    let aura = null;
+    if (auraCfg) {
+      const auraMeshes = createAuraMeshes(silhouette.width, silhouette.height, auraCfg, {
+        withPins,
+        seed: charIndex * 17 + 3,
+      });
+      // 後ろ = 影・光彩より奥。前 = キャラの最前面レイヤー (over) の直上 (次のキャラは +10)。
+      auraMeshes.back.renderOrder = baseOrder - 3;
+      group.add(auraMeshes.back);
+      if (auraMeshes.front) {
+        auraMeshes.front.renderOrder = baseOrder + ORDER_CHAR_OVER_OFFSET + 1;
+        group.add(auraMeshes.front);
+      }
+      // 集中線はオーラ (後ろ) の上、キャラの後ろ。同じ renderOrder なら追加順で後に描かれる。
+      if (auraMeshes.lines) {
+        auraMeshes.lines.renderOrder = baseOrder - 3;
+        group.add(auraMeshes.lines);
+      }
+      // 光彩・影と同じく左右反転 Group の外なので、揺れピンは x を反転して当てる。
+      for (const mesh of [auraMeshes.back, auraMeshes.front, auraMeshes.lines]) {
+        if (mesh) applySwayPinsToMaterial(mesh.material, swayPins, { flipX });
+      }
+      aura = {
+        cfg: auraCfg,
+        back: auraMeshes.back,
+        front: auraMeshes.front,
+        lines: auraMeshes.lines,
+        blur: createBlurPass(silhouette.width, silhouette.height),
+        ready: false,
+        level: auraCfg.when === "always" ? 1 : 0,
+        lastSec: null,
+      };
+    }
     effects = {
       silhouette,
       silhouettePlanes: { under: silUnder, eye: silEye, mouth: silMouth, over: silOver },
@@ -1232,11 +1284,43 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
       shadowPlane,
       glowCfg,
       shadowCfg,
+      aura,
     };
     // B-2: crop が指定されていれば、光彩 / ドロップシャドウの tint plane も
     // キャラ本体と同じ world-space 矩形でクリップする (= 隣スロットへの滲み防止)。
     // tint plane はキャラ group 配下なので uClipRect は world 座標のままでよい。
-    _applyCropToCharacterMeshes([glowPlane, shadowPlane], char.crop);
+    _applyCropToCharacterMeshes([glowPlane, shadowPlane, aura?.back, aura?.front, aura?.lines], char.crop);
+  }
+
+  // 雷・光の筋 (キャラの特殊効果 Phase B、effects/char-sparks.js)。輪郭の点はキャラの絵
+  // (under + over) を縮めて読む。後ろ用 = 光彩と同じ奥、前用 = オーラ前面のさらに手前。
+  const lightningCfg = normalizeLightning(char.lightning);
+  const streaksCfg = normalizeStreaks(char.streaks);
+  let sparks = null;
+  if (lightningCfg || streaksCfg) {
+    const outline = extractOutline([underTex?.image, overTex?.image], w, h, { flipX });
+    sparks = createCharSparks({
+      lightning: lightningCfg,
+      streaks: streaksCfg,
+      outline,
+      seed: charIndex * 31 + 11,
+    });
+    if (sparks) {
+      const { back, front } = sparkMeshes(sparks);
+      for (const mesh of back) {
+        mesh.renderOrder = baseOrder - 1;
+        group.add(mesh);
+      }
+      for (const mesh of front) {
+        mesh.renderOrder = baseOrder + ORDER_CHAR_OVER_OFFSET + 2;
+        group.add(mesh);
+      }
+      _applyCropToCharacterMeshes([...back, ...front], char.crop);
+      sparks.follow = {
+        lightning: { level: lightningCfg?.when === "speaking" ? 0 : 1, lastSec: null },
+        streaks: { level: streaksCfg?.when === "speaking" ? 0 : 1, lastSec: null },
+      };
+    }
   }
 
   return {
@@ -1267,14 +1351,39 @@ async function buildCharacter(scene, char, charIndex, urls, characterEffects, ch
     // 部分伸縮の範囲 (キャラ定義 deform.stretch、未定義なら全身)。h は表示サイズ。
     stretchRegion: resolveStretchRegion(char.deform?.stretch, h),
     // 変形を流し込む material (本体 4 枚 + 光彩 / 影)。
-    deformMaterials: [underMesh, eyeMesh, mouthMesh, overMesh, effects?.glowPlane, effects?.shadowPlane]
+    deformMaterials: [
+      underMesh, eyeMesh, mouthMesh, overMesh,
+      effects?.glowPlane, effects?.shadowPlane, effects?.aura?.back, effects?.aura?.front, effects?.aura?.lines,
+    ]
       .map((mesh) => mesh?.material)
       .filter(Boolean),
     lastStretchKey: "0|1",
+    // 雷・光の筋 (無ければ null)。
+    sparks,
     // 揺れピン。update() でシーン通算秒と強さ (カット側 sway.strength、未設定 = 1) を流す。
     hasSwayPins: withPins,
     swayStrength: _normalizeSwayStrength(char.sway),
   };
+}
+
+// キャラの特殊効果の「出す / 出さない」の目標値。「口パクしているときだけ」は呼び出し側が
+// 渡す「いま声が出ているか」に従い、渡されない (停止中など) ときは常に出す。
+function _effectTarget(cfg, voicedByChar, charId) {
+  if (cfg?.when !== "speaking" || !voicedByChar) return 1;
+  return voicedByChar[charId] ? 1 : 0;
+}
+
+// 明るさ (holder.level、0..1) を目標値へ追従させる。立ち上がり 0.08 秒、消えるのは fadeSec。
+// 時刻が戻った / 大きく飛んだ (シーク) ときはすぐ合わせる。
+function _followLevel(holder, target, now, fadeSec) {
+  const dt = holder.lastSec == null ? Infinity : now - holder.lastSec;
+  if (!(dt >= 0 && dt < 0.5)) {
+    holder.level = target;
+  } else {
+    const tau = target > holder.level ? 0.08 : Math.max(0.01, (Number(fadeSec) || 0) / 3);
+    holder.level += (target - holder.level) * (1 - Math.exp(-dt / tau));
+  }
+  holder.lastSec = now;
 }
 
 // カット側の揺れピンの強さ。未設定 = 1 (キャラ定義どおり)、0 = 止める、最大 3。
@@ -1480,6 +1589,9 @@ export async function buildScene(
     // bobStretchByChar: { [charId]: stretchDy }。体の揺れの「範囲の伸縮」分 (px、+ が下 =
     // 縮む)。キャラ定義の伸縮範囲 (stretchRegion) を頂点シェーダーで伸び縮みさせる。
     bobStretchByChar = null,
+    // effectVoicedByChar: { [charId]: bool }。キャラの特殊効果 (オーラ / 雷 / 光の筋) の
+    // 「口パクしているときだけ」用の「いま声が出ているか」。渡されない (停止中など) ときは常に表示する。
+    effectVoicedByChar = null,
     // M-2: per-character motion offset { [charId]: { dx, dy, scale? } }。
     // 指定があれば shake / move / zoom はこちらを優先。指定なしのキャラは
     // 旧 scene global の shakeDx/Dy (= speaker のみ) を fallback。
@@ -1732,6 +1844,23 @@ export async function buildScene(
       // 表情が変わるのは目パチ / 口パクのときだけなので、ほとんどのフレームで
       // skip できる。tint plane の material には前回の blurred texture が
       // bind されたまま残るため見た目は変わらない。
+      // 雷・光の筋 (キャラの特殊効果 Phase B)。時刻はシーン通算秒 (量子化前)。
+      if (charInstance.sparks) {
+        const sp = charInstance.sparks;
+        const sparkLocal = (rawElapsedSec != null && Number.isFinite(Number(rawElapsedSec)))
+          ? Number(rawElapsedSec) : (Number(elapsedSec) || 0);
+        const now = cutStartSec + sparkLocal;
+        for (const key of ["lightning", "streaks"]) {
+          const cfg = sp[key];
+          if (!cfg) continue;
+          _followLevel(sp.follow[key], _effectTarget(cfg, effectVoicedByChar, charInstance.id), now, cfg.fadeSec);
+        }
+        updateCharSparks(sp, {
+          timeSec: now,
+          levels: { lightning: sp.follow.lightning.level, streaks: sp.follow.streaks.level },
+        });
+      }
+
       const eff = charInstance.effects;
       if (eff && renderer) {
         const effDirty =
@@ -1773,6 +1902,22 @@ export async function buildScene(
           } else {
             eff.glowPlane.visible = false;
           }
+        }
+
+        // オーラ: 輪郭が変わったときだけ場 (輪郭を 間隔 + 広がり でぼかしたもの) を作り直し、
+        // 毎フレームは時刻と明るさだけ流す。
+        if (eff.aura) {
+          const a = eff.aura;
+          if (effDirty || !a.ready) {
+            setAuraField(a, a.blur.pass.apply(renderer, eff.silhouette.rt.texture, auraBlurPx(a.cfg)));
+            a.ready = true;
+          }
+          const auraLocal = (rawElapsedSec != null && Number.isFinite(Number(rawElapsedSec)))
+            ? Number(rawElapsedSec) : (Number(elapsedSec) || 0);
+          const now = cutStartSec + auraLocal;
+          const target = _effectTarget(a.cfg, effectVoicedByChar, charInstance.id);
+          _followLevel(a, target, now, a.cfg.fadeSec);
+          updateAuraMeshes(a, { timeSec: now, level: a.level });
         }
 
         if (eff.shadowPlane && eff.shadowCfg) {
@@ -1937,7 +2082,9 @@ export async function buildScene(
         eff.silhouette?.dispose();
         eff.blurGlow?.dispose();
         eff.blurShadow?.dispose();
+        eff.aura?.blur?.dispose();
       }
+      if (charInstance.sparks) disposeCharSparks(charInstance.sparks);
     }
     // 背景 cover / blur 用 RT も解放。cover は v2 direct-texture + blur のときだけ
     // 生成される (それ以外は texture.repeat/offset で済ませる)。

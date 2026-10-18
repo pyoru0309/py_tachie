@@ -52,9 +52,10 @@ from .paths import (
     STATIC_DIR,
     UI_STATE_PATH,
 )
+from .effect_presets import load_effect_presets, save_effect_presets
 from .global_config import (
-    BUILTIN_VIDEO_PRESETS,
     all_video_presets,
+    default_video_presets,
     current_projects_dir,
     decorate_video_presets,
     default_global_config,
@@ -3327,6 +3328,11 @@ def _build_scene_payload(payload: dict[str, Any], ctx=None) -> dict[str, Any]:
                 "deform": char_deform,
                 # 揺れピンの強さ (カット側、None = キャラ定義どおり)。
                 "sway": getattr(character_request, "sway", None),
+                # オーラ (キャラの特殊効果、None = 無し)。scene-builder / effects/aura.js
+                "aura": getattr(character_request, "aura", None),
+                # 雷・光の筋 (キャラの特殊効果 Phase B、None = 無し)。effects/char-sparks.js
+                "lightning": getattr(character_request, "lightning", None),
+                "streaks": getattr(character_request, "streaks", None),
             }
         )
 
@@ -4565,15 +4571,30 @@ def post_ui_state(payload: dict[str, Any]) -> dict[str, str]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.get("/api/effect-presets")
+def get_effect_presets_endpoint() -> dict[str, Any]:
+    """キャラの特殊効果 (オーラ / 雷 / 光の筋) のプリセット。キャラ・シーン・プロジェクト共通。"""
+    return {"presets": load_effect_presets()}
+
+
+@app.post("/api/effect-presets")
+def post_effect_presets_endpoint(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """{kind, presets} でその系統のプリセット一覧を置き換える (app/effect_presets.py)。"""
+    try:
+        presets = save_effect_presets(payload or {})
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"presets": presets}
+
+
 @app.get("/api/global-config")
 def get_global_config_endpoint() -> dict[str, Any]:
     config = load_global_config()
     return {
         "config": config,
-        "builtInVideoPresets": decorate_video_presets(BUILTIN_VIDEO_PRESETS),
-        "customVideoPresets": decorate_video_presets(
-            [p for p in (config.get("videoExport", {}).get("customPresets") or []) if isinstance(p, dict)]
-        ),
+        # 書き出しプリセットの一覧 (全体設定で編集できる) と、「既定に戻す」用の内蔵既定値。
+        "videoPresets": decorate_video_presets(all_video_presets(config)),
+        "defaultVideoPresets": default_video_presets(),
         "ffmpeg": _ffmpeg_status_payload(),
     }
 
@@ -4588,10 +4609,9 @@ def post_global_config_endpoint(payload: dict[str, Any] | None = None) -> dict[s
     return {
         "ok": True,
         "config": config,
-        "builtInVideoPresets": decorate_video_presets(BUILTIN_VIDEO_PRESETS),
-        "customVideoPresets": decorate_video_presets(
-            [p for p in (config.get("videoExport", {}).get("customPresets") or []) if isinstance(p, dict)]
-        ),
+        # 書き出しプリセットの一覧 (全体設定で編集できる) と、「既定に戻す」用の内蔵既定値。
+        "videoPresets": decorate_video_presets(all_video_presets(config)),
+        "defaultVideoPresets": default_video_presets(),
         "ffmpeg": _ffmpeg_status_payload(),
     }
 
@@ -4932,7 +4952,7 @@ def refresh_ffmpeg_capabilities() -> dict[str, Any]:
     return {
         "ok": True,
         "ffmpeg": _ffmpeg_status_payload(),
-        "builtInVideoPresets": decorate_video_presets(BUILTIN_VIDEO_PRESETS),
+        "videoPresets": decorate_video_presets(all_video_presets()),
     }
 
 

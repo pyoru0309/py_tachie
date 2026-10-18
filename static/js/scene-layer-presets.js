@@ -32,6 +32,7 @@ import { recordHistory } from "./history.js";
 import { renderPreview } from "./playback.js";
 import { markThumbnailDirty } from "./thumbnail.js";
 import { promptConfirm } from "./dialog.js";
+import { resolvePresetSaveTarget } from "./preset-save-target.js";
 
 let deps = {
   handleEditorChanged: () => {},
@@ -296,12 +297,19 @@ async function savePresetsToServer(kind, presets) {
 
 export async function saveCurrentSceneLayerPreset(kind) {
   const k = KINDS[kind];
-  const name = (k.name()?.value || "").trim() || `新規${k.label}`;
-  // 選択中プリセットがあれば上書き、無ければ新規 ID を発行する。
-  const selectedId = k.select()?.value || "";
-  const id = selectedId || `${kind}_${Date.now()}`;
-  const preset = { id, name, ...readControls(kind) };
   const presets = [...presetsOf(kind)];
+  // 保存先: 名前そのまま = 選択中を上書き / 名前を変えた = 別名で新規 (preset-save-target.js)。
+  const target = await resolvePresetSaveTarget({
+    presets,
+    selectedId: k.select()?.value || "",
+    name: k.name()?.value,
+    fallbackName: `新規${k.label}`,
+    newId: () => `${kind}_${Date.now()}`,
+    label: k.label,
+  });
+  if (!target) return;
+  const { id, name } = target;
+  const preset = { id, name, ...readControls(kind) };
   const index = presets.findIndex((p) => p.id === id);
   const oldPreset = index >= 0 ? presets[index] : null;
   // 上書きのとき: 上書き前の値のままの他カット (= このプリセットを使っているカット) を探す。
@@ -338,8 +346,10 @@ export async function saveCurrentSceneLayerPreset(kind) {
   }
   fillSceneLayerPresets(kind, persisted?.id || id);
   showToast(propagate
-    ? `${k.label}プリセットを保存し、${targets.length} カットに反映しました`
-    : `${k.label}プリセットを保存しました`);
+    ? `${k.label}プリセット「${name}」を上書きし、${targets.length} カットに反映しました`
+    : oldPreset
+      ? `${k.label}プリセット「${name}」を上書きしました`
+      : `${k.label}プリセット「${name}」を新しく保存しました`);
 }
 
 export async function deleteCurrentSceneLayerPreset(kind) {

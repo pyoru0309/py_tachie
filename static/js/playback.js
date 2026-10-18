@@ -3416,6 +3416,18 @@ export async function playLiveCutV2(cut, _options = {}) {
         // 体の揺れ。「口パクのときだけ」は MIDI なら口形、音量ならキャラ別ボーカル /
         // 話者音声の今の音量を見て、周期ごとに判定を固定する (bobVoiceGate)。
         const silenceLevel = Number(lipSync?.silenceThreshold ?? 0.08);
+        // キャラの特殊効果 (オーラ / 雷 / 光の筋) の「口パクしているときだけ」用の、いま声が出ているか (キャラごと)。
+        // 判定は体の揺れと同じ入力 (MIDI 口形 / キャラ別ボーカル / 話者音声の音量)。
+        const effectVoicedByChar = {};
+        for (const ch of layerData.characters || []) {
+          if (!ch?.id || ![ch.aura, ch.lightning, ch.streaks].some((fx) => fx?.enabled && fx.when === "speaking")) continue;
+          const entry = layerData.lipSyncByChar?.[ch.id];
+          let voiced = false;
+          if (entry?.kind === "midi") voiced = midiVoicedAtLocal(layerData, ch.id, clamped);
+          else if (entry?.kind === "level") voiced = (charLipVolume(entry.trackSrc) ?? 0) >= silenceLevel;
+          else if (ch.id === speakerId) voiced = (currentAudioVolume() ?? 0) >= silenceLevel;
+          effectVoicedByChar[ch.id] = voiced;
+        }
         // 体の揺れはコマ打ちしない実時間 (clamped) で計算する (書き出しと同じ)。
         const { dyByChar: bobDyByChar, stretchByChar: bobStretchByChar } = computePreviewBobDy(
           layerData, idleMotion, clamped, timelineOffsetSec + clamped,
@@ -3458,6 +3470,7 @@ export async function playLiveCutV2(cut, _options = {}) {
           idleDy: idleOffset.dy,
           bobDyByChar,
           bobStretchByChar,
+          effectVoicedByChar,
           motionOffsetByChar,
           elapsedSec: quantized,
           // 再生中も telop の出入りは量子化していない実時間で判定する。
